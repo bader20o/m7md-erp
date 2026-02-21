@@ -1,0 +1,2 @@
+-- This migration was superseded by 20260221_strong_prd_baseline.
+-- Kept as no-op to preserve migration history ordering in environments that already reference it.

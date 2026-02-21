@@ -1,0 +1,647 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL_SQLITE")
+}
+
+enum Role {
+  CUSTOMER
+  EMPLOYEE
+  RECEPTION
+  ACCOUNTANT
+  MANAGER
+  ADMIN
+}
+
+enum BookingStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+  LATE_CANCELLED
+  NO_SHOW
+  COMPLETED
+  NOT_SERVED
+}
+
+enum TransactionType {
+  INCOME
+  EXPENSE
+}
+
+enum IncomeSource {
+  BOOKING
+  WALK_IN
+  MEMBERSHIP
+}
+
+enum ExpenseCategory {
+  SUPPLIER
+  GENERAL
+  SALARY
+}
+
+enum ReviewStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum MembershipOrderStatus {
+  ACTIVE
+  EXPIRED
+  SUSPENDED
+}
+
+enum MembershipPlanTier {
+  BRONZE
+  SILVER
+  GOLD
+}
+
+enum SalaryPaymentStatus {
+  PENDING
+  PAID
+}
+
+enum AttendanceType {
+  IN
+  OUT
+}
+
+enum NotificationType {
+  GENERAL
+  BOOKING
+  MEMBERSHIP
+  SALARY
+  SYSTEM
+}
+
+enum BackupStatus {
+  RUNNING
+  SUCCESS
+  FAILED
+}
+
+enum InvoiceStatus {
+  DRAFT
+  ISSUED
+  PAID
+  VOID
+}
+
+model User {
+  id                         String                      @id @default(cuid())
+  phone                      String                      @unique
+  passwordHash               String
+  role                       Role                        @default(CUSTOMER)
+  fullName                   String?
+  locale                     String                      @default("en")
+  isActive                   Boolean                     @default(true)
+  createdAt                  DateTime                    @default(now())
+  updatedAt                  DateTime                    @updatedAt
+  customerBookings           Booking[]                   @relation("CustomerBookings")
+  walkInBookingsCreated      Booking[]                   @relation("WalkInCreatedBy")
+  cancelledBookings          Booking[]                   @relation("BookingCancelledBy")
+  membershipOrders           MembershipOrder[]           @relation("MembershipOrderCustomer")
+  reviews                    Review[]
+  reviewsModerated           Review[]                    @relation("ReviewModeratedBy")
+  notifications              Notification[]
+  auditLogs                  AuditLog[]                  @relation("ActorAuditLogs")
+  transactions               Transaction[]               @relation("TransactionCreatedBy")
+  expenses                   Expense[]                   @relation("ExpenseCreatedBy")
+  invoiceLinesCreated        InvoiceLine[]               @relation("InvoiceLineCreatedBy")
+  salaryRecorded             SalaryPayment[]             @relation("SalaryRecordedBy")
+  employeeProfile            Employee?
+  slotLocks                  BookingSlotLock[]
+  initiatedBackups           Backup[]                    @relation("BackupInitiatedBy")
+  restoredBackups            Backup[]                    @relation("BackupRestoredBy")
+  chatMessages               ChatMessage[]               @relation("UserChatMessages")
+  chatParticipants           ChatParticipant[]
+  seenChatMessages           ChatMessageSeen[]
+  membershipUsagesRecorded   MembershipUsage[]           @relation("MembershipUsageRecordedBy")
+  membershipUsageAdjustments MembershipUsageAdjustment[] @relation("MembershipUsageAdjustedBy")
+}
+
+model Service {
+  id                     String                      @id @default(cuid())
+  nameEn                 String
+  nameAr                 String
+  category               String?
+  basePrice              Decimal?
+  descriptionEn          String?
+  descriptionAr          String?
+  durationMinutes        Int
+  isActive               Boolean                     @default(true)
+  createdAt              DateTime                    @default(now())
+  updatedAt              DateTime                    @updatedAt
+  bookings               Booking[]
+  employeeLinks          EmployeeService[]
+  membershipEntitlements MembershipPlanService[]
+  usages                 MembershipUsage[]
+  usageAdjustments       MembershipUsageAdjustment[]
+  offerLinks             OfferService[]
+  assignments            BookingServiceAssignment[]
+  invoiceLines           InvoiceLine[]
+}
+
+model Booking {
+  id                       String                     @id @default(cuid())
+  customerId               String
+  createdByUserId          String?
+  serviceId                String
+  branchId                 String                     @default("MAIN")
+  slotDate                 String
+  slotTime                 String
+  appointmentAt            DateTime
+  status                   BookingStatus              @default(PENDING)
+  notes                    String?
+  rejectReason             String?
+  cancelReason             String?
+  cancelledByUserId        String?
+  finalPrice               Decimal?
+  internalNote             String?
+  performedByEmployeeId    String?
+  serviceNameSnapshotEn    String
+  serviceNameSnapshotAr    String
+  serviceCategorySnapshot  String?
+  serviceBasePriceSnapshot Decimal?
+  completedAt              DateTime?
+  createdAt                DateTime                   @default(now())
+  updatedAt                DateTime                   @updatedAt
+  customer                 User                       @relation("CustomerBookings", fields: [customerId], references: [id], onDelete: Restrict)
+  createdByUser            User?                      @relation("WalkInCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  cancelledByUser          User?                      @relation("BookingCancelledBy", fields: [cancelledByUserId], references: [id], onDelete: SetNull)
+  service                  Service                    @relation(fields: [serviceId], references: [id], onDelete: Restrict)
+  performedByEmployee      Employee?                  @relation("BookingPerformedByEmployee", fields: [performedByEmployeeId], references: [id], onDelete: SetNull)
+  transaction              Transaction?
+  assignments              BookingServiceAssignment[]
+  review                   Review?
+  membershipUsages         MembershipUsage[]
+
+  @@index([customerId, appointmentAt])
+  @@index([serviceId, appointmentAt])
+  @@index([branchId, slotDate, slotTime])
+}
+
+model BookingSlotLock {
+  id             String   @id @default(cuid())
+  branchId       String
+  slotDate       String
+  slotTime       String
+  appointmentAt  DateTime
+  lockedByUserId String
+  expiresAt      DateTime
+  createdAt      DateTime @default(now())
+  lockedBy       User     @relation(fields: [lockedByUserId], references: [id], onDelete: Cascade)
+
+  @@unique([branchId, slotDate, slotTime])
+  @@index([expiresAt])
+}
+
+model Transaction {
+  id                String           @id @default(cuid())
+  type              TransactionType
+  amount            Decimal
+  description       String?
+  bookingId         String?          @unique
+  expenseId         String?          @unique
+  invoiceLineId     String?          @unique
+  membershipOrderId String?
+  incomeSource      IncomeSource?
+  expenseCategory   ExpenseCategory?
+  referenceType     String?
+  referenceId       String?
+  occurredAt        DateTime         @default(now())
+  recordedAt        DateTime         @default(now())
+  createdById       String?
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+  booking           Booking?         @relation(fields: [bookingId], references: [id], onDelete: SetNull)
+  expense           Expense?         @relation(fields: [expenseId], references: [id], onDelete: SetNull)
+  invoiceLine       InvoiceLine?     @relation(fields: [invoiceLineId], references: [id], onDelete: SetNull)
+  membershipOrder   MembershipOrder? @relation(fields: [membershipOrderId], references: [id], onDelete: SetNull)
+  createdBy         User?            @relation("TransactionCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([type, incomeSource, occurredAt])
+  @@index([type, expenseCategory, occurredAt])
+  @@index([referenceType, referenceId])
+}
+
+model Supplier {
+  id           String        @id @default(cuid())
+  name         String
+  phone        String?
+  email        String?
+  address      String?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  expenses     Expense[]
+  invoiceLines InvoiceLine[]
+}
+
+model Invoice {
+  id           String        @id @default(cuid())
+  number       String        @unique
+  note         String?
+  status       InvoiceStatus @default(DRAFT)
+  issueDate    DateTime      @default(now())
+  dueDate      DateTime?
+  paidAt       DateTime?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  expenses     Expense[]
+  invoiceLines InvoiceLine[]
+}
+
+model InvoiceLine {
+  id              String          @id @default(cuid())
+  invoiceId       String
+  supplierId      String?
+  serviceId       String?
+  description     String
+  quantity        Int             @default(1)
+  unitAmount      Decimal
+  lineTotal       Decimal
+  expenseCategory ExpenseCategory @default(SUPPLIER)
+  occurredAt      DateTime        @default(now())
+  createdById     String?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  invoice         Invoice         @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  supplier        Supplier?       @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  service         Service?        @relation(fields: [serviceId], references: [id], onDelete: SetNull)
+  createdBy       User?           @relation("InvoiceLineCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  transaction     Transaction?
+
+  @@index([invoiceId, occurredAt])
+}
+
+model Expense {
+  id              String          @id @default(cuid())
+  amount          Decimal
+  note            String?
+  supplierId      String?
+  invoiceId       String?
+  createdById     String?
+  expenseCategory ExpenseCategory @default(GENERAL)
+  expenseDate     DateTime        @default(now())
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  supplier        Supplier?       @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  invoice         Invoice?        @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
+  createdBy       User?           @relation("ExpenseCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  transaction     Transaction?
+
+  @@index([expenseDate])
+}
+
+model MembershipPlan {
+  id            String                  @id @default(cuid())
+  tier          MembershipPlanTier
+  nameEn        String
+  nameAr        String
+  descriptionEn String?
+  descriptionAr String?
+  price         Decimal
+  durationDays  Int
+  isActive      Boolean                 @default(true)
+  createdAt     DateTime                @default(now())
+  updatedAt     DateTime                @updatedAt
+  entitlements  MembershipPlanService[]
+  orders        MembershipOrder[]
+
+  @@unique([tier])
+}
+
+model MembershipPlanService {
+  id                         String         @id @default(cuid())
+  planId                     String
+  serviceId                  String
+  totalUses                  Int
+  preventDuplicatePerBooking Boolean        @default(true)
+  createdAt                  DateTime       @default(now())
+  plan                       MembershipPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+  service                    Service        @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+
+  @@unique([planId, serviceId])
+}
+
+model MembershipOrder {
+  id            String                      @id @default(cuid())
+  customerId    String
+  planId        String
+  status        MembershipOrderStatus       @default(ACTIVE)
+  priceSnapshot Decimal
+  startDate     DateTime?
+  endDate       DateTime?
+  paidAt        DateTime?
+  createdAt     DateTime                    @default(now())
+  updatedAt     DateTime                    @updatedAt
+  customer      User                        @relation("MembershipOrderCustomer", fields: [customerId], references: [id], onDelete: Restrict)
+  plan          MembershipPlan              @relation(fields: [planId], references: [id], onDelete: Restrict)
+  usages        MembershipUsage[]
+  adjustments   MembershipUsageAdjustment[]
+  transactions  Transaction[]
+
+  @@index([customerId, status])
+}
+
+model MembershipUsage {
+  id              String          @id @default(cuid())
+  orderId         String
+  serviceId       String
+  bookingId       String?
+  usedAt          DateTime        @default(now())
+  note            String?
+  createdByUserId String?
+  order           MembershipOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  service         Service         @relation(fields: [serviceId], references: [id], onDelete: Restrict)
+  booking         Booking?        @relation(fields: [bookingId], references: [id], onDelete: SetNull)
+  createdByUser   User?           @relation("MembershipUsageRecordedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
+
+  @@unique([orderId, serviceId, bookingId])
+  @@index([orderId, serviceId])
+}
+
+model MembershipUsageAdjustment {
+  id               String          @id @default(cuid())
+  orderId          String
+  serviceId        String
+  delta            Int
+  reason           String?
+  adjustedByUserId String
+  createdAt        DateTime        @default(now())
+  order            MembershipOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  service          Service         @relation(fields: [serviceId], references: [id], onDelete: Restrict)
+  adjustedByUser   User            @relation("MembershipUsageAdjustedBy", fields: [adjustedByUserId], references: [id], onDelete: Restrict)
+
+  @@index([orderId, serviceId])
+}
+
+model Employee {
+  id                String                     @id @default(cuid())
+  userId            String                     @unique
+  jobTitle          String?
+  monthlyBase       Decimal?
+  qrSecret          String                     @default(cuid())
+  isActive          Boolean                    @default(true)
+  hiredAt           DateTime                   @default(now())
+  createdAt         DateTime                   @default(now())
+  updatedAt         DateTime                   @updatedAt
+  user              User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  attendance        Attendance[]
+  attendanceEvents  AttendanceEvent[]
+  salaries          SalaryPayment[]
+  services          EmployeeService[]
+  assignments       BookingServiceAssignment[]
+  performedBookings Booking[]                  @relation("BookingPerformedByEmployee")
+}
+
+model EmployeeService {
+  id         String   @id @default(cuid())
+  employeeId String
+  serviceId  String
+  createdAt  DateTime @default(now())
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  service    Service  @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+
+  @@unique([employeeId, serviceId])
+}
+
+model BookingServiceAssignment {
+  id         String   @id @default(cuid())
+  bookingId  String
+  employeeId String
+  serviceId  String?
+  note       String?
+  createdAt  DateTime @default(now())
+  booking    Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  service    Service? @relation(fields: [serviceId], references: [id], onDelete: SetNull)
+}
+
+model Attendance {
+  id         String    @id @default(cuid())
+  employeeId String
+  checkInAt  DateTime  @default(now())
+  checkOutAt DateTime?
+  qrPayload  String
+  note       String?
+  employee   Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([employeeId, checkInAt])
+}
+
+model AttendanceEvent {
+  id         String         @id @default(cuid())
+  employeeId String
+  type       AttendanceType
+  occurredAt DateTime       @default(now())
+  latitude   Decimal?       @db.Decimal(9, 6)
+  longitude  Decimal?       @db.Decimal(9, 6)
+  geoNote    String?
+  qrPayload  String?
+  createdAt  DateTime       @default(now())
+  employee   Employee       @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([employeeId, occurredAt])
+}
+
+model SalaryPayment {
+  id               String              @id @default(cuid())
+  employeeId       String
+  amount           Decimal
+  remainingBalance Decimal?
+  periodMonth      Int
+  periodYear       Int
+  status           SalaryPaymentStatus @default(PENDING)
+  paidAt           DateTime?
+  note             String?
+  recordedById     String?
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+  employee         Employee            @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  recordedBy       User?               @relation("SalaryRecordedBy", fields: [recordedById], references: [id], onDelete: SetNull)
+}
+
+model Review {
+  id               String       @id @default(cuid())
+  bookingId        String       @unique
+  customerId       String
+  rating           Int
+  comment          String?
+  status           ReviewStatus @default(PENDING)
+  moderatedById    String?
+  moderatedAt      DateTime?
+  moderationReason String?
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+  booking          Booking      @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  customer         User         @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  moderatedBy      User?        @relation("ReviewModeratedBy", fields: [moderatedById], references: [id], onDelete: SetNull)
+}
+
+model Offer {
+  id            String         @id @default(cuid())
+  titleEn       String
+  titleAr       String
+  descriptionEn String?
+  descriptionAr String?
+  imageUrl      String?
+  startsAt      DateTime?
+  endsAt        DateTime?
+  isActive      Boolean        @default(true)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  services      OfferService[]
+}
+
+model OfferService {
+  id        String  @id @default(cuid())
+  offerId   String
+  serviceId String
+  offer     Offer   @relation(fields: [offerId], references: [id], onDelete: Cascade)
+  service   Service @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+
+  @@unique([offerId, serviceId])
+}
+
+model AboutSettings {
+  id            Int      @id @default(1)
+  centerNameEn  String
+  centerNameAr  String
+  descriptionEn String?
+  descriptionAr String?
+  mapEmbedUrl   String?
+  phone         String?
+  whatsapp      String?
+  instagramUrl  String?
+  facebookUrl   String?
+  xUrl          String?
+  updatedAt     DateTime @updatedAt
+}
+
+model WorkingHour {
+  id        String   @id @default(cuid())
+  dayOfWeek Int
+  openTime  String
+  closeTime String
+  isClosed  Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([dayOfWeek])
+}
+
+model SystemSetting {
+  id                      Int      @id @default(1)
+  cancellationPolicyHours Int      @default(24)
+  lateCancellationHours   Int      @default(2)
+  defaultCurrency         String   @default("USD")
+  timezone                String   @default("UTC")
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+}
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  title     String
+  message   String
+  type      NotificationType @default(GENERAL)
+  isSeen    Boolean          @default(false)
+  seenAt    DateTime?
+  metadata  Json?
+  createdAt DateTime         @default(now())
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  action    String
+  entity    String
+  entityId  String?
+  actorId   String?
+  ipAddress String?
+  payload   Json?
+  createdAt DateTime @default(now())
+  actor     User?    @relation("ActorAuditLogs", fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([entity, entityId])
+  @@index([createdAt])
+}
+
+model Backup {
+  id            String       @id @default(cuid())
+  status        BackupStatus @default(RUNNING)
+  storageKey    String?
+  fileSizeBytes BigInt?
+  startedAt     DateTime     @default(now())
+  completedAt   DateTime?
+  errorMessage  String?
+  initiatedById String?
+  restoredById  String?
+  restoredAt    DateTime?
+  retentionDays Int          @default(30)
+  createdAt     DateTime     @default(now())
+  initiatedBy   User?        @relation("BackupInitiatedBy", fields: [initiatedById], references: [id], onDelete: SetNull)
+  restoredBy    User?        @relation("BackupRestoredBy", fields: [restoredById], references: [id], onDelete: SetNull)
+
+  @@index([createdAt])
+}
+
+model RolePermission {
+  id         String   @id @default(cuid())
+  role       Role
+  permission String
+  createdAt  DateTime @default(now())
+
+  @@unique([role, permission])
+}
+
+model ChatThread {
+  id           String            @id @default(cuid())
+  subject      String?
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+  participants ChatParticipant[]
+  messages     ChatMessage[]
+}
+
+model ChatParticipant {
+  id         String     @id @default(cuid())
+  threadId   String
+  userId     String
+  joinedAt   DateTime   @default(now())
+  lastSeenAt DateTime?
+  thread     ChatThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([threadId, userId])
+}
+
+model ChatMessage {
+  id        String            @id @default(cuid())
+  threadId  String
+  senderId  String
+  body      String
+  createdAt DateTime          @default(now())
+  thread    ChatThread        @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  sender    User              @relation("UserChatMessages", fields: [senderId], references: [id], onDelete: Cascade)
+  seenBy    ChatMessageSeen[]
+}
+
+model ChatMessageSeen {
+  id        String      @id @default(cuid())
+  messageId String
+  userId    String
+  seenAt    DateTime    @default(now())
+  message   ChatMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, userId])
+}
