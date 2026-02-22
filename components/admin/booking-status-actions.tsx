@@ -3,7 +3,15 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
-type BookingStatus = "PENDING" | "APPROVED" | "REJECTED" | "COMPLETED" | "NO_SHOW";
+type BookingStatus =
+  | "PENDING"
+  | "APPROVED"
+  | "REJECTED"
+  | "CANCELLED"
+  | "LATE_CANCELLED"
+  | "NO_SHOW"
+  | "COMPLETED"
+  | "NOT_SERVED";
 
 type EmployeeOption = {
   id: string;
@@ -33,8 +41,8 @@ export function BookingStatusActions({
   const router = useRouter();
   const [rejectReason, setRejectReason] = useState("");
   const [finalPrice, setFinalPrice] = useState("");
-  const [adminInternalNote, setAdminInternalNote] = useState("");
-  const [linkedEmployeeId, setLinkedEmployeeId] = useState("");
+  const [internalNote, setInternalNote] = useState("");
+  const [performedByEmployeeId, setPerformedByEmployeeId] = useState("");
   const [loadingAction, setLoadingAction] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -63,8 +71,8 @@ export function BookingStatusActions({
     }
     setRejectReason("");
     setFinalPrice("");
-    setAdminInternalNote("");
-    setLinkedEmployeeId("");
+    setInternalNote("");
+    setPerformedByEmployeeId("");
     router.refresh();
   }
 
@@ -118,8 +126,8 @@ export function BookingStatusActions({
               min="0"
             />
             <select
-              value={linkedEmployeeId}
-              onChange={(event) => setLinkedEmployeeId(event.target.value)}
+              value={performedByEmployeeId}
+              onChange={(event) => setPerformedByEmployeeId(event.target.value)}
               className="rounded-md border border-slate-300 px-2 py-1 text-sm"
             >
               <option value="">No linked employee</option>
@@ -131,8 +139,8 @@ export function BookingStatusActions({
             </select>
           </div>
           <textarea
-            value={adminInternalNote}
-            onChange={(event) => setAdminInternalNote(event.target.value)}
+            value={internalNote}
+            onChange={(event) => setInternalNote(event.target.value)}
             className="rounded-md border border-slate-300 px-2 py-1 text-sm"
             placeholder="Admin internal note (optional)"
           />
@@ -142,8 +150,8 @@ export function BookingStatusActions({
               onClick={() =>
                 callAction(`/api/admin/bookings/${bookingId}/complete`, {
                   finalPrice: Number(finalPrice),
-                  adminInternalNote: adminInternalNote.trim() || undefined,
-                  linkedEmployeeId: linkedEmployeeId || undefined
+                  internalNote: internalNote.trim() || undefined,
+                  performedByEmployeeId: performedByEmployeeId || undefined
                 })
               }
               disabled={Boolean(loadingAction) || Number(finalPrice) <= 0}

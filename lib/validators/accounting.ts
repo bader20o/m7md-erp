@@ -1,20 +1,25 @@
 import { z } from "zod";
 
 export const walkInIncomeSchema = z.object({
-  amount: z.coerce.number().min(0),
-  description: z.string().trim().min(3).max(500),
-  occurredAt: z.coerce.date().optional(),
+  itemName: z.string().trim().min(2).max(160),
+  unitPrice: z.coerce.number().min(0),
+  quantity: z.coerce.number().int().min(1).max(10000).default(1),
+  occurredAt: z.coerce.date(),
+  note: z.string().trim().max(500).optional(),
   branchId: z.string().min(1).max(64).optional()
 });
 
 export const createExpenseSchema = z.object({
-  amount: z.coerce.number().min(0),
-  description: z.string().trim().min(2).max(500),
+  itemName: z.string().trim().min(2).max(160),
+  unitPrice: z.coerce.number().min(0),
+  quantity: z.coerce.number().int().min(1).max(10000).default(1),
   expenseCategory: z.enum(["SUPPLIER", "GENERAL", "SALARY"]).default("GENERAL"),
+  partId: z.string().optional(),
   supplierId: z.string().optional(),
   supplierName: z.string().max(150).optional(),
   invoiceId: z.string().optional(),
-  occurredAt: z.coerce.date().optional()
+  occurredAt: z.coerce.date(),
+  note: z.string().trim().max(500).optional()
 });
 
 export const createInvoiceSchema = z.object({

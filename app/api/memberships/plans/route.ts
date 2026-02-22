@@ -6,12 +6,14 @@ import { prisma } from "@/lib/prisma";
 import { requireRoles } from "@/lib/rbac";
 
 const createPlanSchema = z.object({
+  tier: z.string().min(1).max(50),
   nameEn: z.string().min(2).max(120),
   nameAr: z.string().min(2).max(120),
   descriptionEn: z.string().max(1000).optional(),
   descriptionAr: z.string().max(1000).optional(),
   price: z.coerce.number().positive(),
-  durationDays: z.coerce.number().int().positive()
+  durationDays: z.coerce.number().int().positive(),
+  color: z.string().optional()
 });
 
 export async function GET(): Promise<Response> {

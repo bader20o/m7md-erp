@@ -93,6 +93,12 @@ enum InvoiceStatus {
   VOID
 }
 
+enum StockMovementType {
+  IN
+  OUT
+  ADJUST
+}
+
 model User {
   id                         String                      @id @default(cuid())
   phone                      String                      @unique
@@ -124,6 +130,7 @@ model User {
   seenChatMessages           ChatMessageSeen[]
   membershipUsagesRecorded   MembershipUsage[]           @relation("MembershipUsageRecordedBy")
   membershipUsageAdjustments MembershipUsageAdjustment[] @relation("MembershipUsageAdjustedBy")
+  stockMovementsCreated      StockMovement[]             @relation("StockMovementCreatedBy")
 }
 
 model Service {
@@ -181,6 +188,7 @@ model Booking {
   assignments              BookingServiceAssignment[]
   review                   Review?
   membershipUsages         MembershipUsage[]
+  stockMovements          StockMovement[]
 
   @@index([customerId, appointmentAt])
   @@index([serviceId, appointmentAt])
@@ -205,7 +213,11 @@ model BookingSlotLock {
 model Transaction {
   id                String           @id @default(cuid())
   type              TransactionType
+  itemName          String           @default("Unknown Item")
+  unitPrice         Float            @default(0)
+  quantity          Int              @default(1)
   amount            Decimal          @db.Decimal(12, 2)
+  note              String?
   description       String?
   bookingId         String?          @unique
   expenseId         String?          @unique
@@ -241,6 +253,7 @@ model Supplier {
   updatedAt    DateTime      @updatedAt
   expenses     Expense[]
   invoiceLines InvoiceLine[]
+  stockMovements StockMovement[]
 }
 
 model Invoice {
@@ -255,6 +268,7 @@ model Invoice {
   updatedAt    DateTime      @updatedAt
   expenses     Expense[]
   invoiceLines InvoiceLine[]
+  stockMovements StockMovement[]
 }
 
 model InvoiceLine {
@@ -299,15 +313,55 @@ model Expense {
   @@index([expenseDate])
 }
 
+model Part {
+  id                String          @id @default(cuid())
+  name              String
+  sku               String?         @unique
+  unit              String
+  costPrice         Float?
+  sellPrice         Float?
+  stockQty          Int             @default(0)
+  lowStockThreshold Int             @default(0)
+  isActive          Boolean         @default(true)
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  stockMovements    StockMovement[]
+
+  @@index([name])
+}
+
+model StockMovement {
+  id          String            @id @default(cuid())
+  partId      String
+  type        StockMovementType
+  quantity    Int
+  occurredAt  DateTime          @default(now())
+  note        String?
+  createdById String
+  bookingId   String?
+  supplierId  String?
+  invoiceId   String?
+  createdAt   DateTime          @default(now())
+  part        Part              @relation(fields: [partId], references: [id], onDelete: Restrict)
+  createdBy   User              @relation("StockMovementCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  booking     Booking?          @relation(fields: [bookingId], references: [id], onDelete: SetNull)
+  supplier    Supplier?         @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  invoice     Invoice?          @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
+
+  @@index([partId, occurredAt])
+  @@index([createdById, occurredAt])
+}
+
 model MembershipPlan {
   id            String                  @id @default(cuid())
-  tier          MembershipPlanTier
+  tier          String
   nameEn        String
   nameAr        String
   descriptionEn String?
   descriptionAr String?
   price         Decimal                 @db.Decimal(12, 2)
   durationDays  Int
+  color         String?
   isActive      Boolean                 @default(true)
   createdAt     DateTime                @default(now())
   updatedAt     DateTime                @updatedAt
@@ -605,6 +659,7 @@ model RolePermission {
 
 model ChatThread {
   id           String            @id @default(cuid())
+  directKey    String?           @unique
   subject      String?
   createdAt    DateTime          @default(now())
   updatedAt    DateTime          @updatedAt

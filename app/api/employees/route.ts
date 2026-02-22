@@ -36,7 +36,7 @@ export async function POST(request: Request): Promise<Response> {
           phone: body.phone,
           passwordHash: await hashPassword(body.password),
           fullName: body.fullName,
-          role: body.role
+          role: Role.EMPLOYEE
         }
       });
 

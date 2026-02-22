@@ -8,6 +8,9 @@ const statusColor: Record<BookingStatus, string> = {
   PENDING: "bg-slate-100 text-slate-700",
   APPROVED: "bg-blue-100 text-blue-700",
   REJECTED: "bg-red-100 text-red-700",
+  CANCELLED: "bg-orange-100 text-orange-700",
+  LATE_CANCELLED: "bg-orange-200 text-orange-800",
+  NOT_SERVED: "bg-zinc-200 text-zinc-700",
   COMPLETED: "bg-green-100 text-green-700",
   NO_SHOW: "bg-purple-100 text-purple-700"
 };
@@ -19,7 +22,7 @@ export default async function AdminBookingsPage({ params }: Props): Promise<Reac
       include: {
         customer: true,
         service: true,
-        linkedEmployee: { include: { user: true } },
+        performedByEmployee: { include: { user: true } },
         assignments: { include: { employee: { include: { user: true } } } }
       },
       orderBy: { appointmentAt: "desc" },
@@ -58,12 +61,12 @@ export default async function AdminBookingsPage({ params }: Props): Promise<Reac
               <p className="mt-2 text-xs text-slate-600">Final Price: ${item.finalPrice.toString()}</p>
             ) : null}
             {item.rejectReason ? <p className="mt-1 text-xs text-red-700">Reject Reason: {item.rejectReason}</p> : null}
-            {item.adminInternalNote ? (
-              <p className="mt-1 text-xs text-slate-600">Admin Note: {item.adminInternalNote}</p>
+            {item.internalNote ? (
+              <p className="mt-1 text-xs text-slate-600">Admin Note: {item.internalNote}</p>
             ) : null}
-            {item.linkedEmployee ? (
+            {item.performedByEmployee ? (
               <p className="mt-1 text-xs text-slate-600">
-                Linked Employee: {item.linkedEmployee.user.fullName || item.linkedEmployee.user.phone}
+                Linked Employee: {item.performedByEmployee.user.fullName || item.performedByEmployee.user.phone}
               </p>
             ) : null}
             <p className="mt-1 text-xs text-slate-600">

@@ -19,7 +19,7 @@ if (!datasourceUrlPattern.test(schema)) {
 }
 
 schema = schema.replace(datasourceUrlPattern, 'url      = env("DATABASE_URL_SQLITE")');
-schema = schema.replace(/\s+@db\.Decimal\(12,\s*2\)/g, "");
+schema = schema.replace(/\s+@db\.Decimal\(\d+,\s*\d+\)/g, "");
 
 fs.writeFileSync(targetPath, schema, "utf8");
 console.log(`Wrote ${path.relative(process.cwd(), targetPath)}`);

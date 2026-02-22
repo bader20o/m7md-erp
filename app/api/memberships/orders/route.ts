@@ -71,7 +71,11 @@ export async function POST(request: Request): Promise<Response> {
         data: {
           type: TransactionType.INCOME,
           incomeSource: IncomeSource.MEMBERSHIP,
+          itemName: plan.nameEn,
+          unitPrice: Number(plan.price),
+          quantity: 1,
           amount: plan.price,
+          note: null,
           description: `Membership order ${order.id}`,
           membershipOrderId: order.id,
           createdById: actor.sub

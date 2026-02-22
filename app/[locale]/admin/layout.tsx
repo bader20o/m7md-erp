@@ -1,5 +1,5 @@
 import { Role } from "@prisma/client";
-import { AdminSidebar } from "@/components/admin-sidebar";
+import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
 
 type Props = {
@@ -10,9 +10,13 @@ type Props = {
 export default async function AdminLayout({ children, params }: Props): Promise<React.ReactElement> {
   const { locale } = await params;
   const session = await getSession();
-  const allowedRoles: Role[] = [Role.RECEPTION, Role.ACCOUNTANT, Role.MANAGER, Role.ADMIN];
 
-  const allowed = Boolean(session && allowedRoles.includes(session.role));
+  if (!session) {
+    redirect(`/${locale}/login`);
+  }
+
+  const allowedRoles: Role[] = [Role.RECEPTION, Role.ACCOUNTANT, Role.MANAGER, Role.ADMIN];
+  const allowed = allowedRoles.includes(session.role);
 
   if (!allowed) {
     return (
@@ -22,10 +26,5 @@ export default async function AdminLayout({ children, params }: Props): Promise<
     );
   }
 
-  return (
-    <div className="grid gap-4 lg:grid-cols-[320px_1fr]">
-      <AdminSidebar locale={locale} />
-      <div>{children}</div>
-    </div>
-  );
+  return <>{children}</>;
 }

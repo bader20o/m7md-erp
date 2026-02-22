@@ -22,7 +22,9 @@ export async function GET(): Promise<Response> {
       return ok({ items: bookings });
     }
 
-    if (![Role.RECEPTION, Role.MANAGER, Role.ADMIN].includes(actor.role)) {
+    const canViewAll =
+      actor.role === Role.RECEPTION || actor.role === Role.MANAGER || actor.role === Role.ADMIN;
+    if (!canViewAll) {
       throw new ApiError(403, "FORBIDDEN", "You do not have permission for this resource.");
     }
 

@@ -13,9 +13,17 @@ type InvoiceOption = {
   number: string;
 };
 
+type PartOption = {
+  id: string;
+  name: string;
+  sku: string | null;
+};
+
 type Props = {
   suppliers: SupplierOption[];
   invoices: InvoiceOption[];
+  parts: PartOption[];
+  recordedByName: string;
 };
 
 type ApiErrorPayload = {
@@ -27,13 +35,19 @@ function getErrorMessage(payload: unknown, fallback: string): string {
   return typed?.error?.message ?? fallback;
 }
 
-export function AccountingEntryForms({ suppliers, invoices }: Props): React.ReactElement {
+export function AccountingEntryForms({ suppliers, invoices, parts, recordedByName }: Props): React.ReactElement {
   const router = useRouter();
 
-  const [walkinAmount, setWalkinAmount] = useState("");
-  const [walkinDescription, setWalkinDescription] = useState("");
+  const [walkinItemName, setWalkinItemName] = useState("");
+  const [walkinUnitPrice, setWalkinUnitPrice] = useState("");
+  const [walkinQuantity, setWalkinQuantity] = useState("1");
   const [walkinDate, setWalkinDate] = useState("");
-  const [expenseAmount, setExpenseAmount] = useState("");
+  const [walkinNote, setWalkinNote] = useState("");
+  const [expenseItemName, setExpenseItemName] = useState("");
+  const [expenseUnitPrice, setExpenseUnitPrice] = useState("");
+  const [expenseQuantity, setExpenseQuantity] = useState("1");
+  const [expenseCategory, setExpenseCategory] = useState<"SUPPLIER" | "GENERAL" | "SALARY">("GENERAL");
+  const [expensePartId, setExpensePartId] = useState("");
   const [expenseNote, setExpenseNote] = useState("");
   const [expenseSupplierId, setExpenseSupplierId] = useState("");
   const [expenseInvoiceId, setExpenseInvoiceId] = useState("");
@@ -42,6 +56,9 @@ export function AccountingEntryForms({ suppliers, invoices }: Props): React.Reac
   const [loadingExpense, setLoadingExpense] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const walkinTotal = Number(walkinUnitPrice || 0) * Number(walkinQuantity || 0);
+  const expenseTotal = Number(expenseUnitPrice || 0) * Number(expenseQuantity || 0);
+  const selectedPart = parts.find((part) => part.id === expensePartId) ?? null;
 
   async function createWalkinIncome(event: React.FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
@@ -50,11 +67,13 @@ export function AccountingEntryForms({ suppliers, invoices }: Props): React.Reac
     setSuccess(null);
 
     const payload: Record<string, unknown> = {
-      amount: Number(walkinAmount),
-      description: walkinDescription
+      itemName: walkinItemName.trim(),
+      unitPrice: Number(walkinUnitPrice),
+      quantity: Number(walkinQuantity),
+      occurredAt: new Date(walkinDate).toISOString()
     };
-    if (walkinDate) {
-      payload.recordedAt = new Date(walkinDate).toISOString();
+    if (walkinNote.trim()) {
+      payload.note = walkinNote.trim();
     }
 
     const response = await fetch("/api/accounting/walkin-income", {
@@ -70,9 +89,11 @@ export function AccountingEntryForms({ suppliers, invoices }: Props): React.Reac
       return;
     }
 
-    setWalkinAmount("");
-    setWalkinDescription("");
+    setWalkinItemName("");
+    setWalkinUnitPrice("");
+    setWalkinQuantity("1");
     setWalkinDate("");
+    setWalkinNote("");
     setSuccess("Walk-in income recorded.");
     router.refresh();
   }
@@ -84,12 +105,16 @@ export function AccountingEntryForms({ suppliers, invoices }: Props): React.Reac
     setSuccess(null);
 
     const payload: Record<string, unknown> = {
-      amount: Number(expenseAmount)
+      itemName: selectedPart?.name || expenseItemName.trim(),
+      unitPrice: Number(expenseUnitPrice),
+      quantity: Number(expenseQuantity),
+      occurredAt: new Date(expenseDate).toISOString(),
+      expenseCategory
     };
     if (expenseNote.trim()) payload.note = expenseNote.trim();
     if (expenseSupplierId) payload.supplierId = expenseSupplierId;
     if (expenseInvoiceId) payload.invoiceId = expenseInvoiceId;
-    if (expenseDate) payload.expenseDate = new Date(expenseDate).toISOString();
+    if (expensePartId) payload.partId = expensePartId;
 
     const response = await fetch("/api/accounting/expenses", {
       method: "POST",
@@ -104,7 +129,11 @@ export function AccountingEntryForms({ suppliers, invoices }: Props): React.Reac
       return;
     }
 
-    setExpenseAmount("");
+    setExpenseItemName("");
+    setExpenseUnitPrice("");
+    setExpenseQuantity("1");
+    setExpenseCategory("GENERAL");
+    setExpensePartId("");
     setExpenseNote("");
     setExpenseSupplierId("");
     setExpenseInvoiceId("");
@@ -117,29 +146,53 @@ export function AccountingEntryForms({ suppliers, invoices }: Props): React.Reac
     <div className="grid gap-4 lg:grid-cols-2">
       <section className="rounded-xl border border-slate-200 bg-white p-4">
         <h2 className="text-lg font-semibold">Record Walk-in Income</h2>
+        <p className="mt-1 text-xs text-slate-500">Recorded by: {recordedByName}</p>
         <form onSubmit={createWalkinIncome} className="mt-3 grid gap-3">
           <input
-            value={walkinAmount}
-            onChange={(event) => setWalkinAmount(event.target.value)}
+            value={walkinItemName}
+            onChange={(event) => setWalkinItemName(event.target.value)}
             className="rounded-md border border-slate-300 px-3 py-2"
-            placeholder="Amount"
+            placeholder="Item / Service Name"
+            required
+          />
+          <input
+            value={walkinUnitPrice}
+            onChange={(event) => setWalkinUnitPrice(event.target.value)}
+            className="rounded-md border border-slate-300 px-3 py-2"
+            placeholder="Unit Price"
             type="number"
             min="0"
             step="0.01"
             required
           />
           <input
-            value={walkinDescription}
-            onChange={(event) => setWalkinDescription(event.target.value)}
+            value={walkinQuantity}
+            onChange={(event) => setWalkinQuantity(event.target.value)}
             className="rounded-md border border-slate-300 px-3 py-2"
-            placeholder="Description"
+            placeholder="Quantity"
+            type="number"
+            min="1"
+            step="1"
             required
+          />
+          <input
+            value={walkinTotal ? walkinTotal.toFixed(2) : "0.00"}
+            className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-slate-700"
+            placeholder="Total"
+            readOnly
           />
           <input
             value={walkinDate}
             onChange={(event) => setWalkinDate(event.target.value)}
             className="rounded-md border border-slate-300 px-3 py-2"
             type="datetime-local"
+            required
+          />
+          <textarea
+            value={walkinNote}
+            onChange={(event) => setWalkinNote(event.target.value)}
+            className="rounded-md border border-slate-300 px-3 py-2"
+            placeholder="Note (optional)"
           />
           <button
             disabled={loadingWalkin}
@@ -153,22 +206,84 @@ export function AccountingEntryForms({ suppliers, invoices }: Props): React.Reac
 
       <section className="rounded-xl border border-slate-200 bg-white p-4">
         <h2 className="text-lg font-semibold">Record Expense</h2>
+        <p className="mt-1 text-xs text-slate-500">Recorded by: {recordedByName}</p>
         <form onSubmit={createExpense} className="mt-3 grid gap-3">
           <input
-            value={expenseAmount}
-            onChange={(event) => setExpenseAmount(event.target.value)}
+            value={expenseItemName}
+            onChange={(event) => setExpenseItemName(event.target.value)}
             className="rounded-md border border-slate-300 px-3 py-2"
-            placeholder="Amount"
+            placeholder="Item / Service Name"
+            disabled={Boolean(selectedPart)}
+            required
+          />
+          <select
+            value={expenseCategory}
+            onChange={(event) => {
+              const next = event.target.value as "SUPPLIER" | "GENERAL" | "SALARY";
+              setExpenseCategory(next);
+              if (next !== "SUPPLIER") {
+                setExpensePartId("");
+              }
+            }}
+            className="rounded-md border border-slate-300 px-3 py-2"
+          >
+            <option value="GENERAL">GENERAL</option>
+            <option value="SUPPLIER">SUPPLIER</option>
+            <option value="SALARY">SALARY</option>
+          </select>
+          {expenseCategory === "SUPPLIER" ? (
+            <select
+              value={expensePartId}
+              onChange={(event) => {
+                const nextPartId = event.target.value;
+                setExpensePartId(nextPartId);
+                const part = parts.find((item) => item.id === nextPartId);
+                if (part) {
+                  setExpenseItemName(part.name);
+                }
+              }}
+              className="rounded-md border border-slate-300 px-3 py-2"
+            >
+              <option value="">No part selected</option>
+              {parts.map((part) => (
+                <option key={part.id} value={part.id}>
+                  {part.name}
+                  {part.sku ? ` (${part.sku})` : ""}
+                </option>
+              ))}
+            </select>
+          ) : null}
+          <input
+            value={expenseUnitPrice}
+            onChange={(event) => setExpenseUnitPrice(event.target.value)}
+            className="rounded-md border border-slate-300 px-3 py-2"
+            placeholder="Unit Price"
             type="number"
             min="0"
             step="0.01"
             required
           />
           <input
+            value={expenseQuantity}
+            onChange={(event) => setExpenseQuantity(event.target.value)}
+            className="rounded-md border border-slate-300 px-3 py-2"
+            placeholder="Quantity"
+            type="number"
+            min="1"
+            step="1"
+            required
+          />
+          <input
+            value={expenseTotal ? expenseTotal.toFixed(2) : "0.00"}
+            className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-slate-700"
+            placeholder="Total"
+            readOnly
+          />
+          <input
             value={expenseNote}
             onChange={(event) => setExpenseNote(event.target.value)}
             className="rounded-md border border-slate-300 px-3 py-2"
-            placeholder="Note"
+            placeholder="Note (optional)"
           />
           <select
             value={expenseSupplierId}
@@ -199,6 +314,7 @@ export function AccountingEntryForms({ suppliers, invoices }: Props): React.Reac
             onChange={(event) => setExpenseDate(event.target.value)}
             className="rounded-md border border-slate-300 px-3 py-2"
             type="datetime-local"
+            required
           />
           <button
             disabled={loadingExpense}

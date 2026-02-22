@@ -10,14 +10,21 @@ export async function POST(request: Request): Promise<Response> {
   try {
     const actor = requireRoles(await getSession(), [Role.RECEPTION, Role.MANAGER, Role.ADMIN]);
     const body = await parseJsonBody(request, walkInIncomeSchema);
-    const occurredAt = body.occurredAt ?? new Date();
+    const occurredAt = body.occurredAt;
+    const unitPrice = body.unitPrice;
+    const quantity = body.quantity;
+    const amount = Number((unitPrice * quantity).toFixed(2));
 
     const item = await prisma.transaction.create({
       data: {
         type: TransactionType.INCOME,
         incomeSource: IncomeSource.WALK_IN,
-        amount: body.amount,
-        description: body.description,
+        itemName: body.itemName,
+        unitPrice,
+        quantity,
+        amount,
+        note: body.note,
+        description: body.note || body.itemName,
         referenceType: "WALK_IN",
         referenceId: body.branchId ?? "MAIN",
         occurredAt,
@@ -33,4 +40,18 @@ export async function POST(request: Request): Promise<Response> {
       actorId: actor.sub,
       payload: {
         type: item.type,
-        income
+        incomeSource: item.incomeSource,
+        itemName: item.itemName,
+        unitPrice: item.unitPrice,
+        quantity: item.quantity,
+        amount: item.amount,
+        referenceType: item.referenceType,
+        referenceId: item.referenceId
+      }
+    });
+
+    return ok({ item }, 201);
+  } catch (error) {
+    return fail(error);
+  }
+}

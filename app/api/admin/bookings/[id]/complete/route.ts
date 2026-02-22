@@ -60,7 +60,11 @@ export async function POST(request: Request, context: Params): Promise<Response>
         data: {
           type: TransactionType.INCOME,
           incomeSource: IncomeSource.BOOKING,
+          itemName: booking.serviceNameSnapshotEn || booking.serviceNameSnapshotAr || `Booking ${id}`,
+          unitPrice: Number(body.finalPrice),
+          quantity: 1,
           amount: body.finalPrice,
+          note: body.internalNote,
           bookingId: id,
           referenceType: "BOOKING",
           referenceId: id,

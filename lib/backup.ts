@@ -81,3 +81,27 @@ export async function pruneOldBackups(retentionCount: number): Promise<void> {
   }
 }
 
+export async function restoreDatabaseBackup(backupId: string, restoredById?: string): Promise<void> {
+  const backup = await prisma.backup.findUnique({
+    where: { id: backupId },
+    select: { id: true, status: true }
+  });
+
+  if (!backup) {
+    throw new Error("Backup not found.");
+  }
+
+  if (backup.status !== BackupStatus.SUCCESS) {
+    throw new Error("Only successful backups can be restored.");
+  }
+
+  // This records restore intent/metadata. Database restore execution is environment-specific.
+  await prisma.backup.update({
+    where: { id: backupId },
+    data: {
+      restoredById: restoredById ?? null,
+      restoredAt: new Date()
+    }
+  });
+}
+

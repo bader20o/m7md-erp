@@ -136,6 +136,57 @@ async function main(): Promise<void> {
     })
   ]);
 
+  await Promise.all([
+    prisma.part.upsert({
+      where: { id: "seed_part_coolant" },
+      update: {
+        name: "Battery Coolant",
+        sku: "PART-COOLANT-01",
+        unit: "liter",
+        costPrice: 18,
+        sellPrice: 28,
+        stockQty: 24,
+        lowStockThreshold: 6,
+        isActive: true
+      },
+      create: {
+        id: "seed_part_coolant",
+        name: "Battery Coolant",
+        sku: "PART-COOLANT-01",
+        unit: "liter",
+        costPrice: 18,
+        sellPrice: 28,
+        stockQty: 24,
+        lowStockThreshold: 6,
+        isActive: true
+      }
+    }),
+    prisma.part.upsert({
+      where: { id: "seed_part_cabin_filter" },
+      update: {
+        name: "Cabin Filter",
+        sku: "PART-CABIN-01",
+        unit: "piece",
+        costPrice: 9,
+        sellPrice: 15,
+        stockQty: 12,
+        lowStockThreshold: 4,
+        isActive: true
+      },
+      create: {
+        id: "seed_part_cabin_filter",
+        name: "Cabin Filter",
+        sku: "PART-CABIN-01",
+        unit: "piece",
+        costPrice: 9,
+        sellPrice: 15,
+        stockQty: 12,
+        lowStockThreshold: 4,
+        isActive: true
+      }
+    })
+  ]);
+
   const [bronze, silver, gold] = await Promise.all([
     prisma.membershipPlan.upsert({
       where: { tier: MembershipPlanTier.BRONZE },

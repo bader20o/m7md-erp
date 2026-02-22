@@ -3,7 +3,15 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
-type BookingStatus = "PENDING" | "APPROVED" | "REJECTED" | "COMPLETED" | "NO_SHOW";
+type BookingStatus =
+  | "PENDING"
+  | "APPROVED"
+  | "REJECTED"
+  | "CANCELLED"
+  | "LATE_CANCELLED"
+  | "NO_SHOW"
+  | "COMPLETED"
+  | "NOT_SERVED";
 
 type Props = {
   bookingId: string;

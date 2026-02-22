@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { redirect } from "next/navigation";
 import { CustomerMembershipsManager } from "@/components/memberships/customer-memberships-manager";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
@@ -10,14 +10,7 @@ export default async function MembershipsPage({ params }: Props): Promise<React.
   const session = await getSession();
 
   if (!session) {
-    return (
-      <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm">
-        Please login to manage memberships.{" "}
-        <Link href={`/${locale}/login`} className="font-medium underline">
-          Login
-        </Link>
-      </div>
-    );
+    redirect(`/${locale}/login`);
   }
 
   const [plans, orders] = await Promise.all([
@@ -95,4 +88,3 @@ export default async function MembershipsPage({ params }: Props): Promise<React.
 
   return <CustomerMembershipsManager locale={locale} plans={serializedPlans} orders={serializedOrders} />;
 }
-
