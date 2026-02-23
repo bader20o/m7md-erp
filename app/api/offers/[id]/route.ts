@@ -11,7 +11,7 @@ const updateOfferSchema = z.object({
   titleAr: z.string().min(2).max(160).optional(),
   descriptionEn: z.string().max(1000).nullable().optional(),
   descriptionAr: z.string().max(1000).nullable().optional(),
-  imageUrl: z.string().url().nullable().optional(),
+  imageUrl: z.string().max(1000).nullable().optional(),
   startsAt: z.coerce.date().nullable().optional(),
   endsAt: z.coerce.date().nullable().optional(),
   isActive: z.boolean().optional()

@@ -1,98 +1,279 @@
 import { apiFetch } from '../../lib/api.js';
-import { TableRowSkeleton } from '../../components/ui/Skeleton.js';
+import { openImageCropper } from '../../components/ui/ImageCropper.js';
+import { CardSkeleton } from '../../components/ui/Skeleton.js';
+import { uploadLocalFile } from '../../lib/uploads.js';
 
 export function AdminMemberships() {
   window.onMount = async () => {
-    const tbody = document.getElementById('plans-tbody');
+    const grid = document.getElementById('plans-grid');
     const formContainer = document.getElementById('creation-form-container');
     const createBtn = document.getElementById('create-plan-btn');
     const planForm = document.getElementById('plan-form');
+    const imageInput = document.getElementById('plan-image-file');
+    const imageUrlField = document.getElementById('plan-image-url');
+    const imagePreview = document.getElementById('plan-image-preview');
+    const imageHint = document.getElementById('plan-image-hint');
+    const editOverlay = document.getElementById('plan-edit-overlay');
+    const editForm = document.getElementById('plan-edit-form');
+    const editImageInput = document.getElementById('plan-edit-image-file');
+    const editImageUrlField = document.getElementById('plan-edit-image-url');
+    const editImagePreview = document.getElementById('plan-edit-image-preview');
+    const editImageHint = document.getElementById('plan-edit-image-hint');
+
+    let plans = [];
+    let editingPlanId = null;
+
+    function showImage(previewNode, url, label = 'No image') {
+      if (!previewNode) return;
+      if (!url) {
+        previewNode.innerHTML = `<div class="w-full h-full flex items-center justify-center text-[10px] text-muted">${label}</div>`;
+        return;
+      }
+      previewNode.innerHTML = `<img src="${url}" alt="Plan image" class="w-full h-full object-cover">`;
+    }
+
+    async function cropAndUpload(file, title) {
+      const cropped = await openImageCropper({
+        file,
+        title,
+        aspectRatio: 4 / 3,
+        outputType: 'image/jpeg',
+        outputSize: 1200
+      });
+      if (!cropped) return null;
+      const uploadFile = new File([cropped], `membership_${Date.now()}.jpg`, {
+        type: cropped.type || 'image/jpeg'
+      });
+      return uploadLocalFile(uploadFile, { folder: 'memberships' });
+    }
+
+    function resetCreateImage() {
+      imageUrlField.value = '';
+      showImage(imagePreview, '', 'No image');
+      imageHint.textContent = 'Choose image to crop and upload.';
+      if (imageInput) imageInput.value = '';
+    }
+
+    function closeEditModal() {
+      editOverlay.classList.add('hidden');
+      editForm.reset();
+      editingPlanId = null;
+      editImageUrlField.value = '';
+      showImage(editImagePreview, '', 'No image');
+      editImageHint.textContent = 'Choose image to crop and upload.';
+      if (editImageInput) editImageInput.value = '';
+    }
 
     createBtn.addEventListener('click', () => {
       formContainer.classList.toggle('hidden');
     });
 
+    function renderCards() {
+      if (!plans.length) {
+        grid.innerHTML = '<div class="col-span-full py-14 text-center text-muted">No plans found. Create a new membership plan.</div>';
+        return;
+      }
+
+      grid.innerHTML = plans
+        .map(
+          (plan) => `
+            <article class="bg-surface border border-border rounded-2xl overflow-hidden shadow-sm flex flex-col">
+              <div class="h-48 bg-bg border-b border-border overflow-hidden">
+                ${
+                  plan.imageUrl
+                    ? `<img src="${plan.imageUrl}" alt="${plan.nameEn}" class="w-full h-full object-cover">`
+                    : `<div class="w-full h-full flex items-center justify-center text-muted text-sm">No image</div>`
+                }
+              </div>
+              <div class="p-5 flex flex-col gap-3 flex-1">
+                <div class="flex items-start justify-between gap-3">
+                  <div>
+                    <h3 class="text-lg font-heading font-bold text-text">${plan.nameEn}</h3>
+                    <div class="text-xs text-muted">${plan.nameAr}</div>
+                  </div>
+                  <span class="px-2 py-1 rounded-md text-[10px] font-bold uppercase ${
+                    plan.isActive ? 'bg-success/15 text-success' : 'bg-danger/15 text-danger'
+                  }">${plan.isActive ? 'Active' : 'Inactive'}</span>
+                </div>
+                <p class="text-sm text-muted leading-relaxed flex-1">${plan.descriptionEn || 'No description provided.'}</p>
+                <div class="text-2xl font-extrabold text-primary">${Number(plan.price).toFixed(2)} JOD</div>
+                <div class="text-xs text-muted">Duration: ${Math.max(1, Math.round(plan.durationDays / 30))} month(s)</div>
+                <div class="flex items-center gap-2 pt-2">
+                  <button class="flex-1 px-3 py-2 rounded-lg border border-primary text-primary font-semibold hover:bg-primary hover:text-white transition-colors" onclick="window.openPlanEditor('${plan.id}')">Edit</button>
+                  <button class="px-3 py-2 rounded-lg border ${
+                    plan.isActive ? 'border-danger text-danger hover:bg-danger hover:text-white' : 'border-success text-success hover:bg-success hover:text-white'
+                  } font-semibold transition-colors" onclick="window.togglePlanStatus('${plan.id}', ${!plan.isActive})">
+                    ${plan.isActive ? 'Disable' : 'Enable'}
+                  </button>
+                </div>
+              </div>
+            </article>
+          `
+        )
+        .join('');
+    }
+
     async function load() {
-      tbody.innerHTML = TableRowSkeleton(5).repeat(3);
+      grid.innerHTML = Array(6).fill(CardSkeleton()).join('');
       try {
         const res = await apiFetch('/memberships/plans');
-        if (res && res.items) {
-          if (res.items.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="5" class="py-12 text-center text-muted font-medium text-sm">No active membership plans found. Click "Create Plan" to add one.</td></tr>`;
-          } else {
-            tbody.innerHTML = res.items.map(p => `
-                            <tr class="group border-b border-border bg-surface hover:bg-bg transition-colors">
-                                <td class="px-6 py-4 whitespace-nowrap">
-                                    <div class="flex items-center gap-3">
-                                      <div class="w-8 h-8 rounded-lg flex items-center justify-center border border-white/10 shadow-sm shrink-0" style="background-color: ${p.color || '#3B82F6'}">
-                                        <svg class="w-4 h-4 text-white opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"></path></svg>
-                                      </div>
-                                      <div>
-                                        <div class="text-sm font-bold text-text">${p.nameEn} <span class="text-[10px] font-bold uppercase tracking-wider ml-1 opacity-70">(${p.tier})</span></div>
-                                        <div class="text-[10px] text-muted">${p.nameAr}</div>
-                                      </div>
-                                    </div>
-                                </td>
-                                <td class="px-6 py-4 whitespace-nowrap">
-                                    <div class="text-sm font-semibold text-text">${p.price} JOD</div>
-                                    <div class="text-[10px] text-muted uppercase tracking-wider">${Math.round(p.durationDays / 30) || 12} Months</div>
-                                </td>
-                                <td class="px-6 py-4 max-w-xs truncate">
-                                    <div class="text-xs text-muted truncate">${p.descriptionEn || '--'}</div>
-                                </td>
-                                <td class="px-6 py-4 whitespace-nowrap">
-                                    ${p.isActive
-                ? `<span class="px-2.5 py-1 bg-success/15 text-success rounded-md text-[10px] font-bold uppercase tracking-wider">Active</span>`
-                : `<span class="px-2.5 py-1 bg-danger/15 text-danger rounded-md text-[10px] font-bold uppercase tracking-wider">Inactive</span>`}
-                                </td>
-                                <td class="px-6 py-4 whitespace-nowrap text-right pr-6 text-sm">
-                                    <button class="text-primary hover:text-primary-hover font-semibold p-2">Edit</button>
-                                </td>
-                            </tr>
-                        `).join('');
-          }
-        }
-      } catch (e) {
-        // If endpoint doesn't exist yet, just show empty state
-        tbody.innerHTML = `<tr><td colspan="5" class="py-12 text-center text-muted font-medium text-sm">No active membership plans found. Database pending integration.</td></tr>`;
+        plans = res?.items || [];
+        renderCards();
+      } catch (error) {
+        grid.innerHTML = `<div class="col-span-full py-14 text-center text-danger">${error.message || 'Unable to load plans.'}</div>`;
       }
     }
 
-    planForm.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const form = e.target;
+    window.openPlanEditor = (id) => {
+      const plan = plans.find((item) => item.id === id);
+      if (!plan) return;
 
-      const body = {
-        tier: form.tier.value,
-        color: form.color.value,
-        nameEn: form.nameEn.value,
-        nameAr: form.nameAr.value,
-        price: parseFloat(form.price.value),
-        durationDays: parseInt(form.durationMonths.value, 10) * 30,
-        descriptionEn: form.featuresEn.value,
-        descriptionAr: form.featuresAr.value
-      };
+      editingPlanId = id;
+      editForm.tier.value = plan.tier || '';
+      editForm.color.value = plan.color || '#3B82F6';
+      editForm.nameEn.value = plan.nameEn || '';
+      editForm.nameAr.value = plan.nameAr || '';
+      editForm.price.value = Number(plan.price || 0);
+      editForm.durationMonths.value = Math.max(1, Math.round((plan.durationDays || 30) / 30));
+      editForm.descriptionEn.value = plan.descriptionEn || '';
+      editForm.descriptionAr.value = plan.descriptionAr || '';
+      editImageUrlField.value = plan.imageUrl || '';
+      showImage(editImagePreview, plan.imageUrl, 'No image');
+      editImageHint.textContent = 'Update image if needed.';
+      editOverlay.classList.remove('hidden');
+    };
+
+    window.togglePlanStatus = async (id, isActive) => {
+      try {
+        await apiFetch(`/memberships/plans/${id}`, {
+          method: 'PATCH',
+          body: { isActive }
+        });
+        window.toast('Plan status updated.', 'success');
+        await load();
+      } catch (error) {
+        window.toast(error.message || 'Failed to update status.', 'error');
+      }
+    };
+
+    imageInput?.addEventListener('change', async (event) => {
+      const file = event.target.files?.[0];
+      if (!file) return;
 
       try {
-        await apiFetch('/memberships/plans', { method: 'POST', body });
-        window.toast('Membership Plan created successfully!', 'success');
-        form.reset();
-        formContainer.classList.add('hidden');
-        load();
-      } catch (err) {
-        window.toast(err.message || 'Failed to create plan', 'error');
+        imageHint.textContent = 'Processing image...';
+        const fileUrl = await cropAndUpload(file, 'Crop membership image');
+        if (!fileUrl) {
+          imageHint.textContent = 'Upload cancelled.';
+          return;
+        }
+        imageUrlField.value = fileUrl;
+        showImage(imagePreview, fileUrl);
+        imageHint.textContent = 'Image uploaded.';
+      } catch (error) {
+        imageHint.textContent = 'Upload failed.';
+        window.toast(error.message || 'Failed to upload image.', 'error');
+      } finally {
+        event.target.value = '';
       }
     });
 
-    load();
+    editImageInput?.addEventListener('change', async (event) => {
+      const file = event.target.files?.[0];
+      if (!file) return;
+
+      try {
+        editImageHint.textContent = 'Processing image...';
+        const fileUrl = await cropAndUpload(file, 'Crop membership image');
+        if (!fileUrl) {
+          editImageHint.textContent = 'Upload cancelled.';
+          return;
+        }
+        editImageUrlField.value = fileUrl;
+        showImage(editImagePreview, fileUrl);
+        editImageHint.textContent = 'Image uploaded.';
+      } catch (error) {
+        editImageHint.textContent = 'Upload failed.';
+        window.toast(error.message || 'Failed to upload image.', 'error');
+      } finally {
+        event.target.value = '';
+      }
+    });
+
+    planForm.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const form = event.target;
+
+      try {
+        await apiFetch('/memberships/plans', {
+          method: 'POST',
+          body: {
+            tier: form.tier.value,
+            color: form.color.value,
+            nameEn: form.nameEn.value,
+            nameAr: form.nameAr.value,
+            imageUrl: form.imageUrl.value || undefined,
+            price: parseFloat(form.price.value),
+            durationDays: parseInt(form.durationMonths.value, 10) * 30,
+            descriptionEn: form.descriptionEn.value || undefined,
+            descriptionAr: form.descriptionAr.value || undefined
+          }
+        });
+        window.toast('Membership plan created.', 'success');
+        form.reset();
+        resetCreateImage();
+        formContainer.classList.add('hidden');
+        await load();
+      } catch (error) {
+        window.toast(error.message || 'Failed to create plan.', 'error');
+      }
+    });
+
+    editForm.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      if (!editingPlanId) return;
+
+      try {
+        await apiFetch(`/memberships/plans/${editingPlanId}`, {
+          method: 'PATCH',
+          body: {
+            tier: editForm.tier.value,
+            color: editForm.color.value,
+            nameEn: editForm.nameEn.value,
+            nameAr: editForm.nameAr.value,
+            imageUrl: editForm.imageUrl.value || null,
+            price: parseFloat(editForm.price.value),
+            durationDays: parseInt(editForm.durationMonths.value, 10) * 30,
+            descriptionEn: editForm.descriptionEn.value || null,
+            descriptionAr: editForm.descriptionAr.value || null
+          }
+        });
+        window.toast('Membership plan updated.', 'success');
+        closeEditModal();
+        await load();
+      } catch (error) {
+        window.toast(error.message || 'Failed to update plan.', 'error');
+      }
+    });
+
+    document.getElementById('plan-edit-close')?.addEventListener('click', closeEditModal);
+    document.getElementById('plan-edit-cancel')?.addEventListener('click', closeEditModal);
+    editOverlay?.addEventListener('click', (event) => {
+      if (event.target === editOverlay) {
+        closeEditModal();
+      }
+    });
+
+    resetCreateImage();
+    await load();
   };
 
   return `
     <div class="w-full h-full flex flex-col gap-6 fade-in">
       <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-surface border border-border p-6 rounded-xl shadow-sm">
         <div>
-          <h1 class="text-2xl font-heading font-bold text-text">Memberships Management</h1>
-          <p class="text-sm text-muted mt-1">View and manage customer membership plans and subscriptions.</p>
+          <h1 class="text-2xl font-heading font-bold text-text">Membership Plans</h1>
+          <p class="text-sm text-muted mt-1">Large card view with image, description, and fixed JOD pricing.</p>
         </div>
         <button id="create-plan-btn" class="bg-primary hover:bg-primary-hover text-white px-5 py-2.5 rounded-lg font-bold text-sm transition-colors shadow-sm flex items-center gap-2">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
@@ -100,71 +281,98 @@ export function AdminMemberships() {
         </button>
       </div>
 
-      <!-- Creation Form -->
       <div id="creation-form-container" class="hidden bg-surface border border-border rounded-xl p-6 shadow-sm">
-        <h3 class="font-heading font-bold text-lg mb-4 text-text">Add New Membership Plan</h3>
+        <h3 class="font-heading font-bold text-lg mb-4 text-text">Add Membership Plan</h3>
         <form id="plan-form" class="space-y-4">
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label class="block text-xs font-bold text-muted uppercase tracking-wider mb-1">Tier Level</label>
-              <input type="text" name="tier" required placeholder="e.g. Platinum" class="w-full bg-bg border border-border rounded-lg px-3 py-2 text-text outline-none focus:border-primary transition-colors">
+              <label class="block text-xs font-bold text-muted uppercase tracking-wider mb-1">Tier</label>
+              <input type="text" name="tier" required class="w-full bg-bg border border-border rounded-lg px-3 py-2 text-text">
             </div>
             <div>
               <label class="block text-xs font-bold text-muted uppercase tracking-wider mb-1">Theme Color</label>
-              <input type="color" name="color" value="#3B82F6" class="w-full bg-bg border border-border rounded-lg h-[42px] px-1 py-1 cursor-pointer outline-none focus:border-primary transition-colors">
+              <input type="color" name="color" value="#3B82F6" class="w-full bg-bg border border-border rounded-lg h-[42px] px-1 py-1">
             </div>
             <div>
-              <label class="block text-xs font-bold text-muted uppercase tracking-wider mb-1">Plan Name (EN)</label>
-              <input type="text" name="nameEn" required class="w-full bg-bg border border-border rounded-lg px-3 py-2 text-text outline-none focus:border-primary transition-colors">
+              <label class="block text-xs font-bold text-muted uppercase tracking-wider mb-1">Name (EN)</label>
+              <input type="text" name="nameEn" required class="w-full bg-bg border border-border rounded-lg px-3 py-2 text-text">
             </div>
             <div>
-              <label class="block text-xs font-bold text-muted uppercase tracking-wider mb-1">Plan Name (AR)</label>
-              <input type="text" name="nameAr" required class="w-full bg-bg border border-border rounded-lg px-3 py-2 text-text text-right outline-none focus:border-primary transition-colors">
+              <label class="block text-xs font-bold text-muted uppercase tracking-wider mb-1">Name (AR)</label>
+              <input type="text" name="nameAr" required class="w-full bg-bg border border-border rounded-lg px-3 py-2 text-right text-text">
             </div>
             <div>
               <label class="block text-xs font-bold text-muted uppercase tracking-wider mb-1">Price (JOD)</label>
-              <input type="number" step="0.01" name="price" required class="w-full bg-bg border border-border rounded-lg px-3 py-2 text-text outline-none focus:border-primary transition-colors">
+              <input type="number" step="0.01" name="price" required class="w-full bg-bg border border-border rounded-lg px-3 py-2 text-text">
             </div>
             <div>
               <label class="block text-xs font-bold text-muted uppercase tracking-wider mb-1">Duration (Months)</label>
-              <input type="number" name="durationMonths" required min="1" value="12" class="w-full bg-bg border border-border rounded-lg px-3 py-2 text-text outline-none focus:border-primary transition-colors">
+              <input type="number" name="durationMonths" required min="1" value="12" class="w-full bg-bg border border-border rounded-lg px-3 py-2 text-text">
             </div>
           </div>
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label class="block text-xs font-bold text-muted uppercase tracking-wider mb-1">Features (EN) - Comma Separated</label>
-              <textarea name="featuresEn" rows="2" placeholder="e.g. Free Oil Change, 20% Discount on Labor" class="w-full bg-bg border border-border rounded-lg px-3 py-2 text-text outline-none focus:border-primary transition-colors resize-none"></textarea>
+              <label class="block text-xs font-bold text-muted uppercase tracking-wider mb-1">Description (EN)</label>
+              <textarea name="descriptionEn" rows="3" class="w-full bg-bg border border-border rounded-lg px-3 py-2 text-text resize-none"></textarea>
             </div>
             <div>
-              <label class="block text-xs font-bold text-muted uppercase tracking-wider mb-1">Features (AR) - Comma Separated</label>
-              <textarea name="featuresAr" rows="2" placeholder="e.g. تغيير زيت مجاني, خصم ٢٠٪" class="w-full bg-bg border border-border rounded-lg px-3 py-2 text-text right outline-none focus:border-primary transition-colors resize-none text-right"></textarea>
+              <label class="block text-xs font-bold text-muted uppercase tracking-wider mb-1">Description (AR)</label>
+              <textarea name="descriptionAr" rows="3" class="w-full bg-bg border border-border rounded-lg px-3 py-2 text-right text-text resize-none"></textarea>
             </div>
           </div>
-          <div class="flex justify-end pt-2">
-             <button type="submit" class="bg-success hover:bg-green-600 text-white px-8 py-2.5 rounded-lg font-bold text-sm transition-colors shadow-sm">Save Plan</button>
+          <div>
+            <label class="block text-xs font-bold text-muted uppercase tracking-wider mb-1">Plan Image</label>
+            <input id="plan-image-file" type="file" accept="image/*" class="hidden">
+            <input id="plan-image-url" name="imageUrl" type="hidden">
+            <div class="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
+              <label for="plan-image-file" class="inline-flex items-center px-4 py-2 rounded-lg border border-border text-sm font-semibold text-text hover:border-primary hover:text-primary cursor-pointer transition-colors">Choose File</label>
+              <div id="plan-image-preview" class="w-24 h-24 rounded-lg border border-border bg-bg overflow-hidden"></div>
+              <div id="plan-image-hint" class="text-xs text-muted">Choose image to crop and upload.</div>
+            </div>
+          </div>
+          <div class="flex justify-end">
+            <button type="submit" class="bg-success hover:bg-green-600 text-white px-8 py-2.5 rounded-lg font-bold text-sm transition-colors">Save Plan</button>
           </div>
         </form>
       </div>
 
-      <!-- Plans Table -->
-      <div class="bg-surface border border-border rounded-xl overflow-hidden shadow-sm flex-1 flex flex-col min-h-0">
-        <div class="overflow-x-auto overflow-y-auto block h-full flex-1">
-          <table class="w-full text-left min-w-[800px]">
-            <thead class="bg-bg border-b border-border sticky top-0 z-10 w-full">
-              <tr>
-                <th class="px-6 py-4 text-xs font-bold text-muted uppercase tracking-wider">Plan Details</th>
-                <th class="px-6 py-4 text-xs font-bold text-muted uppercase tracking-wider">Price / Duration</th>
-                <th class="px-6 py-4 text-xs font-bold text-muted uppercase tracking-wider">Features</th>
-                <th class="px-6 py-4 text-xs font-bold text-muted uppercase tracking-wider">Status</th>
-                <th class="px-6 py-4 text-xs font-bold text-muted uppercase tracking-wider text-right pr-6">Actions</th>
-              </tr>
-            </thead>
-            <tbody id="plans-tbody" class="divide-y divide-border">
-            </tbody>
-          </table>
+      <section id="plans-grid" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6"></section>
+
+      <div id="plan-edit-overlay" class="hidden fixed inset-0 z-[75] bg-black/55 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="w-full max-w-3xl bg-surface border border-border rounded-2xl shadow-2xl overflow-hidden">
+          <div class="flex items-center justify-between px-5 py-4 border-b border-border">
+            <h3 class="text-lg font-heading font-bold text-text">Edit Membership Plan</h3>
+            <button id="plan-edit-close" type="button" class="w-8 h-8 rounded-full border border-border text-muted hover:text-text hover:border-text">&times;</button>
+          </div>
+          <form id="plan-edit-form" class="p-5 space-y-4">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <input type="text" name="tier" required class="w-full bg-bg border border-border rounded-lg px-3 py-2 text-text" placeholder="Tier">
+              <input type="color" name="color" class="w-full bg-bg border border-border rounded-lg h-[42px] px-1 py-1">
+              <input type="text" name="nameEn" required class="w-full bg-bg border border-border rounded-lg px-3 py-2 text-text" placeholder="Name EN">
+              <input type="text" name="nameAr" required class="w-full bg-bg border border-border rounded-lg px-3 py-2 text-right text-text" placeholder="Name AR">
+              <input type="number" step="0.01" name="price" required class="w-full bg-bg border border-border rounded-lg px-3 py-2 text-text" placeholder="Price">
+              <input type="number" min="1" name="durationMonths" required class="w-full bg-bg border border-border rounded-lg px-3 py-2 text-text" placeholder="Duration (Months)">
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <textarea name="descriptionEn" rows="3" class="w-full bg-bg border border-border rounded-lg px-3 py-2 text-text resize-none" placeholder="Description EN"></textarea>
+              <textarea name="descriptionAr" rows="3" class="w-full bg-bg border border-border rounded-lg px-3 py-2 text-right text-text resize-none" placeholder="Description AR"></textarea>
+            </div>
+            <div>
+              <input id="plan-edit-image-file" type="file" accept="image/*" class="hidden">
+              <input id="plan-edit-image-url" name="imageUrl" type="hidden">
+              <div class="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
+                <label for="plan-edit-image-file" class="inline-flex items-center px-4 py-2 rounded-lg border border-border text-sm font-semibold text-text hover:border-primary hover:text-primary cursor-pointer transition-colors">Choose File</label>
+                <div id="plan-edit-image-preview" class="w-24 h-24 rounded-lg border border-border bg-bg overflow-hidden"></div>
+                <div id="plan-edit-image-hint" class="text-xs text-muted">Choose image to crop and upload.</div>
+              </div>
+            </div>
+            <div class="flex justify-end gap-3">
+              <button id="plan-edit-cancel" type="button" class="px-4 py-2 rounded-lg border border-border text-text hover:border-text">Cancel</button>
+              <button type="submit" class="px-6 py-2.5 rounded-lg bg-primary text-white font-semibold hover:bg-primary-hover">Save Changes</button>
+            </div>
+          </form>
         </div>
       </div>
-
     </div>
-    `;
+  `;
 }

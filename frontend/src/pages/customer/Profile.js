@@ -1,37 +1,16 @@
 import { t } from "../../lib/i18n.js";
 import { apiFetch } from "../../lib/api.js";
+import { openImageCropper } from "../../components/ui/ImageCropper.js";
 import { isAdminRole, isCustomerRole, isEmployeeRole } from "../../lib/roles.js";
 import { store } from "../../lib/store.js";
+import { uploadLocalFile } from "../../lib/uploads.js";
 
-function toDataUrl(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result);
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
-}
-
-function canvasToBlob(canvas, type = "image/jpeg", quality = 0.9) {
-  return new Promise((resolve) => {
-    canvas.toBlob((blob) => resolve(blob), type, quality);
-  });
-}
-
-async function uploadAvatar(blob) {
-  const formData = new FormData();
-  formData.append("file", new File([blob], `avatar_${Date.now()}.jpg`, { type: "image/jpeg" }));
-  formData.append("folder", "avatars");
-  const response = await fetch("/api/uploads/local", {
-    method: "POST",
-    credentials: "include",
-    body: formData
-  });
-  const json = await response.json();
-  if (!response.ok || !json?.success) {
-    throw new Error(json?.error?.message || "Avatar upload failed.");
+function avatarPreviewMarkup(fullName, avatarUrl) {
+  if (avatarUrl) {
+    return `<img src="${avatarUrl}" class="w-20 h-20 rounded-full object-cover border border-border" alt="Avatar">`;
   }
-  return json.data.fileUrl;
+
+  return `<div class="w-20 h-20 rounded-full bg-primary/10 text-primary text-3xl font-bold flex items-center justify-center border border-border">${(fullName || "U").charAt(0).toUpperCase()}</div>`;
 }
 
 export function Profile() {
@@ -46,12 +25,9 @@ export function Profile() {
     const passwordForm = document.getElementById("password-form");
     const avatarInput = document.getElementById("avatar-file");
     const avatarPreview = document.getElementById("avatar-preview");
-    const avatarImage = document.getElementById("avatar-crop-image");
-    const zoomRange = document.getElementById("avatar-zoom");
-    const saveAvatarBtn = document.getElementById("save-avatar-btn");
+    const avatarHint = document.getElementById("avatar-upload-hint");
     const avatarField = document.getElementById("profile-avatar-url");
     const hrContainer = document.getElementById("hr-readonly");
-    let sourceAvatarDataUrl = null;
 
     if (logoutBtn) {
       logoutBtn.addEventListener("click", async () => {
@@ -72,9 +48,7 @@ export function Profile() {
       document.getElementById("profile-car-type").value = user.carType || "";
       document.getElementById("profile-location").value = user.location || "";
       document.getElementById("profile-avatar-url").value = user.avatarUrl || "";
-      avatarPreview.innerHTML = user.avatarUrl
-        ? `<img src="${user.avatarUrl}" class="w-20 h-20 rounded-full object-cover border border-border">`
-        : `<div class="w-20 h-20 rounded-full bg-primary/10 text-primary text-3xl font-bold flex items-center justify-center border border-border">${(user.fullName || "U").charAt(0).toUpperCase()}</div>`;
+      avatarPreview.innerHTML = avatarPreviewMarkup(user.fullName, user.avatarUrl);
 
       if (isAdmin) {
         document.getElementById("profile-lang").value = user.locale || "en";
@@ -98,48 +72,50 @@ export function Profile() {
     avatarInput?.addEventListener("change", async (event) => {
       const file = event.target.files?.[0];
       if (!file) return;
-      sourceAvatarDataUrl = await toDataUrl(file);
-      avatarImage.src = sourceAvatarDataUrl;
-      avatarImage.classList.remove("hidden");
-      saveAvatarBtn.disabled = false;
-    });
-
-    saveAvatarBtn?.addEventListener("click", async () => {
-      if (!sourceAvatarDataUrl) return;
 
       try {
-        const img = new Image();
-        img.src = sourceAvatarDataUrl;
-        await new Promise((resolve) => {
-          img.onload = resolve;
+        if (avatarHint) avatarHint.textContent = "Cropping image...";
+        const croppedBlob = await openImageCropper({
+          file,
+          title: "Crop avatar",
+          aspectRatio: 1,
+          outputType: "image/jpeg",
+          outputSize: 640
         });
-
-        const zoom = Number(zoomRange.value || 1);
-        const canvas = document.createElement("canvas");
-        const size = 400;
-        canvas.width = size;
-        canvas.height = size;
-        const ctx = canvas.getContext("2d");
-        ctx.fillStyle = "#ffffff";
-        ctx.fillRect(0, 0, size, size);
-
-        const minDimension = Math.min(img.width, img.height);
-        const cropSize = Math.max(60, minDimension / zoom);
-        const sx = (img.width - cropSize) / 2;
-        const sy = (img.height - cropSize) / 2;
-        ctx.drawImage(img, sx, sy, cropSize, cropSize, 0, 0, size, size);
-
-        const blob = await canvasToBlob(canvas, "image/jpeg", 0.9);
-        if (!blob) {
-          throw new Error("Failed to crop avatar.");
+        if (!croppedBlob) {
+          if (avatarHint) avatarHint.textContent = "Upload cancelled.";
+          return;
         }
 
-        const fileUrl = await uploadAvatar(blob);
+        if (avatarHint) avatarHint.textContent = "Uploading image...";
+        const uploadFile = new File([croppedBlob], `avatar_${Date.now()}.jpg`, {
+          type: croppedBlob.type || "image/jpeg"
+        });
+        const fileUrl = await uploadLocalFile(uploadFile, { folder: "avatars" });
+
         avatarField.value = fileUrl;
-        avatarPreview.innerHTML = `<img src="${fileUrl}" class="w-20 h-20 rounded-full object-cover border border-border">`;
-        window.toast("Avatar uploaded", "success");
+        avatarPreview.innerHTML = avatarPreviewMarkup(
+          document.getElementById("profile-name").value || store.state.user?.fullName,
+          fileUrl
+        );
+
+        await apiFetch("/profile", {
+          method: "PATCH",
+          body: {
+            action: "update_profile",
+            avatarUrl: fileUrl
+          }
+        });
+
+        await store.syncAuth();
+        if (avatarHint) avatarHint.textContent = "Avatar updated.";
+        window.toast("Avatar updated.", "success");
+        await App.render();
       } catch (error) {
+        if (avatarHint) avatarHint.textContent = "Upload failed.";
         window.toast(error.message, "error");
+      } finally {
+        event.target.value = "";
       }
     });
 
@@ -218,14 +194,10 @@ export function Profile() {
           <div id="avatar-preview"></div>
           <div class="flex-1">
             <div class="text-xs text-muted uppercase mb-2">Avatar</div>
-            <input id="avatar-file" type="file" accept="image/*" class="text-xs">
-            <div class="mt-3 flex items-center gap-3">
-              <img id="avatar-crop-image" class="hidden w-20 h-20 rounded-lg object-cover border border-border" alt="crop">
-              <div class="flex-1">
-                <label class="text-xs text-muted uppercase">Zoom</label>
-                <input id="avatar-zoom" type="range" min="1" max="3" step="0.1" value="1" class="w-full">
-              </div>
-              <button id="save-avatar-btn" type="button" class="px-3 py-2 rounded-lg border border-border text-sm hover:border-primary disabled:opacity-40" disabled>Crop + Upload</button>
+            <input id="avatar-file" type="file" accept="image/*" class="hidden">
+            <div class="flex items-center gap-3">
+              <label for="avatar-file" class="inline-flex items-center px-4 py-2 rounded-lg border border-border text-sm font-semibold hover:border-primary hover:text-primary cursor-pointer transition-colors">Choose File</label>
+              <div id="avatar-upload-hint" class="text-xs text-muted">Selecting an image opens cropper before upload.</div>
             </div>
             <input id="profile-avatar-url" type="hidden">
           </div>

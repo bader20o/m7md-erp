@@ -40,8 +40,8 @@ export function hasPermission(user, permission) {
 function firstEmployeeRoute(user) {
   if (hasPermission(user, PERMISSIONS.ANALYTICS)) return "/admin/dashboard";
   if (hasPermission(user, PERMISSIONS.BOOKINGS)) return "/admin/bookings";
+  if (hasPermission(user, PERMISSIONS.WAREHOUSE)) return "/admin/inventory";
   if (hasPermission(user, PERMISSIONS.ACCOUNTING)) return "/admin/accounting";
-  if (hasPermission(user, PERMISSIONS.HR)) return "/admin/employees";
   if (hasPermission(user, PERMISSIONS.MEMBERSHIPS)) return "/admin/memberships";
   if (hasPermission(user, PERMISSIONS.SERVICES)) return "/admin/services";
   return "/admin/profile";
@@ -54,4 +54,3 @@ export function getDefaultRouteForUser(user) {
   if (isEmployeeRole(user.role)) return firstEmployeeRoute(user);
   return "/login";
 }
-

@@ -1,5 +1,6 @@
 import { apiFetch } from '../../lib/api.js';
 import { TableRowSkeleton, KPISkeleton } from '../../components/ui/Skeleton.js';
+import { store } from '../../lib/store.js';
 
 export function AdminAccounting() {
 
@@ -8,6 +9,13 @@ export function AdminAccounting() {
     const tbody = document.getElementById('tx-tbody');
     const incomeForm = document.getElementById('income-form');
     const expenseForm = document.getElementById('expense-form');
+    const incomeItemSelect = document.getElementById('income-item-select');
+    const expenseItemSelect = document.getElementById('expense-item-select');
+    const catalogForm = document.getElementById('catalog-form');
+    const catalogList = document.getElementById('item-catalog-list');
+    const catalogSection = document.getElementById('catalog-admin-section');
+    const isAdmin = store.state.user?.role === 'ADMIN';
+    let catalogItems = [];
 
     document.getElementById('add-income-btn').addEventListener('click', () => {
       document.getElementById('income-container').classList.toggle('hidden');
@@ -18,6 +26,93 @@ export function AdminAccounting() {
       document.getElementById('expense-container').classList.toggle('hidden');
       document.getElementById('income-container').classList.add('hidden');
     });
+
+    if (!isAdmin && catalogSection) {
+      catalogSection.classList.add('hidden');
+    }
+
+    function getCatalogItemById(id) {
+      return catalogItems.find((item) => item.id === id) || null;
+    }
+
+    function renderCatalogSelects() {
+      const options = [
+        '<option value="">Select item...</option>',
+        ...catalogItems.map(
+          (item) =>
+            `<option value="${item.id}">${item.itemName}${item.category ? ` (${item.category})` : ''}</option>`
+        )
+      ].join('');
+      incomeItemSelect.innerHTML = options;
+      expenseItemSelect.innerHTML = options;
+
+      if (catalogItems.length) {
+        incomeItemSelect.value = catalogItems[0].id;
+        expenseItemSelect.value = catalogItems[0].id;
+        applyCatalogToForm(incomeItemSelect, incomeForm);
+        applyCatalogToForm(expenseItemSelect, expenseForm);
+      } else {
+        incomeForm.itemName.value = '';
+        incomeForm.unitPrice.value = '';
+        expenseForm.itemName.value = '';
+        expenseForm.unitPrice.value = '';
+      }
+    }
+
+    function renderCatalogList() {
+      if (!catalogList) return;
+      if (!catalogItems.length) {
+        catalogList.innerHTML = '<div class="text-xs text-muted">No catalog items yet.</div>';
+        return;
+      }
+
+      catalogList.innerHTML = catalogItems
+        .map(
+          (item) => `
+            <div class="flex items-center justify-between gap-3 border border-border rounded-lg p-2 bg-bg">
+              <div>
+                <div class="text-sm font-semibold text-text">${item.itemName}</div>
+                <div class="text-xs text-muted">${item.category || 'General'} - ${Number(item.defaultUnitPrice).toFixed(2)} JOD</div>
+              </div>
+              <button type="button" class="text-xs text-danger border border-danger/40 rounded-md px-2 py-1 hover:bg-danger hover:text-white transition-colors" onclick="window.removeCatalogItem('${item.id}')">Remove</button>
+            </div>
+          `
+        )
+        .join('');
+    }
+
+    function applyCatalogToForm(selectNode, formNode) {
+      const item = getCatalogItemById(selectNode.value);
+      if (!item) return;
+      formNode.itemName.value = item.itemName;
+      formNode.unitPrice.value = Number(item.defaultUnitPrice).toFixed(2);
+    }
+
+    async function loadCatalog() {
+      try {
+        const response = await apiFetch('/accounting/item-catalog');
+        catalogItems = response.items || [];
+        renderCatalogSelects();
+        renderCatalogList();
+      } catch (error) {
+        catalogItems = [];
+        renderCatalogSelects();
+        renderCatalogList();
+        if (isAdmin) {
+          window.toast(error.message || 'Failed to load item catalog.', 'error');
+        }
+      }
+    }
+
+    window.removeCatalogItem = async (id) => {
+      try {
+        await apiFetch(`/accounting/item-catalog/${id}`, { method: 'DELETE' });
+        window.toast('Catalog item archived.', 'success');
+        await loadCatalog();
+      } catch (error) {
+        window.toast(error.message || 'Failed to remove catalog item.', 'error');
+      }
+    };
 
     async function load() {
       tbody.innerHTML = TableRowSkeleton(6).repeat(8);
@@ -79,6 +174,7 @@ export function AdminAccounting() {
             itemName: incomeForm.itemName.value,
             unitPrice: parseFloat(incomeForm.unitPrice.value),
             quantity: parseInt(incomeForm.quantity.value, 10),
+            note: incomeForm.note.value || undefined,
             occurredAt: new Date().toISOString()
           }
         });
@@ -98,6 +194,7 @@ export function AdminAccounting() {
             itemName: expenseForm.itemName.value,
             unitPrice: parseFloat(expenseForm.unitPrice.value),
             quantity: parseInt(expenseForm.quantity.value, 10),
+            note: expenseForm.note.value || undefined,
             expenseCategory: expenseForm.expenseCategory.value,
             occurredAt: expenseForm.occurredAt.value ? new Date(expenseForm.occurredAt.value).toISOString() : new Date().toISOString()
           }
@@ -109,6 +206,31 @@ export function AdminAccounting() {
       } catch (e) { window.toast(e.message, 'error'); }
     });
 
+    incomeItemSelect.addEventListener('change', () => applyCatalogToForm(incomeItemSelect, incomeForm));
+    expenseItemSelect.addEventListener('change', () => applyCatalogToForm(expenseItemSelect, expenseForm));
+
+    catalogForm?.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const form = event.target;
+
+      try {
+        await apiFetch('/accounting/item-catalog', {
+          method: 'POST',
+          body: {
+            itemName: form.itemName.value,
+            defaultUnitPrice: Number(form.defaultUnitPrice.value),
+            category: form.category.value || undefined
+          }
+        });
+        window.toast('Catalog item created.', 'success');
+        form.reset();
+        await loadCatalog();
+      } catch (error) {
+        window.toast(error.message || 'Failed to create catalog item.', 'error');
+      }
+    });
+
+    await loadCatalog();
     load();
   };
 
@@ -158,34 +280,67 @@ export function AdminAccounting() {
         </div>
       </div>
 
+      <div id="catalog-admin-section" class="bg-surface border border-border rounded-xl p-4">
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <form id="catalog-form" class="grid grid-cols-1 sm:grid-cols-4 gap-3 items-end">
+            <div class="sm:col-span-2">
+              <label class="block text-xs font-bold text-muted uppercase tracking-wider mb-1">Catalog Item Name</label>
+              <input type="text" name="itemName" required class="w-full px-3 py-2 rounded-lg border border-border bg-bg text-sm">
+            </div>
+            <div>
+              <label class="block text-xs font-bold text-muted uppercase tracking-wider mb-1">Default Price</label>
+              <input type="number" name="defaultUnitPrice" step="0.01" min="0" required class="w-full px-3 py-2 rounded-lg border border-border bg-bg text-sm">
+            </div>
+            <div>
+              <label class="block text-xs font-bold text-muted uppercase tracking-wider mb-1">Category</label>
+              <input type="text" name="category" class="w-full px-3 py-2 rounded-lg border border-border bg-bg text-sm">
+            </div>
+            <button class="sm:col-span-4 px-4 py-2 rounded-lg bg-primary text-white font-semibold text-sm hover:bg-primary-hover transition-colors">Add Catalog Item</button>
+          </form>
+          <div id="item-catalog-list" class="flex flex-col gap-2"></div>
+        </div>
+      </div>
+
       <!-- Forms (Hidden by default) -->
       <div id="income-container" class="hidden bg-success/10 border border-success/30 rounded-xl p-6">
         <h3 class="font-bold text-success mb-4 flex items-center gap-2"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg> Record External Income</h3>
-        <form id="income-form" class="flex flex-wrap gap-4 items-end">
-          <div class="flex-1 min-w-[200px]">
-            <label class="block text-xs font-bold text-success uppercase tracking-wider mb-1">Item / Description</label>
-            <input type="text" name="itemName" required class="w-full bg-surface border border-success/30 rounded-lg px-3 py-2 text-text outline-none focus:ring-1 focus:ring-success">
+        <form id="income-form" class="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
+          <div class="md:col-span-2">
+            <label class="block text-xs font-bold text-success uppercase tracking-wider mb-1">Catalog Item</label>
+            <select id="income-item-select" class="w-full bg-surface border border-success/30 rounded-lg px-3 py-2 text-text outline-none focus:ring-1 focus:ring-success"></select>
           </div>
-          <div class="w-24">
+          <div>
+            <label class="block text-xs font-bold text-success uppercase tracking-wider mb-1">Item Name</label>
+            <input type="text" name="itemName" required readonly class="w-full bg-surface border border-success/30 rounded-lg px-3 py-2 text-text outline-none focus:ring-1 focus:ring-success">
+          </div>
+          <div>
             <label class="block text-xs font-bold text-success uppercase tracking-wider mb-1">Unit Price</label>
             <input type="number" step="0.01" name="unitPrice" required class="w-full bg-surface border border-success/30 rounded-lg px-3 py-2 text-text outline-none focus:ring-1 focus:ring-success">
           </div>
-          <div class="w-24">
+          <div>
             <label class="block text-xs font-bold text-success uppercase tracking-wider mb-1">Qty</label>
             <input type="number" name="quantity" value="1" min="1" required class="w-full bg-surface border border-success/30 rounded-lg px-3 py-2 text-text outline-none focus:ring-1 focus:ring-success">
           </div>
-          <button type="submit" class="bg-success text-white px-8 py-2.5 rounded-lg font-bold">Save</button>
+          <div class="md:col-span-5">
+            <label class="block text-xs font-bold text-success uppercase tracking-wider mb-1">Note</label>
+            <textarea name="note" rows="2" class="w-full bg-surface border border-success/30 rounded-lg px-3 py-2 text-text outline-none focus:ring-1 focus:ring-success resize-none"></textarea>
+          </div>
+          <button type="submit" class="md:col-span-5 justify-self-end bg-success text-white px-8 py-2.5 rounded-lg font-bold">Save</button>
         </form>
       </div>
 
       <div id="expense-container" class="hidden bg-danger/10 border border-danger/30 rounded-xl p-6">
         <h3 class="font-bold text-danger mb-4 flex items-center gap-2">- Record Business Expense</h3>
-        <form id="expense-form" class="flex flex-wrap gap-4 items-end">
-          <div class="flex-1 min-w-[200px]">
-            <label class="block text-xs font-bold text-danger uppercase tracking-wider mb-1">Supplier / Item / Desc</label>
-            <input type="text" name="itemName" required class="w-full bg-surface border border-danger/30 rounded-lg px-3 py-2 text-text outline-none focus:ring-1 focus:ring-danger">
+        <form id="expense-form" class="grid grid-cols-1 md:grid-cols-6 gap-4 items-end">
+          <div class="md:col-span-2">
+            <label class="block text-xs font-bold text-danger uppercase tracking-wider mb-1">Catalog Item</label>
+            <select id="expense-item-select" class="w-full bg-surface border border-danger/30 rounded-lg px-3 py-2 text-text outline-none"></select>
           </div>
-          <div class="w-40">
+          <div>
+            <label class="block text-xs font-bold text-danger uppercase tracking-wider mb-1">Item Name</label>
+            <input type="text" name="itemName" required readonly class="w-full bg-surface border border-danger/30 rounded-lg px-3 py-2 text-text outline-none focus:ring-1 focus:ring-danger">
+          </div>
+          <div>
             <label class="block text-xs font-bold text-danger uppercase tracking-wider mb-1">Category</label>
             <select name="expenseCategory" class="w-full bg-surface border border-danger/30 rounded-lg px-3 py-2 text-text outline-none">
               <option value="GENERAL">General Operational</option>
@@ -193,19 +348,23 @@ export function AdminAccounting() {
               <option value="SALARY">Payroll / Salary</option>
             </select>
           </div>
-          <div class="w-24">
+          <div>
             <label class="block text-xs font-bold text-danger uppercase tracking-wider mb-1">Cost</label>
             <input type="number" step="0.01" name="unitPrice" required class="w-full bg-surface border border-danger/30 rounded-lg px-3 py-2 text-text outline-none focus:ring-1 focus:ring-danger">
           </div>
-          <div class="w-24">
+          <div>
             <label class="block text-xs font-bold text-danger uppercase tracking-wider mb-1">Qty</label>
             <input type="number" name="quantity" value="1" min="1" required class="w-full bg-surface border border-danger/30 rounded-lg px-3 py-2 text-text outline-none focus:ring-1 focus:ring-danger">
           </div>
-          <div class="w-40">
+          <div>
             <label class="block text-xs font-bold text-danger uppercase tracking-wider mb-1">Date Occurred</label>
             <input type="date" name="occurredAt" class="w-full bg-surface border border-danger/30 rounded-lg px-3 py-2 text-text outline-none custom-calendar-icon">
           </div>
-          <button type="submit" class="bg-danger text-white px-8 py-2.5 rounded-lg font-bold">Charge</button>
+          <div class="md:col-span-6">
+            <label class="block text-xs font-bold text-danger uppercase tracking-wider mb-1">Note</label>
+            <textarea name="note" rows="2" class="w-full bg-surface border border-danger/30 rounded-lg px-3 py-2 text-text outline-none focus:ring-1 focus:ring-danger resize-none"></textarea>
+          </div>
+          <button type="submit" class="md:col-span-6 justify-self-end bg-danger text-white px-8 py-2.5 rounded-lg font-bold">Charge</button>
         </form>
       </div>
 

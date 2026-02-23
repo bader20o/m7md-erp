@@ -24,7 +24,7 @@ export default async function AdminAboutSettingsPage(): Promise<React.ReactEleme
       settings={{
         cancellationPolicyHours: systemSettings?.cancellationPolicyHours ?? 24,
         lateCancellationHours: systemSettings?.lateCancellationHours ?? 2,
-        defaultCurrency: systemSettings?.defaultCurrency ?? "USD",
+        defaultCurrency: systemSettings?.defaultCurrency ?? "JOD",
         timezone: systemSettings?.timezone ?? "UTC"
       }}
     />

@@ -11,7 +11,7 @@ const permissionSchema = z.enum([
 ]);
 
 export const createEmployeeSchema = z.object({
-  phone: z.string().min(7).max(20),
+  phone: z.string().trim().regex(/^07\d{8}$/, "Phone must start with 07 and contain 10 digits."),
   fullName: z.string().min(2).max(120),
   nationalId: z.string().min(6).max(64),
   birthDate: z.coerce.date(),

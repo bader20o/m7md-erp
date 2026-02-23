@@ -40,3 +40,21 @@ export const createInvoiceLineSchema = z.object({
   expenseCategory: z.enum(["SUPPLIER", "GENERAL", "SALARY"]).default("SUPPLIER"),
   occurredAt: z.coerce.date().optional()
 });
+
+export const createItemCatalogSchema = z.object({
+  itemName: z.string().trim().min(2).max(160),
+  defaultUnitPrice: z.coerce.number().min(0),
+  category: z.string().trim().max(120).optional(),
+  isActive: z.boolean().default(true)
+});
+
+export const updateItemCatalogSchema = z
+  .object({
+    itemName: z.string().trim().min(2).max(160).optional(),
+    defaultUnitPrice: z.coerce.number().min(0).optional(),
+    category: z.string().trim().max(120).nullable().optional(),
+    isActive: z.boolean().optional()
+  })
+  .refine((value) => Object.values(value).some((entry) => entry !== undefined), {
+    message: "At least one field is required."
+  });

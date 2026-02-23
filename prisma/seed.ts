@@ -18,7 +18,7 @@ const ROLE_PERMISSION_MAP: Record<Role, string[]> = {
 };
 
 async function main(): Promise<void> {
-  const adminPhone = process.env.DEFAULT_ADMIN_PHONE ?? "+15550000000";
+  const adminPhone = process.env.DEFAULT_ADMIN_PHONE ?? "0790000000";
   const adminPassword = process.env.DEFAULT_ADMIN_PASSWORD ?? "ChangeMe123!";
   const adminName = process.env.DEFAULT_ADMIN_NAME ?? "System Admin";
 
@@ -294,10 +294,10 @@ async function main(): Promise<void> {
         { day: 6, open: "09:00", close: "18:00", closed: false }
       ],
       holidays: [],
-      currency: "USD",
+      currency: "JOD",
       cancellationPolicyHours: 24,
       lateCancellationHours: 2,
-      defaultCurrency: "USD",
+      defaultCurrency: "JOD",
       timezone: "UTC"
     },
     create: {
@@ -315,10 +315,10 @@ async function main(): Promise<void> {
         { day: 6, open: "09:00", close: "18:00", closed: false }
       ],
       holidays: [],
-      currency: "USD",
+      currency: "JOD",
       cancellationPolicyHours: 24,
       lateCancellationHours: 2,
-      defaultCurrency: "USD",
+      defaultCurrency: "JOD",
       timezone: "UTC"
     }
   });

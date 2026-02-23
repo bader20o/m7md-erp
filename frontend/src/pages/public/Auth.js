@@ -3,6 +3,8 @@ import { apiFetch } from '../../lib/api.js';
 import { store } from '../../lib/store.js';
 import { getDefaultRouteForUser } from '../../lib/roles.js';
 
+const LOCAL_PHONE_REGEX = /^07\d{8}$/;
+
 export function Login() {
   window.onMount = () => {
     const form = document.getElementById('login-form');
@@ -12,8 +14,13 @@ export function Login() {
 
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
-      const phone = form.phone.value;
+      const phone = form.phone.value.trim();
       const password = form.password.value;
+
+      if (!LOCAL_PHONE_REGEX.test(phone)) {
+        window.toast('Phone must start with 07 and contain 10 digits.', 'error');
+        return;
+      }
 
       try {
         btn.disabled = true;
@@ -56,7 +63,7 @@ export function Login() {
         <form id="login-form" class="space-y-5">
           <div>
             <label class="block text-sm font-medium text-text mb-1">${t('auth.phone')}</label>
-            <input type="tel" name="phone" required class="w-full px-4 py-2.5 bg-bg border border-border rounded-xl text-text focus:outline-none focus:border-primary transition-colors" placeholder="+962790000000">
+            <input type="tel" name="phone" required maxlength="10" pattern="07[0-9]{8}" class="w-full px-4 py-2.5 bg-bg border border-border rounded-xl text-text focus:outline-none focus:border-primary transition-colors" placeholder="07XXXXXXXX">
           </div>
           <div>
             <label class="block text-sm font-medium text-text mb-1">${t('auth.password')}</label>
@@ -87,8 +94,13 @@ export function Register() {
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
       const fullName = form.fullName.value;
-      const phone = form.phone.value;
+      const phone = form.phone.value.trim();
       const password = form.password.value;
+
+      if (!LOCAL_PHONE_REGEX.test(phone)) {
+        window.toast('Phone must start with 07 and contain 10 digits.', 'error');
+        return;
+      }
 
       try {
         btn.disabled = true;
@@ -132,7 +144,7 @@ export function Register() {
           </div>
           <div>
             <label class="block text-sm font-medium text-text mb-1">${t('auth.phone')}</label>
-            <input type="tel" name="phone" required class="w-full px-4 py-2.5 bg-bg border border-border rounded-xl text-text focus:outline-none focus:border-primary transition-colors" placeholder="+962790000000">
+            <input type="tel" name="phone" required maxlength="10" pattern="07[0-9]{8}" class="w-full px-4 py-2.5 bg-bg border border-border rounded-xl text-text focus:outline-none focus:border-primary transition-colors" placeholder="07XXXXXXXX">
           </div>
           <div>
             <label class="block text-sm font-medium text-text mb-1">${t('auth.password')}</label>

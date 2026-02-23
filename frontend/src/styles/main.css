@@ -10,6 +10,7 @@
   --primary-hover: #1D4ED8;
   --danger: #EF4444;
   --success: #10B981;
+  --calendar-icon-filter: invert(34%) sepia(20%) saturate(852%) hue-rotate(177deg) brightness(96%) contrast(92%);
 }
 
 .dark {
@@ -22,6 +23,7 @@
 
   --primary: #3B82F6;
   --primary-hover: #60A5FA;
+  --calendar-icon-filter: invert(98%) sepia(6%) saturate(331%) hue-rotate(173deg) brightness(114%) contrast(96%);
 }
 
 html {
@@ -73,4 +75,38 @@ body {
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(5px); }
   to { opacity: 1; transform: translateY(0); }
+}
+
+input[type="date"] {
+  color-scheme: light;
+}
+
+.dark input[type="date"] {
+  color-scheme: dark;
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: var(--calendar-icon-filter);
+  opacity: 1;
+  cursor: pointer;
+  padding: 0.125rem;
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator:hover {
+  opacity: 1;
+}
+
+table thead th,
+table tbody td {
+  text-align: center;
+  vertical-align: middle;
+}
+
+table thead th:last-child,
+table tbody td:last-child {
+  border-inline-start: 1px solid var(--border);
+}
+
+main h1 {
+  text-align: center;
 }

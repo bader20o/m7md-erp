@@ -65,4 +65,12 @@ export const createMovementSchema = z.object({
   supplierId: z.string().optional(),
   invoiceId: z.string().optional(),
   adjustDirection: z.enum(["IN", "OUT"]).optional()
+}).superRefine((value, context) => {
+  if ((value.type === "IN" || value.type === "OUT") && !value.note?.trim()) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["note"],
+      message: "note is required for IN and OUT movements."
+    });
+  }
 });

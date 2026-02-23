@@ -14,11 +14,8 @@ export function AdminAnalytics() {
         document.getElementById('date-from').value = thirtyDaysAgo.toISOString().split('T')[0];
 
         document.getElementById('filter-btn').addEventListener('click', loadDashboard);
-        document.getElementById('copy-ai-data').addEventListener('click', copyAiData);
         document.getElementById('export-tx').addEventListener('click', () => exportCSV('transactions'));
         document.getElementById('export-bk').addEventListener('click', () => exportCSV('bookings'));
-
-        let currentAiData = null;
 
         loadDashboard();
 
@@ -30,16 +27,15 @@ export function AdminAnalytics() {
             setLoadingState();
 
             try {
-                const [overviewRes, aiSummaryRes, outstandingRes] = await Promise.all([
+                const [overviewRes, summaryRes, outstandingRes] = await Promise.all([
                     apiFetch(`/admin/analytics/overview?from=${from}&to=${to}&groupBy=${groupBy}`),
                     apiFetch(`/admin/analytics/ai-summary?from=${from}&to=${to}`),
                     apiFetch('/admin/analytics/outstanding')
                 ]);
 
                 if (overviewRes) populateOverview(overviewRes);
-                if (aiSummaryRes) {
-                    populateAISummary(aiSummaryRes);
-                    currentAiData = aiSummaryRes.compactData;
+                if (summaryRes) {
+                    populateExecutiveSummary(summaryRes);
                 }
                 if (outstandingRes) {
                     populateOutstanding(outstandingRes);
@@ -103,16 +99,16 @@ export function AdminAnalytics() {
 
             document.getElementById('top-employees').innerHTML = top.employees.slice(0, 3).map(e => `
         <div class="flex justify-between items-center text-sm py-2 border-b border-border last:border-0">
-          <div><span class="font-medium text-text">${e.name}</span> <span class="text-xs text-muted ml-1 inline-block">★ ${e.ratingAvg || '-'}</span></div>
+          <div><span class="font-medium text-text">${e.name}</span> <span class="text-xs text-muted ml-1 inline-block">* ${e.ratingAvg || '-'}</span></div>
           <span class="font-bold text-text">${e.handledOrders} ord</span>
         </div>
       `).join('');
         }
 
-        function populateAISummary(data) {
-            document.getElementById('ai-pulse').classList.remove('animate-pulse', 'bg-primary/20');
-            document.getElementById('ai-pulse').classList.add('bg-primary/10');
-            document.getElementById('ai-summary-text').innerHTML = `<p class="text-sm leading-relaxed">${data.summaryText}</p>`;
+        function populateExecutiveSummary(data) {
+            document.getElementById('summary-pulse').classList.remove('animate-pulse', 'bg-primary/20');
+            document.getElementById('summary-pulse').classList.add('bg-primary/10');
+            document.getElementById('summary-text').innerHTML = `<p class="text-sm leading-relaxed">${data.summaryText}</p>`;
 
             const badgeColors = {
                 low: 'bg-green-500/10 text-green-500 border-green-500/20',
@@ -120,7 +116,7 @@ export function AdminAnalytics() {
                 high: 'bg-red-500/10 text-red-500 border-red-500/20'
             };
 
-            document.getElementById('ai-signals').innerHTML = data.signals.map(s => `
+            document.getElementById('summary-signals').innerHTML = data.signals.map(s => `
         <div class="border border-border rounded-lg p-3 bg-bg">
           <div class="flex items-center gap-2 mb-1">
             <span class="text-[10px] uppercase font-bold px-2 py-0.5 rounded border ${badgeColors[s.severity] || badgeColors.low}">${s.severity} ${s.type}</span>
@@ -170,13 +166,6 @@ export function AdminAnalytics() {
       `;
         }
 
-        function copyAiData() {
-            if (currentAiData) {
-                navigator.clipboard.writeText(JSON.stringify(currentAiData, null, 2));
-                window.toast('Compact data copied to clipboard', 'success');
-            }
-        }
-
         function exportCSV(type) {
             const from = document.getElementById('date-from').value;
             const to = document.getElementById('date-to').value;
@@ -212,31 +201,30 @@ export function AdminAnalytics() {
         </div>
       </div>
 
-      <!-- AI Summary Banner -->
+      <!-- Executive Summary Banner -->
       <div class="bg-gradient-to-r from-blue-900 to-indigo-900 rounded-2xl p-1 relative overflow-hidden shadow-lg border border-indigo-500/30">
         <div class="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI4IiBoZWlnaHQ9IjgiPgo8cmVjdCB3aWR0aD0iOCIgaGVpZ2h0PSI4IiBmaWxsPSIjZmZmIiBmaWxsLW9wYWNpdHk9IjAuMDUiLz4KPC9zdmc+')] opacity-20"></div>
         <div class="bg-surface/95 backdrop-blur-md rounded-xl p-6 relative z-10">
           <div class="flex items-center justify-between mb-4 border-b border-border/50 pb-4">
              <div class="flex items-center gap-3">
-               <div id="ai-pulse" class="w-10 h-10 rounded-xl bg-primary/20 text-primary flex items-center justify-center animate-pulse">
+               <div id="summary-pulse" class="w-10 h-10 rounded-xl bg-primary/20 text-primary flex items-center justify-center animate-pulse">
                  <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
                </div>
                <div>
-                 <h2 class="font-heading font-bold text-lg text-text">AI Executive Summary</h2>
-                 <p class="text-xs text-muted">Analysis generated across selected date range</p>
+                 <h2 class="font-heading font-bold text-lg text-text">Executive Summary</h2>
+                 <p class="text-xs text-muted">Summary generated across selected date range</p>
                </div>
              </div>
-             <button id="copy-ai-data" class="text-xs font-semibold px-3 py-1.5 border border-border rounded bg-bg hover:bg-black/5 dark:hover:bg-white/5 transition-colors text-text">Copy Context Data</button>
           </div>
           
           <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div id="ai-summary-text" class="lg:col-span-2 text-text">
+            <div id="summary-text" class="lg:col-span-2 text-text">
               <!-- JS loaded -->
               <div class="skeleton h-4 w-full mb-2"></div>
               <div class="skeleton h-4 w-5/6 mb-2"></div>
               <div class="skeleton h-4 w-4/6"></div>
             </div>
-            <div id="ai-signals" class="flex flex-col gap-2">
+            <div id="summary-signals" class="flex flex-col gap-2">
               <div class="skeleton h-20 w-full rounded-lg"></div>
             </div>
           </div>
@@ -255,7 +243,7 @@ export function AdminAnalytics() {
       <div class="bg-surface border border-border rounded-2xl p-6">
         <div class="flex items-center justify-between border-b border-border pb-3 mb-4">
           <h3 class="font-bold text-text text-sm uppercase tracking-wider">Outstanding Debt</h3>
-          <a href="/admin/customers" onclick="navigate(event, '/admin/customers')" class="text-xs font-semibold text-primary hover:text-primary-hover">Open Customers</a>
+          <a href="/admin/customers" onclick="navigate(event, '/admin/customers')" class="inline-flex items-center px-3 py-1.5 rounded-lg border-2 border-primary text-primary text-xs font-bold uppercase tracking-wide hover:bg-primary hover:text-white transition-colors">Open Customer</a>
         </div>
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div class="rounded-xl border border-border p-4 bg-bg">
@@ -329,15 +317,17 @@ export function AdminAnalytics() {
       </div>
 
       <!-- Action Footer -->
-      <div class="flex items-center justify-end gap-3 pb-8">
-        <button id="export-tx" class="px-5 py-2.5 bg-surface border border-border hover:border-text text-text font-semibold rounded-lg text-sm transition-colors flex items-center gap-2 shadow-sm">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
-          Export Transactions (CSV)
-        </button>
-        <button id="export-bk" class="px-5 py-2.5 bg-surface border border-border hover:border-text text-text font-semibold rounded-lg text-sm transition-colors flex items-center gap-2 shadow-sm">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
-          Export Bookings (CSV)
-        </button>
+      <div class="bg-surface border border-border rounded-xl p-4 mb-8">
+        <div class="flex items-center justify-end gap-3">
+          <button id="export-tx" class="px-5 py-2.5 bg-surface border border-border hover:border-text text-text font-semibold rounded-lg text-sm transition-colors flex items-center gap-2 shadow-sm">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+            Export Transactions (CSV)
+          </button>
+          <button id="export-bk" class="px-5 py-2.5 bg-surface border border-border hover:border-text text-text font-semibold rounded-lg text-sm transition-colors flex items-center gap-2 shadow-sm">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+            Export Bookings (CSV)
+          </button>
+        </div>
       </div>
 
     </div>

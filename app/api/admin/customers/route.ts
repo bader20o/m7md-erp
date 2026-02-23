@@ -18,7 +18,7 @@ const listCustomersQuerySchema = z.object({
 
 const createCustomerSchema = z.object({
   fullName: z.string().min(2).max(120),
-  phone: z.string().min(7).max(20),
+  phone: z.string().trim().regex(/^07\d{8}$/, "Phone must start with 07 and contain 10 digits."),
   password: z.string().min(8).max(128).optional(),
   bio: z.string().max(280).optional(),
   carType: z.string().max(120).optional(),
@@ -221,4 +221,3 @@ export async function POST(request: Request): Promise<Response> {
     return fail(error);
   }
 }
-

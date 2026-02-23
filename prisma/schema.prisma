@@ -293,6 +293,19 @@ model Transaction {
   @@index([referenceType, referenceId])
 }
 
+model ItemCatalog {
+  id               String   @id @default(cuid())
+  itemName         String
+  defaultUnitPrice Decimal  @db.Decimal(12, 2)
+  category         String?
+  isActive         Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@unique([itemName, category])
+  @@index([itemName])
+}
+
 model Supplier {
   id           String        @id @default(cuid())
   name         String
@@ -690,10 +703,10 @@ model SystemSetting {
   businessAddress         String?
   workingHours            Json?
   holidays                Json?
-  currency                String   @default("USD")
+  currency                String   @default("JOD")
   cancellationPolicyHours Int      @default(24)
   lateCancellationHours   Int      @default(2)
-  defaultCurrency         String   @default("USD")
+  defaultCurrency         String   @default("JOD")
   timezone                String   @default("UTC")
   createdAt               DateTime @default(now())
   updatedAt               DateTime @updatedAt

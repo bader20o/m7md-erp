@@ -1,5 +1,8 @@
 import { apiFetch, buildQuery } from "../../lib/api.js";
 import { TableRowSkeleton } from "../../components/ui/Skeleton.js";
+import { uploadLocalFile } from "../../lib/uploads.js";
+
+const LOCAL_PHONE_REGEX = /^07\d{8}$/;
 
 const PERMISSIONS = [
   "accounting",
@@ -26,12 +29,13 @@ function permissionChips(permissions) {
   if (!permissions || !permissions.length) {
     return `<span class="text-xs text-muted">No permissions</span>`;
   }
-  return permissions
+  const chips = permissions
     .map(
       (permission) =>
         `<span class="px-2 py-1 bg-primary/10 text-primary rounded-md text-[10px] uppercase font-semibold">${permission}</span>`
     )
-    .join(" ");
+    .join("");
+  return `<div class="flex flex-wrap gap-1 max-w-[220px]">${chips}</div>`;
 }
 
 function avatarFor(fullName, avatarUrl) {
@@ -56,6 +60,14 @@ export function AdminEmployees() {
     const phoneInput = document.getElementById("employee-phone");
     const nationalIdInput = document.getElementById("employee-national-id");
     const duplicateWarning = document.getElementById("employee-duplicate-warning");
+    const idCardImageInput = document.getElementById("employee-id-card-file");
+    const idCardImageUrlInput = document.getElementById("employee-id-card-url");
+    const idCardImageHint = document.getElementById("employee-id-card-hint");
+    const idCardImagePreview = document.getElementById("employee-id-card-preview");
+    const profilePhotoInput = document.getElementById("employee-profile-photo-file");
+    const profilePhotoUrlInput = document.getElementById("employee-profile-photo-url");
+    const profilePhotoHint = document.getElementById("employee-profile-photo-hint");
+    const profilePhotoPreview = document.getElementById("employee-profile-photo-preview");
 
     const state = {
       q: "",
@@ -72,6 +84,43 @@ export function AdminEmployees() {
 
     let searchDebounce = null;
     let duplicateDebounce = null;
+
+    function setImagePreview(container, url, alt) {
+      if (!container) return;
+      if (!url) {
+        container.innerHTML = `<div class="w-full h-full flex items-center justify-center text-[10px] text-muted">No image</div>`;
+        return;
+      }
+      container.innerHTML = `<img src="${url}" alt="${alt}" class="w-full h-full object-cover">`;
+    }
+
+    function resetCreateImageFields() {
+      if (idCardImageUrlInput) idCardImageUrlInput.value = "";
+      if (profilePhotoUrlInput) profilePhotoUrlInput.value = "";
+      if (idCardImageHint) idCardImageHint.textContent = "Choose image from device.";
+      if (profilePhotoHint) profilePhotoHint.textContent = "Choose image from device.";
+      if (idCardImageInput) idCardImageInput.value = "";
+      if (profilePhotoInput) profilePhotoInput.value = "";
+      setImagePreview(idCardImagePreview, "", "ID Card Image");
+      setImagePreview(profilePhotoPreview, "", "Profile Photo");
+    }
+
+    async function uploadEmployeeImage({ file, folder, urlInput, hintNode, previewNode, label }) {
+      if (!file || !urlInput || !hintNode) return;
+      try {
+        hintNode.textContent = "Uploading...";
+        const fileUrl = await uploadLocalFile(file, { folder });
+        urlInput.value = fileUrl;
+        setImagePreview(previewNode, fileUrl, label);
+        hintNode.textContent = "Image uploaded.";
+        window.toast(`${label} uploaded.`, "success");
+      } catch (error) {
+        urlInput.value = "";
+        setImagePreview(previewNode, "", label);
+        hintNode.textContent = "Upload failed.";
+        window.toast(error.message || `Failed to upload ${label}.`, "error");
+      }
+    }
 
     function getSelectedPermissions() {
       return Array.from(document.querySelectorAll(".employee-permission-checkbox"))
@@ -410,12 +459,46 @@ export function AdminEmployees() {
       duplicateDebounce = setTimeout(checkDuplicates, 250);
     });
 
+    idCardImageInput?.addEventListener("change", async (event) => {
+      const file = event.target.files?.[0];
+      await uploadEmployeeImage({
+        file,
+        folder: "employee-id-cards",
+        urlInput: idCardImageUrlInput,
+        hintNode: idCardImageHint,
+        previewNode: idCardImagePreview,
+        label: "ID card image"
+      });
+      event.target.value = "";
+    });
+
+    profilePhotoInput?.addEventListener("change", async (event) => {
+      const file = event.target.files?.[0];
+      await uploadEmployeeImage({
+        file,
+        folder: "employee-profiles",
+        urlInput: profilePhotoUrlInput,
+        hintNode: profilePhotoHint,
+        previewNode: profilePhotoPreview,
+        label: "Profile photo"
+      });
+      event.target.value = "";
+    });
+
     createForm.addEventListener("submit", async (event) => {
       event.preventDefault();
       const form = event.target;
 
       if (state.duplicateBlocked) {
         window.toast("Duplicate phone or national ID detected.", "error");
+        return;
+      }
+      if (!LOCAL_PHONE_REGEX.test(form.phone.value.trim())) {
+        window.toast("Phone must start with 07 and contain 10 digits.", "error");
+        return;
+      }
+      if (!idCardImageUrlInput?.value || !profilePhotoUrlInput?.value) {
+        window.toast("Choose ID Card Image and Profile Photo from your device.", "error");
         return;
       }
 
@@ -426,8 +509,8 @@ export function AdminEmployees() {
           nationalId: form.nationalId.value,
           birthDate: form.birthDate.value,
           jobTitle: form.jobTitle.value,
-          idCardImageUrl: form.idCardImageUrl.value,
-          profilePhotoUrl: form.profilePhotoUrl.value,
+          idCardImageUrl: idCardImageUrlInput.value,
+          profilePhotoUrl: profilePhotoUrlInput.value,
           permissions: getSelectedPermissions(),
           defaultSalaryInfo: {
             monthlyBase: form.monthlyBase.value ? Number(form.monthlyBase.value) : undefined
@@ -443,6 +526,7 @@ export function AdminEmployees() {
         });
 
         form.reset();
+        resetCreateImageFields();
         createContainer.classList.add("hidden");
         duplicateWarning.classList.add("hidden");
         duplicateWarning.textContent = "";
@@ -457,38 +541,67 @@ export function AdminEmployees() {
       }
     });
 
+    resetCreateImageFields();
     loadEmployees();
   };
 
   const permissionCheckboxes = PERMISSIONS.map(
     (permission) => `
-      <label class="inline-flex items-center gap-2 text-xs">
-        <input type="checkbox" value="${permission}" class="employee-permission-checkbox">
-        <span class="uppercase">${permission}</span>
+      <label class="flex items-center gap-2 rounded-lg border border-border bg-surface px-3 py-2 cursor-pointer hover:border-primary/70 transition-colors">
+        <input type="checkbox" value="${permission}" class="employee-permission-checkbox sr-only peer">
+        <span class="inline-flex h-4 w-4 items-center justify-center rounded border border-border bg-bg peer-checked:bg-primary peer-checked:border-primary transition-colors">
+          <svg class="w-3 h-3 text-white opacity-0 peer-checked:opacity-100 transition-opacity" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+            <path fill-rule="evenodd" d="M16.704 5.29a1 1 0 010 1.414l-7.07 7.07a1 1 0 01-1.414 0l-3.535-3.535a1 1 0 011.414-1.414l2.828 2.828 6.363-6.363a1 1 0 011.414 0z" clip-rule="evenodd"></path>
+          </svg>
+        </span>
+        <span class="uppercase text-xs font-semibold tracking-wide peer-checked:text-primary">${permission}</span>
       </label>
     `
   ).join("");
 
   return `
     <div class="w-full flex flex-col gap-5 relative">
-      <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3 bg-surface border border-border rounded-xl p-4">
-        <div>
+      <div class="relative bg-surface border border-border rounded-xl p-4">
+        <div class="text-center">
           <h1 class="text-2xl font-heading font-bold">Employees</h1>
           <p class="text-sm text-muted">Manage employees, HR fields, permissions, and account controls.</p>
         </div>
-        <button id="toggle-employee-create" class="px-4 py-2 rounded-lg bg-primary text-white text-sm font-semibold hover:bg-primary-hover">Create Employee</button>
+        <div class="mt-3 flex justify-center md:mt-0 md:absolute md:right-4 md:top-1/2 md:-translate-y-1/2">
+          <button id="toggle-employee-create" class="px-4 py-2 rounded-lg bg-primary text-white text-sm font-semibold hover:bg-primary-hover">Create Employee</button>
+        </div>
       </div>
 
       <div id="employee-create-container" class="hidden bg-surface border border-border rounded-xl p-4">
         <form id="employee-create-form" class="grid grid-cols-1 md:grid-cols-3 gap-3">
           <input id="employee-full-name" name="fullName" required placeholder="Full Name (4 parts)" class="px-3 py-2 rounded-lg border border-border bg-bg">
-          <input id="employee-phone" name="phone" required placeholder="Phone" class="px-3 py-2 rounded-lg border border-border bg-bg">
+          <input id="employee-phone" name="phone" required maxlength="10" pattern="07[0-9]{8}" placeholder="07XXXXXXXX" class="px-3 py-2 rounded-lg border border-border bg-bg">
           <input id="employee-national-id" name="nationalId" required placeholder="National ID" class="px-3 py-2 rounded-lg border border-border bg-bg">
-          <input name="birthDate" type="date" required class="px-3 py-2 rounded-lg border border-border bg-bg">
+          <input name="birthDate" type="date" required class="employee-date-input px-3 py-2 rounded-lg border border-border bg-bg">
           <input name="jobTitle" required placeholder="Job Title" class="px-3 py-2 rounded-lg border border-border bg-bg">
           <input name="monthlyBase" type="number" step="0.01" placeholder="Default Salary Monthly Base" class="px-3 py-2 rounded-lg border border-border bg-bg">
-          <input name="idCardImageUrl" required placeholder="ID Card Image URL" class="px-3 py-2 rounded-lg border border-border bg-bg">
-          <input name="profilePhotoUrl" required placeholder="Profile Photo URL" class="px-3 py-2 rounded-lg border border-border bg-bg">
+
+          <div class="rounded-lg border border-border bg-bg p-3 space-y-2">
+            <div class="text-xs uppercase text-muted">ID Card Image</div>
+            <input id="employee-id-card-file" type="file" accept="image/*" class="hidden">
+            <input id="employee-id-card-url" name="idCardImageUrl" type="hidden">
+            <div class="flex items-center gap-2">
+              <label for="employee-id-card-file" class="inline-flex items-center px-3 py-1.5 rounded-md border border-border text-xs font-semibold cursor-pointer hover:border-primary hover:text-primary transition-colors">Choose File</label>
+              <div id="employee-id-card-hint" class="text-xs text-muted">Choose image from device.</div>
+            </div>
+            <div id="employee-id-card-preview" class="w-20 h-20 rounded-lg border border-border bg-surface overflow-hidden"></div>
+          </div>
+
+          <div class="rounded-lg border border-border bg-bg p-3 space-y-2">
+            <div class="text-xs uppercase text-muted">Profile Photo</div>
+            <input id="employee-profile-photo-file" type="file" accept="image/*" class="hidden">
+            <input id="employee-profile-photo-url" name="profilePhotoUrl" type="hidden">
+            <div class="flex items-center gap-2">
+              <label for="employee-profile-photo-file" class="inline-flex items-center px-3 py-1.5 rounded-md border border-border text-xs font-semibold cursor-pointer hover:border-primary hover:text-primary transition-colors">Choose File</label>
+              <div id="employee-profile-photo-hint" class="text-xs text-muted">Choose image from device.</div>
+            </div>
+            <div id="employee-profile-photo-preview" class="w-20 h-20 rounded-lg border border-border bg-surface overflow-hidden"></div>
+          </div>
+
           <input name="workSchedule" placeholder="Work Schedule (text)" class="px-3 py-2 rounded-lg border border-border bg-bg">
           <div class="md:col-span-3 rounded-lg border border-border p-3 bg-bg">
             <div class="text-xs uppercase text-muted mb-2">Permissions</div>
@@ -508,8 +621,8 @@ export function AdminEmployees() {
           <option value="banned">Banned</option>
         </select>
         <div class="grid grid-cols-2 gap-2">
-          <input id="employees-join-from" type="date" class="px-3 py-2 rounded-lg border border-border bg-surface">
-          <input id="employees-join-to" type="date" class="px-3 py-2 rounded-lg border border-border bg-surface">
+          <input id="employees-join-from" type="date" class="employee-date-input px-3 py-2 rounded-lg border border-border bg-surface">
+          <input id="employees-join-to" type="date" class="employee-date-input px-3 py-2 rounded-lg border border-border bg-surface">
         </div>
       </div>
 
@@ -536,7 +649,7 @@ export function AdminEmployees() {
       <aside id="employee-details-drawer" class="fixed top-0 right-0 h-full w-full max-w-lg bg-surface border-l border-border z-[70] p-5 overflow-y-auto transform translate-x-full transition-transform duration-300">
         <div class="flex items-center justify-between mb-4">
           <h3 id="employee-drawer-title" class="text-lg font-bold">Employee</h3>
-          <button id="close-employee-drawer" class="w-8 h-8 rounded-full border border-border hover:border-primary">×</button>
+          <button id="close-employee-drawer" class="w-8 h-8 rounded-full border border-border hover:border-primary">&times;</button>
         </div>
         <div id="employee-details-content"></div>
       </aside>

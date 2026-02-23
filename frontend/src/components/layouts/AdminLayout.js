@@ -5,6 +5,13 @@ import { store } from "../../lib/store.js";
 export function AdminLayout(children) {
   const { user, lang, theme } = store.state;
   if (!user) return "";
+  const initial = user.fullName ? user.fullName.charAt(0).toUpperCase() : "U";
+  const sidebarAvatar = user.avatarUrl
+    ? `<img src="${user.avatarUrl}" alt="${user.fullName || "User"}" class="w-8 h-8 rounded-full object-cover border border-border shrink-0">`
+    : `<div class="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-sm shrink-0">${initial}</div>`;
+  const headerAvatar = user.avatarUrl
+    ? `<img src="${user.avatarUrl}" alt="${user.fullName || "User"}" class="w-7 h-7 rounded-full object-cover border border-border shrink-0">`
+    : `<div class="w-7 h-7 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-xs shrink-0">${initial}</div>`;
 
   const isDark =
     theme === "dark" ||
@@ -90,15 +97,13 @@ export function AdminLayout(children) {
 
         <div class="p-4 border-t border-border">
           <div class="flex items-center justify-between bg-bg rounded-xl p-3 border border-border">
-            <div class="flex items-center gap-3 overflow-hidden cursor-pointer" onclick="navigate(event, '/admin/profile')" title="View Profile">
-              <div class="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-sm shrink-0">
-                ${user.fullName ? user.fullName.charAt(0).toUpperCase() : "U"}
-              </div>
+            <a href="/admin/profile" onclick="navigate(event, '/admin/profile')" class="flex items-center gap-3 overflow-hidden flex-1 min-w-0" title="View Profile">
+              ${sidebarAvatar}
               <div class="overflow-hidden">
                 <div class="text-xs font-bold text-text truncate hover:text-primary transition-colors">${user.fullName || "User"}</div>
-                <div class="text-[10px] uppercase font-semibold text-primary truncate">${user.role}</div>
+                <div class="text-[10px] text-muted truncate">${user.phone || "-"}</div>
               </div>
-            </div>
+            </a>
             <button onclick="handleLogout(event)" class="text-muted hover:text-danger p-2 transition-colors ml-1" title="Logout">
               <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
             </button>
@@ -107,7 +112,7 @@ export function AdminLayout(children) {
       </aside>
 
       <div class="flex-1 flex flex-col w-full min-w-0">
-        <header class="h-16 bg-surface border-b border-border flex items-center px-4 sticky top-0 z-30 justify-between md:justify-end">
+        <header class="min-h-16 bg-surface border-b border-border flex items-center px-4 md:px-8 py-3 sticky top-0 z-30 justify-between md:justify-end">
           <div class="flex items-center gap-3 md:hidden">
             <button onclick="toggleAdminDrawer()" class="p-2 -ml-2 text-text">
               <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
@@ -115,6 +120,10 @@ export function AdminLayout(children) {
             <div class="font-heading font-bold">Admin Center</div>
           </div>
           <div class="flex items-center gap-4">
+            <a href="/admin/profile" onclick="navigate(event, '/admin/profile')" class="hidden sm:inline-flex items-center gap-2 px-2 py-1 rounded-full border border-border hover:border-primary transition-colors max-w-[180px]" title="Profile">
+              ${headerAvatar}
+              <span class="text-sm font-semibold text-text truncate">${user.fullName || "User"}</span>
+            </a>
             <a href="/admin/profile" onclick="navigate(event, '/admin/profile')" class="inline-flex items-center justify-center w-8 h-8 rounded-full border border-border text-muted hover:text-primary hover:border-primary transition-colors" title="Profile">
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
             </a>

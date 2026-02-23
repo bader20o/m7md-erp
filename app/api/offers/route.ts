@@ -11,7 +11,7 @@ const createOfferSchema = z.object({
   titleAr: z.string().min(2).max(160),
   descriptionEn: z.string().max(1000).optional(),
   descriptionAr: z.string().max(1000).optional(),
-  imageUrl: z.string().url().optional(),
+  imageUrl: z.string().max(1000).optional(),
   startsAt: z.coerce.date().optional(),
   endsAt: z.coerce.date().optional(),
   isActive: z.boolean().default(true),

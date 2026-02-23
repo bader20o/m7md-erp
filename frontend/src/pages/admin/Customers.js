@@ -1,6 +1,8 @@
 import { apiFetch, buildQuery } from "../../lib/api.js";
 import { TableRowSkeleton } from "../../components/ui/Skeleton.js";
 
+const LOCAL_PHONE_REGEX = /^07\d{8}$/;
+
 function formatDate(value) {
   if (!value) return "-";
   return new Date(value).toLocaleDateString();
@@ -353,6 +355,10 @@ export function AdminCustomers() {
         window.toast("Duplicate phone detected.", "error");
         return;
       }
+      if (!LOCAL_PHONE_REGEX.test(form.phone.value.trim())) {
+        window.toast("Phone must start with 07 and contain 10 digits.", "error");
+        return;
+      }
       try {
         await apiFetch("/admin/customers", {
           method: "POST",
@@ -396,7 +402,7 @@ export function AdminCustomers() {
       <div id="customer-create-container" class="hidden bg-surface border border-border rounded-xl p-4">
         <form id="customer-create-form" class="grid grid-cols-1 md:grid-cols-3 gap-3">
           <input name="fullName" required placeholder="Full Name" class="px-3 py-2 rounded-lg border border-border bg-bg">
-          <input id="customer-create-phone" name="phone" required placeholder="Phone" class="px-3 py-2 rounded-lg border border-border bg-bg">
+          <input id="customer-create-phone" name="phone" required maxlength="10" pattern="07[0-9]{8}" placeholder="07XXXXXXXX" class="px-3 py-2 rounded-lg border border-border bg-bg">
           <input name="password" placeholder="Password (optional)" class="px-3 py-2 rounded-lg border border-border bg-bg">
           <input name="location" placeholder="Location" class="px-3 py-2 rounded-lg border border-border bg-bg">
           <input name="initialDebt" type="number" step="0.01" placeholder="Initial Debt" class="px-3 py-2 rounded-lg border border-border bg-bg">
