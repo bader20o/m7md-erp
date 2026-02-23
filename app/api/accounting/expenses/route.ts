@@ -8,7 +8,7 @@ import { createExpenseSchema } from "@/lib/validators/accounting";
 
 export async function GET(): Promise<Response> {
   try {
-    requireRoles(await getSession(), [Role.ACCOUNTANT, Role.MANAGER, Role.ADMIN]);
+    requireRoles(await getSession(), [Role.EMPLOYEE, Role.ADMIN]);
 
     const items = await prisma.expense.findMany({
       include: { supplier: true, invoice: true, transaction: true },
@@ -24,7 +24,7 @@ export async function GET(): Promise<Response> {
 
 export async function POST(request: Request): Promise<Response> {
   try {
-    const actor = requireRoles(await getSession(), [Role.ACCOUNTANT, Role.MANAGER, Role.ADMIN]);
+    const actor = requireRoles(await getSession(), [Role.EMPLOYEE, Role.ADMIN]);
     const body = await parseJsonBody(request, createExpenseSchema);
     const occurredAt = body.occurredAt;
     const unitPrice = body.unitPrice;
@@ -134,3 +134,4 @@ export async function POST(request: Request): Promise<Response> {
     return fail(error);
   }
 }
+

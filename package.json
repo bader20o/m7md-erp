@@ -3,9 +3,10 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
+    "spa:sync": "node scripts/sync-spa.mjs",
+    "dev": "npm run spa:sync && next dev -p 3000",
+    "build": "npm run spa:sync && next build",
+    "start": "next start -p 3000",
     "lint": "tsc --noEmit",
     "typecheck": "tsc --noEmit",
     "db:generate": "prisma generate",

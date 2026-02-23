@@ -1,80 +1,45 @@
-import type { Role } from "@prisma/client";
+import { EmployeePermission, Role } from "@prisma/client";
 import { ApiError } from "@/lib/api";
+import { prisma } from "@/lib/prisma";
 import type { SessionPayload } from "@/lib/auth";
 
 export type Permission =
-  | "bookings.manage"
-  | "bookings.walkin"
-  | "customers.manage"
-  | "reviews.moderate"
-  | "membership.manage"
-  | "membership.adjust"
-  | "users.manage"
-  | "attendance.own"
-  | "attendance.manage"
-  | "salaries.manage"
-  | "services.manage"
-  | "offers.manage"
-  | "about.manage"
-  | "hours.manage"
-  | "ledger.read"
-  | "ledger.write"
-  | "reports.read"
-  | "suppliers.manage"
-  | "invoices.manage"
-  | "audit.read"
-  | "backup.manage"
-  | "system.admin";
+  | "accounting"
+  | "warehouse"
+  | "bookings"
+  | "hr"
+  | "memberships"
+  | "analytics"
+  | "services";
 
-const ALL_PERMISSIONS: Permission[] = [
-  "bookings.manage",
-  "bookings.walkin",
-  "customers.manage",
-  "reviews.moderate",
-  "membership.manage",
-  "membership.adjust",
-  "users.manage",
-  "attendance.own",
-  "attendance.manage",
-  "salaries.manage",
-  "services.manage",
-  "offers.manage",
-  "about.manage",
-  "hours.manage",
-  "ledger.read",
-  "ledger.write",
-  "reports.read",
-  "suppliers.manage",
-  "invoices.manage",
-  "audit.read",
-  "backup.manage",
-  "system.admin"
+export const EMPLOYEE_PERMISSIONS: Permission[] = [
+  "accounting",
+  "warehouse",
+  "bookings",
+  "hr",
+  "memberships",
+  "analytics",
+  "services"
 ];
 
-export const rolePermissions: Record<Role, Permission[]> = {
-  CUSTOMER: [],
-  EMPLOYEE: ["attendance.own"],
-  RECEPTION: ["bookings.walkin", "bookings.manage", "customers.manage", "attendance.manage", "ledger.write"],
-  ACCOUNTANT: ["ledger.read", "ledger.write", "reports.read", "suppliers.manage", "invoices.manage", "salaries.manage"],
-  MANAGER: [
-    "bookings.manage",
-    "bookings.walkin",
-    "customers.manage",
-    "reviews.moderate",
-    "membership.manage",
-    "attendance.manage",
-    "salaries.manage",
-    "services.manage",
-    "offers.manage",
-    "about.manage",
-    "hours.manage",
-    "ledger.read",
-    "ledger.write",
-    "reports.read",
-    "suppliers.manage",
-    "invoices.manage"
-  ],
-  ADMIN: ALL_PERMISSIONS
+const dbToAppPermission: Record<EmployeePermission, Permission> = {
+  ACCOUNTING: "accounting",
+  WAREHOUSE: "warehouse",
+  BOOKINGS: "bookings",
+  HR: "hr",
+  MEMBERSHIPS: "memberships",
+  ANALYTICS: "analytics",
+  SERVICES: "services"
+};
+
+export const appToDbPermission: Record<Permission, EmployeePermission> = {
+  accounting: EmployeePermission.ACCOUNTING,
+  warehouse: EmployeePermission.WAREHOUSE,
+  bookings: EmployeePermission.BOOKINGS,
+  hr: EmployeePermission.HR,
+  memberships: EmployeePermission.MEMBERSHIPS,
+  analytics: EmployeePermission.ANALYTICS,
+  services: EmployeePermission.SERVICES
 };
 
 export function requireSession(session: SessionPayload | null): SessionPayload {
@@ -92,14 +57,53 @@ export function requireRoles(session: SessionPayload | null, allowed: Role[]): S
   return activeSession;
 }
 
-export function hasPermission(role: Role, permission: Permission): boolean {
-  return rolePermissions[role].includes(permission);
+export async function getPermissionsForUser(userId: string, role: Role): Promise<Permission[]> {
+  if (role === Role.ADMIN) {
+    return EMPLOYEE_PERMISSIONS;
+  }
+
+  if (role !== Role.EMPLOYEE) {
+    return [];
+  }
+
+  const employee = await prisma.employee.findUnique({
+    where: { userId },
+    select: { permissionGrants: { select: { permission: true } } }
+  });
+
+  if (!employee) {
+    return [];
+  }
+
+  return employee.permissionGrants.map((item) => dbToAppPermission[item.permission]);
 }
 
-export function requirePermission(session: SessionPayload | null, permission: Permission): SessionPayload {
+export async function hasPermission(userId: string, role: Role, permission: Permission): Promise<boolean> {
+  const permissions = await getPermissionsForUser(userId, role);
+  return permissions.includes(permission);
+}
+
+export async function requirePermission(
+  session: SessionPayload | null,
+  permission: Permission
+): Promise<SessionPayload> {
   const activeSession = requireSession(session);
-  if (!hasPermission(activeSession.role, permission)) {
+  const allowed = await hasPermission(activeSession.sub, activeSession.role, permission);
+  if (!allowed) {
     throw new ApiError(403, "FORBIDDEN", "You do not have permission for this resource.");
   }
   return activeSession;
 }
+
+export async function requireAnyPermission(
+  session: SessionPayload | null,
+  permissions: Permission[]
+): Promise<SessionPayload> {
+  const activeSession = requireSession(session);
+  const granted = await getPermissionsForUser(activeSession.sub, activeSession.role);
+  if (!permissions.some((permission) => granted.includes(permission))) {
+    throw new ApiError(403, "FORBIDDEN", "You do not have permission for this resource.");
+  }
+  return activeSession;
+}
+

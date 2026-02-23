@@ -1,6 +1,7 @@
 import { t } from '../../lib/i18n.js';
 import { apiFetch } from '../../lib/api.js';
 import { store } from '../../lib/store.js';
+import { getDefaultRouteForUser } from '../../lib/roles.js';
 
 export function Login() {
   window.onMount = () => {
@@ -27,17 +28,16 @@ export function Login() {
 
         if (user) {
           store.setUser(user);
+          await store.syncAuth();
+          const resolvedUser = store.state.user || user;
           window.toast('Login successful', 'success');
 
-          // Role-based redirect
-          if (['ADMIN', 'MANAGER', 'RECEPTION', 'ACCOUNTANT'].includes(user.role)) {
-            App.navigate('/admin/analytics');
-          } else {
-            App.navigate('/dashboard');
-          }
+          App.navigate(getDefaultRouteForUser(resolvedUser));
         }
       } catch (err) {
-        window.toast(err.message || t('common.error'), 'error');
+        const details = err.details || {};
+        const banSuffix = details.remainingDuration ? ` (${details.remainingDuration})` : '';
+        window.toast((err.message || t('common.error')) + banSuffix, 'error');
         btn.disabled = false;
         btnText.classList.remove('hidden');
         btnLoader.classList.add('hidden');
@@ -103,8 +103,10 @@ export function Register() {
 
         if (user) {
           store.setUser(user);
+          await store.syncAuth();
+          const resolvedUser = store.state.user || user;
           window.toast('Account created successfully', 'success');
-          App.navigate('/dashboard');
+          App.navigate(getDefaultRouteForUser(resolvedUser));
         }
       } catch (err) {
         window.toast(err.message || t('common.error'), 'error');

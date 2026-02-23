@@ -12,8 +12,8 @@ export async function GET(): Promise<Response> {
   try {
     const actor = requireRoles(await getSession(), [
       Role.CUSTOMER,
-      Role.RECEPTION,
-      Role.MANAGER,
+      Role.EMPLOYEE,
+      Role.EMPLOYEE,
       Role.ADMIN
     ]);
 
@@ -42,7 +42,7 @@ export async function GET(): Promise<Response> {
 
 export async function POST(request: Request): Promise<Response> {
   try {
-    const actor = requireRoles(await getSession(), [Role.CUSTOMER, Role.RECEPTION, Role.MANAGER, Role.ADMIN]);
+    const actor = requireRoles(await getSession(), [Role.CUSTOMER, Role.EMPLOYEE, Role.ADMIN]);
     const body = await parseJsonBody(request, createMembershipOrderSchema);
 
     const plan = await prisma.membershipPlan.findUnique({
@@ -109,3 +109,4 @@ export async function POST(request: Request): Promise<Response> {
     return fail(error);
   }
 }
+

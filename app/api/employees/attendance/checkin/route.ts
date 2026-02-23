@@ -28,7 +28,7 @@ function verifyQrPayload(employeeId: string, payload: string, secret: string): b
 
 export async function POST(request: Request): Promise<Response> {
   try {
-    requireRoles(await getSession(), [Role.EMPLOYEE, Role.RECEPTION, Role.MANAGER, Role.ADMIN]);
+    requireRoles(await getSession(), [Role.EMPLOYEE, Role.ADMIN]);
     const body = await parseJsonBody(request, attendanceScanSchema);
 
     const employee = await prisma.employee.findUnique({
@@ -72,4 +72,5 @@ export async function POST(request: Request): Promise<Response> {
     return fail(error);
   }
 }
+
 

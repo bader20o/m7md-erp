@@ -8,7 +8,7 @@ import { createPartSchema, listPartsQuerySchema } from "@/lib/validators/invento
 
 export async function GET(request: Request): Promise<Response> {
   try {
-    requireRoles(await getSession(), [Role.MANAGER, Role.ADMIN]);
+    requireRoles(await getSession(), [Role.EMPLOYEE, Role.ADMIN]);
     const url = new URL(request.url);
     const query = await listPartsQuerySchema.parseAsync({
       q: url.searchParams.get("q") ?? undefined,
@@ -42,7 +42,7 @@ export async function GET(request: Request): Promise<Response> {
 
 export async function POST(request: Request): Promise<Response> {
   try {
-    requireRoles(await getSession(), [Role.MANAGER, Role.ADMIN]);
+    requireRoles(await getSession(), [Role.EMPLOYEE, Role.ADMIN]);
     const body = await parseJsonBody(request, createPartSchema);
 
     const item = await prisma.part.create({
@@ -74,3 +74,4 @@ export async function POST(request: Request): Promise<Response> {
     return fail(error);
   }
 }
+

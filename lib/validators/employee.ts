@@ -1,11 +1,41 @@
 import { z } from "zod";
 
+const permissionSchema = z.enum([
+  "accounting",
+  "warehouse",
+  "bookings",
+  "hr",
+  "memberships",
+  "analytics",
+  "services"
+]);
+
 export const createEmployeeSchema = z.object({
   phone: z.string().min(7).max(20),
-  password: z.string().min(8).max(128),
   fullName: z.string().min(2).max(120),
-  jobTitle: z.string().max(120).optional(),
-  monthlyBase: z.coerce.number().min(0).optional()
+  nationalId: z.string().min(6).max(64),
+  birthDate: z.coerce.date(),
+  jobTitle: z.string().min(2).max(120),
+  idCardImageUrl: z.string().min(1).max(1000),
+  profilePhotoUrl: z.string().min(1).max(1000),
+  permissions: z.array(permissionSchema).default([]),
+  defaultSalaryInfo: z.record(z.any()).default({}),
+  workSchedule: z.record(z.any()).default({})
+});
+
+export const updateEmployeePermissionsSchema = z.object({
+  permissions: z.array(permissionSchema)
+});
+
+export const updateEmployeeHrSchema = z.object({
+  fullName: z.string().min(2).max(120).optional(),
+  nationalId: z.string().min(6).max(64).optional(),
+  birthDate: z.coerce.date().optional(),
+  jobTitle: z.string().min(2).max(120).optional(),
+  idCardImageUrl: z.string().min(1).max(1000).optional(),
+  profilePhotoUrl: z.string().min(1).max(1000).optional(),
+  defaultSalaryInfo: z.record(z.any()).optional(),
+  workSchedule: z.record(z.any()).optional()
 });
 
 export const attendanceScanSchema = z.object({

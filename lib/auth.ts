@@ -1,8 +1,9 @@
 import bcrypt from "bcryptjs";
 import { SignJWT, jwtVerify } from "jose";
 import { cookies } from "next/headers";
-import type { Role } from "@prisma/client";
+import { Role, UserStatus } from "@prisma/client";
 import { env } from "@/lib/env";
+import { prisma } from "@/lib/prisma";
 
 const COOKIE_NAME = "session_token";
 const encoder = new TextEncoder();
@@ -59,9 +60,51 @@ export async function getSession(): Promise<SessionPayload | null> {
     if (!payload?.sub || !payload?.role) {
       return null;
     }
-    return payload;
+
+    const user = await prisma.user.findUnique({
+      where: { id: payload.sub },
+      select: {
+        id: true,
+        phone: true,
+        role: true,
+        status: true,
+        bannedUntil: true,
+        isActive: true
+      }
+    });
+
+    if (!user) {
+      return null;
+    }
+
+    if (user.status === UserStatus.BANNED) {
+      if (user.bannedUntil && user.bannedUntil.getTime() <= Date.now()) {
+        await prisma.user.update({
+          where: { id: user.id },
+          data: {
+            status: UserStatus.ACTIVE,
+            isActive: true,
+            bannedUntil: null,
+            banReason: null,
+            banMessage: null,
+            bannedByAdminId: null
+          }
+        });
+      } else {
+        return null;
+      }
+    }
+
+    if (user.status === UserStatus.SUSPENDED || !user.isActive) {
+      return null;
+    }
+
+    return {
+      sub: user.id,
+      role: user.role,
+      phone: user.phone
+    };
   } catch {
     return null;
   }
 }
-

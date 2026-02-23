@@ -14,7 +14,7 @@ export default async function AdminIndexPage({ params }: Props): Promise<never> 
     redirect(`/${locale}/login`);
   }
 
-  if (session.role === Role.ACCOUNTANT) {
+  if (session.role === Role.EMPLOYEE) {
     redirect(`/${locale}/admin/transactions`);
   }
 

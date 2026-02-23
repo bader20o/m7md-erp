@@ -10,7 +10,7 @@ type Params = { params: Promise<{ id: string }> };
 
 export async function POST(_: Request, context: Params): Promise<Response> {
   try {
-    const actor = requireRoles(await getSession(), [Role.RECEPTION, Role.MANAGER, Role.ADMIN]);
+    const actor = requireRoles(await getSession(), [Role.EMPLOYEE, Role.ADMIN]);
     const { id } = await context.params;
 
     const booking = await prisma.booking.findUnique({

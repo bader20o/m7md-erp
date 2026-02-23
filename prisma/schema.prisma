@@ -8,12 +8,38 @@ datasource db {
 }
 
 enum Role {
-  CUSTOMER
-  EMPLOYEE
-  RECEPTION
-  ACCOUNTANT
-  MANAGER
   ADMIN
+  EMPLOYEE
+  CUSTOMER
+}
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  BANNED
+}
+
+enum EmployeePermission {
+  ACCOUNTING
+  WAREHOUSE
+  BOOKINGS
+  HR
+  MEMBERSHIPS
+  ANALYTICS
+  SERVICES
+}
+
+enum CustomerAccountEntryType {
+  CHARGE
+  PAYMENT
+  ADJUSTMENT
+}
+
+enum ChatMessageType {
+  TEXT
+  IMAGE
+  VIDEO
+  VOICE
 }
 
 enum BookingStatus {
@@ -104,9 +130,25 @@ model User {
   phone                      String                      @unique
   passwordHash               String
   role                       Role                        @default(CUSTOMER)
+  status                     UserStatus                  @default(ACTIVE)
   fullName                   String?
+  bio                        String?
+  carType                    String?
+  location                   String?
+  avatarUrl                  String?
   locale                     String                      @default("en")
+  theme                      String                      @default("system")
   isActive                   Boolean                     @default(true)
+  forcePasswordReset         Boolean                     @default(false)
+  mustChangePassword         Boolean                     @default(false)
+  bannedUntil                DateTime?
+  banReason                  String?
+  banMessage                 String?
+  bannedByAdminId            String?
+  suspendedAt                DateTime?
+  suspendedByAdminId         String?
+  suspensionReason           String?
+  lastPasswordChangeAt       DateTime?
   createdAt                  DateTime                    @default(now())
   updatedAt                  DateTime                    @updatedAt
   customerBookings           Booking[]                   @relation("CustomerBookings")
@@ -131,6 +173,13 @@ model User {
   membershipUsagesRecorded   MembershipUsage[]           @relation("MembershipUsageRecordedBy")
   membershipUsageAdjustments MembershipUsageAdjustment[] @relation("MembershipUsageAdjustedBy")
   stockMovementsCreated      StockMovement[]             @relation("StockMovementCreatedBy")
+  suspendedUsers             User[]                      @relation("SuspendedByAdmin")
+  suspendedByAdmin           User?                       @relation("SuspendedByAdmin", fields: [suspendedByAdminId], references: [id], onDelete: SetNull)
+  bannedUsers                User[]                      @relation("BannedByAdmin")
+  bannedByAdmin              User?                       @relation("BannedByAdmin", fields: [bannedByAdminId], references: [id], onDelete: SetNull)
+  employeeProfilesCreated    Employee[]                  @relation("EmployeeCreatedByAdmin")
+  customerLedgerEntries      CustomerAccountEntry[]      @relation("CustomerLedgerEntries")
+  ledgerEntriesCreated       CustomerAccountEntry[]      @relation("LedgerEntriesCreatedByAdmin")
 }
 
 model Service {
@@ -139,6 +188,7 @@ model Service {
   nameAr                 String
   category               String?
   basePrice              Decimal?                    @db.Decimal(12, 2)
+  imageUrl               String?
   descriptionEn          String?
   descriptionAr          String?
   durationMinutes        Int
@@ -357,6 +407,7 @@ model MembershipPlan {
   tier          String
   nameEn        String
   nameAr        String
+  imageUrl      String?
   descriptionEn String?
   descriptionAr String?
   price         Decimal                 @db.Decimal(12, 2)
@@ -439,6 +490,16 @@ model MembershipUsageAdjustment {
 model Employee {
   id                String                     @id @default(cuid())
   userId            String                     @unique
+  createdByAdminId  String?
+  nationalIdHash    String                     @unique
+  nationalIdEncrypted String
+  birthDateEncrypted String
+  jobTitleEncrypted String
+  defaultSalaryEncrypted String?
+  workScheduleEncrypted String?
+  idCardImageUrl    String?
+  profilePhotoUrl   String?
+  permissionsUpdatedAt DateTime?
   jobTitle          String?
   monthlyBase       Decimal?                   @db.Decimal(12, 2)
   qrSecret          String                     @default(cuid())
@@ -447,12 +508,43 @@ model Employee {
   createdAt         DateTime                   @default(now())
   updatedAt         DateTime                   @updatedAt
   user              User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdByAdmin    User?                      @relation("EmployeeCreatedByAdmin", fields: [createdByAdminId], references: [id], onDelete: SetNull)
   attendance        Attendance[]
   attendanceEvents  AttendanceEvent[]
   salaries          SalaryPayment[]
   services          EmployeeService[]
   assignments       BookingServiceAssignment[]
   performedBookings Booking[]                  @relation("BookingPerformedByEmployee")
+  permissionGrants  EmployeePermissionGrant[]
+}
+
+model EmployeePermissionGrant {
+  id         String             @id @default(cuid())
+  employeeId String
+  permission EmployeePermission
+  createdAt  DateTime           @default(now())
+  employee   Employee           @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@unique([employeeId, permission])
+  @@index([permission])
+}
+
+model CustomerAccountEntry {
+  id               String                   @id @default(cuid())
+  customerId       String
+  type             CustomerAccountEntryType
+  amount           Decimal                  @db.Decimal(12, 2)
+  occurredAt       DateTime                 @default(now())
+  note             String?
+  createdByAdminId String
+  referenceType    String?
+  referenceId      String?
+  createdAt        DateTime                 @default(now())
+  customer         User                     @relation("CustomerLedgerEntries", fields: [customerId], references: [id], onDelete: Cascade)
+  createdByAdmin   User                     @relation("LedgerEntriesCreatedByAdmin", fields: [createdByAdminId], references: [id], onDelete: Restrict)
+
+  @@index([customerId, occurredAt])
+  @@index([createdByAdminId, occurredAt])
 }
 
 model EmployeeService {
@@ -593,6 +685,12 @@ model WorkingHour {
 
 model SystemSetting {
   id                      Int      @id @default(1)
+  businessName            String   @default("Hybrid & Electric Car Service Center")
+  businessPhone           String?
+  businessAddress         String?
+  workingHours            Json?
+  holidays                Json?
+  currency                String   @default("USD")
   cancellationPolicyHours Int      @default(24)
   lateCancellationHours   Int      @default(2)
   defaultCurrency         String   @default("USD")
@@ -680,14 +778,20 @@ model ChatParticipant {
 }
 
 model ChatMessage {
-  id        String            @id @default(cuid())
-  threadId  String
-  senderId  String
-  body      String
-  createdAt DateTime          @default(now())
-  thread    ChatThread        @relation(fields: [threadId], references: [id], onDelete: Cascade)
-  sender    User              @relation("UserChatMessages", fields: [senderId], references: [id], onDelete: Cascade)
-  seenBy    ChatMessageSeen[]
+  id                String            @id @default(cuid())
+  threadId          String
+  senderId          String
+  messageType       ChatMessageType   @default(TEXT)
+  body              String
+  mediaUrl          String?
+  mediaMimeType     String?
+  mediaDurationSec  Int?
+  deletedAt         DateTime?
+  deletedById       String?
+  createdAt         DateTime          @default(now())
+  thread            ChatThread        @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  sender            User              @relation("UserChatMessages", fields: [senderId], references: [id], onDelete: Cascade)
+  seenBy            ChatMessageSeen[]
 }
 
 model ChatMessageSeen {

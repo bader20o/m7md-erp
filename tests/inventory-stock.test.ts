@@ -17,6 +17,6 @@ test("negative stock is blocked for non-admin and allowed for admin override", (
   const currentQty = 2;
   const outDelta = resolveStockDelta("OUT", 5);
 
-  assert.equal(isStockChangeAllowed(currentQty, outDelta, "MANAGER"), false);
+  assert.equal(isStockChangeAllowed(currentQty, outDelta, "EMPLOYEE"), false);
   assert.equal(isStockChangeAllowed(currentQty, outDelta, "ADMIN"), true);
 });

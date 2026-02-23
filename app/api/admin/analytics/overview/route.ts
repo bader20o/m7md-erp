@@ -1,14 +1,13 @@
-import { Role } from "@prisma/client";
 import { fail, ok } from "@/lib/api";
 import { getAnalyticsOverview } from "@/lib/analytics/overview";
 import { getSession } from "@/lib/auth";
-import { requireRoles } from "@/lib/rbac";
+import { requireAnyPermission } from "@/lib/rbac";
 import { adminAnalyticsOverviewQuerySchema } from "@/lib/validators/admin-analytics";
 import { parseDateOnlyUtc } from "@/lib/validators/reports";
 
 export async function GET(request: Request): Promise<Response> {
   try {
-    requireRoles(await getSession(), [Role.ADMIN]);
+    await requireAnyPermission(await getSession(), ["analytics"]);
     const url = new URL(request.url);
     const query = await adminAnalyticsOverviewQuerySchema.parseAsync({
       from: url.searchParams.get("from") ?? "",
@@ -27,4 +26,3 @@ export async function GET(request: Request): Promise<Response> {
     return fail(error);
   }
 }
-

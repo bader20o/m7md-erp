@@ -13,7 +13,27 @@ const listMessagesQuerySchema = z.object({
 
 const sendMessageSchema = z.object({
   threadId: z.string().min(1),
-  body: z.string().min(1).max(2000)
+  messageType: z.enum(["TEXT", "IMAGE", "VIDEO", "VOICE"]).default("TEXT"),
+  body: z.string().max(2000).optional(),
+  mediaUrl: z.string().max(1200).optional(),
+  mediaMimeType: z.string().max(120).optional(),
+  mediaDurationSec: z.coerce.number().int().min(0).max(60 * 60).optional()
+}).superRefine((data, context) => {
+  if (data.messageType === "TEXT" && !data.body?.trim()) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["body"],
+      message: "Text message body is required."
+    });
+  }
+
+  if (data.messageType !== "TEXT" && !data.mediaUrl?.trim()) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["mediaUrl"],
+      message: "mediaUrl is required for media messages."
+    });
+  }
 });
 
 const markSeenSchema = z.object({
@@ -114,7 +134,12 @@ export async function GET(request: Request): Promise<Response> {
     const hasMore = rows.length > take;
     const slice = hasMore ? rows.slice(0, take) : rows;
     const nextCursor = hasMore ? slice[slice.length - 1]?.id ?? null : null;
-    const messages = slice.reverse();
+    const messages = slice.reverse().map((message) => ({
+      ...message,
+      body: message.deletedAt ? "" : message.body,
+      mediaUrl: message.deletedAt ? null : message.mediaUrl,
+      mediaMimeType: message.deletedAt ? null : message.mediaMimeType
+    }));
 
     return ok({ messages, nextCursor });
   } catch (error) {
@@ -141,13 +166,50 @@ export async function POST(request: Request): Promise<Response> {
     await assertAdminContactThread(body.threadId, actor.role);
 
     const item = await prisma.$transaction(async (tx) => {
+      const existingCustomerMessageCount =
+        actor.role === Role.CUSTOMER
+          ? await tx.chatMessage.count({
+              where: {
+                threadId: body.threadId,
+                senderId: actor.sub,
+                sender: { role: Role.CUSTOMER },
+                deletedAt: null
+              }
+            })
+          : 0;
+
       const message = await tx.chatMessage.create({
         data: {
           threadId: body.threadId,
           senderId: actor.sub,
-          body: body.body
+          messageType: body.messageType,
+          body: body.body?.trim() || "",
+          mediaUrl: body.mediaUrl,
+          mediaMimeType: body.mediaMimeType,
+          mediaDurationSec: body.mediaDurationSec
         }
       });
+
+      if (actor.role === Role.CUSTOMER && existingCustomerMessageCount === 0) {
+        const firstAdminParticipant = await tx.chatParticipant.findFirst({
+          where: {
+            threadId: body.threadId,
+            user: { role: Role.ADMIN }
+          },
+          select: { userId: true }
+        });
+
+        if (firstAdminParticipant) {
+          await tx.chatMessage.create({
+            data: {
+              threadId: body.threadId,
+              senderId: firstAdminParticipant.userId,
+              messageType: "TEXT",
+              body: "أهلًا وسهلًا 👋 نحن هنا لمساعدتك، يرجى كتابة رسالتك."
+            }
+          });
+        }
+      }
 
       await tx.chatThread.update({
         where: { id: body.threadId },

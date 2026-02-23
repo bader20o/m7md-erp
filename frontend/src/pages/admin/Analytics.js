@@ -30,15 +30,19 @@ export function AdminAnalytics() {
             setLoadingState();
 
             try {
-                const [overviewRes, aiSummaryRes] = await Promise.all([
+                const [overviewRes, aiSummaryRes, outstandingRes] = await Promise.all([
                     apiFetch(`/admin/analytics/overview?from=${from}&to=${to}&groupBy=${groupBy}`),
-                    apiFetch(`/admin/analytics/ai-summary?from=${from}&to=${to}`)
+                    apiFetch(`/admin/analytics/ai-summary?from=${from}&to=${to}`),
+                    apiFetch('/admin/analytics/outstanding')
                 ]);
 
                 if (overviewRes) populateOverview(overviewRes);
                 if (aiSummaryRes) {
                     populateAISummary(aiSummaryRes);
                     currentAiData = aiSummaryRes.compactData;
+                }
+                if (outstandingRes) {
+                    populateOutstanding(outstandingRes);
                 }
 
             } catch (e) {
@@ -52,6 +56,9 @@ export function AdminAnalytics() {
             });
             document.getElementById('chart-timeseries').innerHTML = ChartSkeleton();
             document.getElementById('chart-donuts').innerHTML = ChartSkeleton();
+            document.getElementById('outstanding-total').textContent = '...';
+            document.getElementById('outstanding-count').textContent = '...';
+            document.getElementById('outstanding-top').innerHTML = `<div class="skeleton h-8 w-full rounded mb-2"></div><div class="skeleton h-8 w-full rounded"></div>`;
         }
 
         function populateOverview(data) {
@@ -122,6 +129,23 @@ export function AdminAnalytics() {
           <p class="text-xs text-muted leading-relaxed">${s.detail}</p>
         </div>
       `).join('');
+        }
+
+        function populateOutstanding(data) {
+            document.getElementById('outstanding-total').textContent = `${Number(data.totalOutstanding || 0).toFixed(2)} JOD`;
+            document.getElementById('outstanding-count').textContent = `${data.countCustomersWithDebt || 0}`;
+            const top = data.topCustomersByDebt || [];
+            document.getElementById('outstanding-top').innerHTML = top.length
+                ? top.map(c => `
+                    <div class="flex items-center justify-between py-2 border-b border-border last:border-0 text-sm">
+                      <div>
+                        <div class="font-semibold text-text">${c.fullName || c.phone || 'Customer'}</div>
+                        <div class="text-xs text-muted">${c.phone || '-'}</div>
+                      </div>
+                      <div class="font-bold text-danger">${Number(c.balanceDue).toFixed(2)}</div>
+                    </div>
+                  `).join('')
+                : `<div class="text-sm text-muted py-3">No outstanding debt.</div>`;
         }
 
         function renderKpi(title, value, intent, icon) {
@@ -226,6 +250,27 @@ export function AdminAnalytics() {
         <div id="kpi-profit"></div>
         <div id="kpi-orders"></div>
         <div id="kpi-avg"></div>
+      </div>
+
+      <div class="bg-surface border border-border rounded-2xl p-6">
+        <div class="flex items-center justify-between border-b border-border pb-3 mb-4">
+          <h3 class="font-bold text-text text-sm uppercase tracking-wider">Outstanding Debt</h3>
+          <a href="/admin/customers" onclick="navigate(event, '/admin/customers')" class="text-xs font-semibold text-primary hover:text-primary-hover">Open Customers</a>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div class="rounded-xl border border-border p-4 bg-bg">
+            <div class="text-xs text-muted uppercase tracking-wider">Total Outstanding</div>
+            <div id="outstanding-total" class="text-2xl font-bold text-danger mt-1">0.00 JOD</div>
+          </div>
+          <div class="rounded-xl border border-border p-4 bg-bg">
+            <div class="text-xs text-muted uppercase tracking-wider">Customers with Debt</div>
+            <div id="outstanding-count" class="text-2xl font-bold text-text mt-1">0</div>
+          </div>
+          <div class="rounded-xl border border-border p-4 bg-bg">
+            <div class="text-xs text-muted uppercase tracking-wider mb-2">Top by Debt</div>
+            <div id="outstanding-top"></div>
+          </div>
+        </div>
       </div>
 
       <!-- Main Charts Row -->

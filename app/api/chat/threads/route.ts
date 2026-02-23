@@ -6,7 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { requireSession } from "@/lib/rbac";
 
 const createThreadSchema = z.object({
-  participantUserIds: z.array(z.string().min(1)).min(1).max(1),
+  participantUserIds: z.array(z.string().min(1)).max(1).optional(),
   subject: z.string().max(160).optional()
 });
 
@@ -155,8 +155,25 @@ export async function POST(request: Request): Promise<Response> {
     const actor = requireSession(await getSession());
     const body = await parseJsonBody(request, createThreadSchema);
 
-    const uniqueParticipants = Array.from(new Set([...body.participantUserIds, actor.sub]));
-    if (body.participantUserIds.length !== 1 || uniqueParticipants.length !== 2) {
+    let participantUserIds = body.participantUserIds ?? [];
+
+    if (actor.role === Role.CUSTOMER && participantUserIds.length === 0) {
+      const fallbackAdmin = await prisma.user.findFirst({
+        where: {
+          role: Role.ADMIN,
+          isActive: true
+        },
+        select: { id: true },
+        orderBy: { createdAt: "asc" }
+      });
+      if (!fallbackAdmin) {
+        throw new ApiError(503, "ADMIN_UNAVAILABLE", "No admin is available for chat.");
+      }
+      participantUserIds = [fallbackAdmin.id];
+    }
+
+    const uniqueParticipants = Array.from(new Set([...participantUserIds, actor.sub]));
+    if (participantUserIds.length !== 1 || uniqueParticipants.length !== 2) {
       throw new ApiError(400, "THREAD_PARTICIPANTS_INVALID", "Thread must include exactly one other participant.");
     }
 

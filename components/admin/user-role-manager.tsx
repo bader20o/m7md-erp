@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
-type UserRole = "CUSTOMER" | "EMPLOYEE" | "RECEPTION" | "ACCOUNTANT" | "MANAGER" | "ADMIN";
+type UserRole = "CUSTOMER" | "EMPLOYEE" | "ADMIN";
 
 type UserRow = {
   id: string;
@@ -25,7 +25,7 @@ type ApiErrorPayload = {
   error?: { message?: string };
 };
 
-const ROLES: UserRole[] = ["CUSTOMER", "EMPLOYEE", "RECEPTION", "ACCOUNTANT", "MANAGER", "ADMIN"];
+const ROLES: UserRole[] = ["CUSTOMER", "EMPLOYEE", "ADMIN"];
 
 function getErrorMessage(payload: unknown, fallback: string): string {
   const typed = payload as ApiErrorPayload;

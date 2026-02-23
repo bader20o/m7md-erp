@@ -13,7 +13,7 @@ const createInvoiceSchema = z.object({
 
 export async function GET(): Promise<Response> {
   try {
-    requireRoles(await getSession(), [Role.ACCOUNTANT, Role.MANAGER, Role.ADMIN]);
+    requireRoles(await getSession(), [Role.EMPLOYEE, Role.ADMIN]);
     const items = await prisma.invoice.findMany({
       include: { expenses: true },
       orderBy: { issueDate: "desc" }
@@ -26,7 +26,7 @@ export async function GET(): Promise<Response> {
 
 export async function POST(request: Request): Promise<Response> {
   try {
-    requireRoles(await getSession(), [Role.ACCOUNTANT, Role.MANAGER, Role.ADMIN]);
+    requireRoles(await getSession(), [Role.EMPLOYEE, Role.ADMIN]);
     const body = await parseJsonBody(request, createInvoiceSchema);
     const item = await prisma.invoice.create({
       data: {
@@ -40,4 +40,5 @@ export async function POST(request: Request): Promise<Response> {
     return fail(error);
   }
 }
+
 

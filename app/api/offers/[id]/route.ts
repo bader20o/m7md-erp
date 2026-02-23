@@ -21,7 +21,7 @@ type Params = { params: Promise<{ id: string }> };
 
 export async function PATCH(request: Request, context: Params): Promise<Response> {
   try {
-    const actor = requireRoles(await getSession(), [Role.MANAGER, Role.ADMIN]);
+    const actor = requireRoles(await getSession(), [Role.EMPLOYEE, Role.ADMIN]);
     const body = await parseJsonBody(request, updateOfferSchema);
     const { id } = await context.params;
 

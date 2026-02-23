@@ -8,7 +8,7 @@ import { updateUserRoleSchema } from "@/lib/validators/admin-users";
 
 export async function GET(request: Request): Promise<Response> {
   try {
-    requireRoles(await getSession(), [Role.RECEPTION, Role.MANAGER, Role.ADMIN]);
+    requireRoles(await getSession(), [Role.ADMIN]);
 
     const url = new URL(request.url);
     const role = url.searchParams.get("role");
@@ -92,4 +92,5 @@ export async function PATCH(request: Request): Promise<Response> {
     return fail(error);
   }
 }
+
 

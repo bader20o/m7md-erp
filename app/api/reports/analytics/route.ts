@@ -50,7 +50,7 @@ function enumerateDayKeys(from: Date, to: Date): string[] {
 
 export async function GET(request: Request): Promise<Response> {
   try {
-    requirePermission(await getSession(), "reports.read");
+    await requirePermission(await getSession(), "analytics");
 
     const url = new URL(request.url);
     const query = await analyticsRangeQuerySchema.parseAsync({
@@ -372,4 +372,3 @@ export async function GET(request: Request): Promise<Response> {
     return fail(error);
   }
 }
-

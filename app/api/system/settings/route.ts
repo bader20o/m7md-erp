@@ -7,14 +7,29 @@ import { prisma } from "@/lib/prisma";
 import { requireRoles } from "@/lib/rbac";
 
 const updateSystemSettingsSchema = z.object({
-  cancellationPolicyHours: z.number().int().min(1).max(168),
-  lateCancellationHours: z.number().int().min(0).max(48),
-  defaultCurrency: z.string().min(3).max(3),
-  timezone: z.string().min(2).max(100)
+  businessName: z.string().min(2).max(160),
+  businessPhone: z.string().min(7).max(30),
+  businessAddress: z.string().min(2).max(240),
+  workingHours: z.array(
+    z.object({
+      day: z.number().int().min(0).max(6),
+      open: z.string().min(3).max(16),
+      close: z.string().min(3).max(16),
+      closed: z.boolean().default(false)
+    })
+  ),
+  holidays: z.array(
+    z.object({
+      date: z.string().min(4).max(32),
+      label: z.string().min(1).max(120)
+    })
+  ),
+  currency: z.string().min(3).max(8)
 });
 
 export async function GET(): Promise<Response> {
   try {
+    requireRoles(await getSession(), [Role.ADMIN]);
     const item = await prisma.systemSetting.findUnique({ where: { id: 1 } });
     return ok({ item });
   } catch (error) {
@@ -24,15 +39,29 @@ export async function GET(): Promise<Response> {
 
 export async function PUT(request: Request): Promise<Response> {
   try {
-    const actor = requireRoles(await getSession(), [Role.MANAGER, Role.ADMIN]);
+    const actor = requireRoles(await getSession(), [Role.ADMIN]);
     const body = await parseJsonBody(request, updateSystemSettingsSchema);
 
     const item = await prisma.systemSetting.upsert({
       where: { id: 1 },
-      update: body,
+      update: {
+        businessName: body.businessName,
+        businessPhone: body.businessPhone,
+        businessAddress: body.businessAddress,
+        workingHours: body.workingHours,
+        holidays: body.holidays,
+        currency: body.currency,
+        defaultCurrency: body.currency
+      },
       create: {
         id: 1,
-        ...body
+        businessName: body.businessName,
+        businessPhone: body.businessPhone,
+        businessAddress: body.businessAddress,
+        workingHours: body.workingHours,
+        holidays: body.holidays,
+        currency: body.currency,
+        defaultCurrency: body.currency
       }
     });
 
@@ -42,8 +71,8 @@ export async function PUT(request: Request): Promise<Response> {
       entityId: String(item.id),
       actorId: actor.sub,
       payload: {
-        cancellationPolicyHours: item.cancellationPolicyHours,
-        lateCancellationHours: item.lateCancellationHours
+        businessName: item.businessName,
+        currency: item.currency
       }
     });
 
@@ -52,3 +81,4 @@ export async function PUT(request: Request): Promise<Response> {
     return fail(error);
   }
 }
+

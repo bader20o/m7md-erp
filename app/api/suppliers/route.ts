@@ -14,7 +14,7 @@ const createSupplierSchema = z.object({
 
 export async function GET(): Promise<Response> {
   try {
-    requireRoles(await getSession(), [Role.ACCOUNTANT, Role.MANAGER, Role.ADMIN]);
+    requireRoles(await getSession(), [Role.EMPLOYEE, Role.ADMIN]);
     const items = await prisma.supplier.findMany({
       orderBy: { name: "asc" }
     });
@@ -26,7 +26,7 @@ export async function GET(): Promise<Response> {
 
 export async function POST(request: Request): Promise<Response> {
   try {
-    requireRoles(await getSession(), [Role.ACCOUNTANT, Role.MANAGER, Role.ADMIN]);
+    requireRoles(await getSession(), [Role.EMPLOYEE, Role.ADMIN]);
     const body = await parseJsonBody(request, createSupplierSchema);
     const item = await prisma.supplier.create({ data: body });
     return ok({ item }, 201);
@@ -34,4 +34,5 @@ export async function POST(request: Request): Promise<Response> {
     return fail(error);
   }
 }
+
 

@@ -8,6 +8,7 @@ import { prisma } from "@/lib/prisma";
 const createServiceSchema = z.object({
   nameEn: z.string().min(2).max(160),
   nameAr: z.string().min(2).max(160),
+  imageUrl: z.string().max(1000).optional(),
   descriptionEn: z.string().max(1000).optional(),
   descriptionAr: z.string().max(1000).optional(),
   durationMinutes: z.coerce.number().int().min(15).max(600)
@@ -27,7 +28,7 @@ export async function GET(): Promise<Response> {
 
 export async function POST(request: Request): Promise<Response> {
   try {
-    requireRoles(await getSession(), [Role.ADMIN, Role.MANAGER]);
+    requireRoles(await getSession(), [Role.ADMIN, Role.EMPLOYEE]);
     const body = await parseJsonBody(request, createServiceSchema);
 
     const service = await prisma.service.create({ data: body });
@@ -37,3 +38,4 @@ export async function POST(request: Request): Promise<Response> {
     return fail(error);
   }
 }
+

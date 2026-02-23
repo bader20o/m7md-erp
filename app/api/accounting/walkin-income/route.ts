@@ -8,7 +8,7 @@ import { walkInIncomeSchema } from "@/lib/validators/accounting";
 
 export async function POST(request: Request): Promise<Response> {
   try {
-    const actor = requireRoles(await getSession(), [Role.RECEPTION, Role.MANAGER, Role.ADMIN]);
+    const actor = requireRoles(await getSession(), [Role.EMPLOYEE, Role.ADMIN]);
     const body = await parseJsonBody(request, walkInIncomeSchema);
     const occurredAt = body.occurredAt;
     const unitPrice = body.unitPrice;
@@ -55,3 +55,4 @@ export async function POST(request: Request): Promise<Response> {
     return fail(error);
   }
 }
+

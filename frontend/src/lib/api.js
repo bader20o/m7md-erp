@@ -8,7 +8,7 @@ export class ApiError extends Error {
 }
 
 export async function apiFetch(path, options = {}) {
-    const baseUrl = 'http://localhost:3000/api'; // Backend server
+    const baseUrl = '/api';
     const url = `${baseUrl}${path}`;
 
     const headers = {

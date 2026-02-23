@@ -11,7 +11,7 @@ const uploadRequestSchema = z.object({
 
 export async function POST(request: Request): Promise<Response> {
   try {
-    requireRoles(await getSession(), [Role.EMPLOYEE, Role.RECEPTION, Role.MANAGER, Role.ADMIN]);
+    requireRoles(await getSession(), [Role.CUSTOMER, Role.EMPLOYEE, Role.ADMIN]);
     const body = await parseJsonBody(request, uploadRequestSchema);
 
     // Placeholder flow: integrate with S3/R2 presigned URLs later.
@@ -27,4 +27,5 @@ export async function POST(request: Request): Promise<Response> {
     return fail(error);
   }
 }
+
 

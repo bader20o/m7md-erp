@@ -22,8 +22,7 @@ export async function GET(): Promise<Response> {
       return ok({ items: bookings });
     }
 
-    const canViewAll =
-      actor.role === Role.RECEPTION || actor.role === Role.MANAGER || actor.role === Role.ADMIN;
+    const canViewAll = actor.role === Role.EMPLOYEE || actor.role === Role.ADMIN;
     if (!canViewAll) {
       throw new ApiError(403, "FORBIDDEN", "You do not have permission for this resource.");
     }
@@ -48,7 +47,7 @@ export async function POST(request: Request): Promise<Response> {
 
   try {
     const session = await getSession();
-    const actor = requireRoles(session, [Role.CUSTOMER, Role.RECEPTION, Role.MANAGER, Role.ADMIN]);
+    const actor = requireRoles(session, [Role.CUSTOMER, Role.EMPLOYEE, Role.ADMIN]);
     const body = await parseJsonBody(request, createBookingSchema);
 
     const service = await prisma.service.findUnique({
@@ -154,3 +153,4 @@ export async function POST(request: Request): Promise<Response> {
     return fail(error);
   }
 }
+

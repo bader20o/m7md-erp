@@ -9,8 +9,8 @@ export async function GET(): Promise<Response> {
   try {
     const actor = requireRoles(await getSession(), [
       Role.CUSTOMER,
-      Role.RECEPTION,
-      Role.MANAGER,
+      Role.EMPLOYEE,
+      Role.EMPLOYEE,
       Role.ADMIN
     ]);
 
@@ -67,4 +67,5 @@ export async function POST(request: Request): Promise<Response> {
     return fail(error);
   }
 }
+
 

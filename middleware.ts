@@ -1,16 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const locales = ["en", "ar"];
-
-function hasLocale(pathname: string): boolean {
-  return locales.some((locale) => pathname === `/${locale}` || pathname.startsWith(`/${locale}/`));
-}
-
-function extractLocale(pathname: string): "en" | "ar" {
-  if (pathname === "/ar" || pathname.startsWith("/ar/")) {
-    return "ar";
-  }
-  return "en";
+function isStaticAsset(pathname: string): boolean {
+  return (
+    pathname.startsWith("/_next") ||
+    pathname.startsWith("/spa/") ||
+    pathname === "/favicon.ico" ||
+    pathname === "/icon.svg" ||
+    pathname === "/robots.txt" ||
+    pathname.includes(".")
+  );
 }
 
 export function middleware(request: NextRequest): NextResponse {
@@ -40,28 +38,15 @@ export function middleware(request: NextRequest): NextResponse {
     return response;
   }
 
-  if (
-    pathname.startsWith("/_next") ||
-    pathname.startsWith("/favicon.ico") ||
-    pathname.includes(".")
-  ) {
+  if (isStaticAsset(pathname)) {
     return NextResponse.next();
   }
 
-  if (!hasLocale(pathname)) {
-    const url = request.nextUrl.clone();
-    url.pathname = `/en${pathname}`;
-    const response = NextResponse.redirect(url);
-    response.cookies.set("locale", "en", { path: "/" });
-    return response;
-  }
-
-  const locale = extractLocale(pathname);
-  const response = NextResponse.next();
-  response.cookies.set("locale", locale, { path: "/" });
-  return response;
+  const spaUrl = request.nextUrl.clone();
+  spaUrl.pathname = "/spa/index.html";
+  return NextResponse.rewrite(spaUrl);
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"]
+  matcher: ["/:path*"]
 };

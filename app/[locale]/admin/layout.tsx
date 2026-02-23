@@ -15,7 +15,7 @@ export default async function AdminLayout({ children, params }: Props): Promise<
     redirect(`/${locale}/login`);
   }
 
-  const allowedRoles: Role[] = [Role.RECEPTION, Role.ACCOUNTANT, Role.MANAGER, Role.ADMIN];
+  const allowedRoles: Role[] = [Role.EMPLOYEE, Role.EMPLOYEE, Role.EMPLOYEE, Role.ADMIN];
   const allowed = allowedRoles.includes(session.role);
 
   if (!allowed) {

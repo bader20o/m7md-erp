@@ -6,36 +6,70 @@ import { ApiError, fail, ok } from "@/lib/api";
 import { getSession } from "@/lib/auth";
 import { requireRoles } from "@/lib/rbac";
 
-const maxFileSizeBytes = 5 * 1024 * 1024;
+const maxImageSizeBytes = 8 * 1024 * 1024;
+const maxVideoSizeBytes = 35 * 1024 * 1024;
+const maxAudioSizeBytes = 15 * 1024 * 1024;
+
 const contentTypeToExtension: Record<string, string> = {
   "image/jpeg": "jpg",
   "image/png": "png",
   "image/webp": "webp",
-  "image/gif": "gif"
+  "image/gif": "gif",
+  "video/mp4": "mp4",
+  "video/webm": "webm",
+  "video/quicktime": "mov",
+  "audio/webm": "webm",
+  "audio/ogg": "ogg",
+  "audio/mpeg": "mp3",
+  "audio/mp4": "m4a",
+  "audio/wav": "wav"
 };
+
+function getUploadLimit(contentType: string): number {
+  if (contentType.startsWith("image/")) {
+    return maxImageSizeBytes;
+  }
+
+  if (contentType.startsWith("video/")) {
+    return maxVideoSizeBytes;
+  }
+
+  if (contentType.startsWith("audio/")) {
+    return maxAudioSizeBytes;
+  }
+
+  return 0;
+}
 
 export async function POST(request: Request): Promise<Response> {
   try {
-    requireRoles(await getSession(), [Role.EMPLOYEE, Role.RECEPTION, Role.MANAGER, Role.ADMIN]);
+    requireRoles(await getSession(), [Role.CUSTOMER, Role.EMPLOYEE, Role.ADMIN]);
 
     const formData = await request.formData();
     const file = formData.get("file");
+    const folderInput = String(formData.get("folder") ?? "general").trim().toLowerCase();
 
     if (!(file instanceof File)) {
-      throw new ApiError(400, "MISSING_FILE", "Image file is required.");
+      throw new ApiError(400, "MISSING_FILE", "File is required.");
     }
 
     const extension = contentTypeToExtension[file.type];
     if (!extension) {
-      throw new ApiError(400, "UNSUPPORTED_FILE_TYPE", "Only JPG, PNG, WEBP, and GIF files are allowed.");
+      throw new ApiError(
+        400,
+        "UNSUPPORTED_FILE_TYPE",
+        "Allowed types: JPG, PNG, WEBP, GIF, MP4, WEBM, MOV, OGG, MP3, M4A, WAV."
+      );
     }
 
-    if (file.size > maxFileSizeBytes) {
-      throw new ApiError(400, "FILE_TOO_LARGE", "Image exceeds maximum size of 5MB.");
+    const maxSize = getUploadLimit(file.type);
+    if (!maxSize || file.size > maxSize) {
+      throw new ApiError(400, "FILE_TOO_LARGE", "File exceeds allowed size.");
     }
 
     const bytes = Buffer.from(await file.arrayBuffer());
-    const relativeDir = path.join("uploads", "offers");
+    const safeFolder = folderInput.replace(/[^a-z0-9_-]/g, "") || "general";
+    const relativeDir = path.join("uploads", safeFolder);
     const outputDir = path.join(process.cwd(), "public", relativeDir);
 
     await fs.mkdir(outputDir, { recursive: true });

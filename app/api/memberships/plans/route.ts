@@ -9,6 +9,7 @@ const createPlanSchema = z.object({
   tier: z.string().min(1).max(50),
   nameEn: z.string().min(2).max(120),
   nameAr: z.string().min(2).max(120),
+  imageUrl: z.string().max(1000).optional(),
   descriptionEn: z.string().max(1000).optional(),
   descriptionAr: z.string().max(1000).optional(),
   price: z.coerce.number().positive(),
@@ -31,7 +32,7 @@ export async function GET(): Promise<Response> {
 
 export async function POST(request: Request): Promise<Response> {
   try {
-    requireRoles(await getSession(), [Role.MANAGER, Role.ADMIN]);
+    requireRoles(await getSession(), [Role.EMPLOYEE, Role.ADMIN]);
     const body = await parseJsonBody(request, createPlanSchema);
     const item = await prisma.membershipPlan.create({ data: body });
     return ok({ item }, 201);
@@ -39,4 +40,5 @@ export async function POST(request: Request): Promise<Response> {
     return fail(error);
   }
 }
+
 

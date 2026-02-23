@@ -1,4 +1,6 @@
+import { UserStatus } from "@prisma/client";
 import { ApiError, fail, ok, parseJsonBody } from "@/lib/api";
+import { evaluateBan, toRemainingDurationLabel } from "@/lib/account-status";
 import { logAudit } from "@/lib/audit";
 import { setSessionCookie, signSession, verifyPassword } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
@@ -12,8 +14,37 @@ export async function POST(request: Request): Promise<Response> {
       where: { phone: body.phone }
     });
 
-    if (!user || !user.isActive) {
+    if (!user) {
       throw new ApiError(401, "INVALID_CREDENTIALS", "Invalid phone or password.");
+    }
+
+    if (user.status === UserStatus.SUSPENDED || !user.isActive) {
+      throw new ApiError(403, "ACCOUNT_SUSPENDED", "This account is suspended.");
+    }
+
+    const banState = evaluateBan(user.status, user.bannedUntil);
+    if (banState.isBanned) {
+      throw new ApiError(403, "ACCOUNT_BANNED", user.banMessage || "This account is banned.", {
+        banReason: user.banReason,
+        banMessage: user.banMessage,
+        bannedUntil: user.bannedUntil,
+        remainingDuration: toRemainingDurationLabel(banState.remainingMs),
+        isPermanent: banState.isPermanent
+      });
+    }
+
+    if (user.status === UserStatus.BANNED && !banState.isBanned) {
+      await prisma.user.update({
+        where: { id: user.id },
+        data: {
+          status: UserStatus.ACTIVE,
+          isActive: true,
+          bannedUntil: null,
+          banReason: null,
+          banMessage: null,
+          bannedByAdminId: null
+        }
+      });
     }
 
     const isValid = await verifyPassword(body.password, user.passwordHash);
@@ -40,11 +71,12 @@ export async function POST(request: Request): Promise<Response> {
         id: user.id,
         phone: user.phone,
         role: user.role,
-        fullName: user.fullName
+        fullName: user.fullName,
+        mustChangePassword: user.mustChangePassword,
+        forcePasswordReset: user.forcePasswordReset
       }
     });
   } catch (error) {
     return fail(error);
   }
 }
-

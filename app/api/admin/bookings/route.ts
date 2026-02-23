@@ -6,7 +6,7 @@ import { requireRoles } from "@/lib/rbac";
 
 export async function GET(): Promise<Response> {
   try {
-    requireRoles(await getSession(), [Role.RECEPTION, Role.MANAGER, Role.ADMIN]);
+    requireRoles(await getSession(), [Role.EMPLOYEE, Role.ADMIN]);
 
     const items = await prisma.booking.findMany({
       include: {
@@ -24,3 +24,4 @@ export async function GET(): Promise<Response> {
     return fail(error);
   }
 }
+

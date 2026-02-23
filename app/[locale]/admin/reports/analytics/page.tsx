@@ -16,7 +16,7 @@ export default async function AdminAnalyticsPage({ params }: Props): Promise<Rea
     redirect(`/${locale}/login`);
   }
 
-  const allowedRoles: Role[] = [Role.ADMIN, Role.MANAGER, Role.ACCOUNTANT];
+  const allowedRoles: Role[] = [Role.ADMIN, Role.EMPLOYEE, Role.EMPLOYEE];
   if (!allowedRoles.includes(session.role)) {
     return (
       <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">

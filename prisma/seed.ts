@@ -5,50 +5,15 @@ const prisma = new PrismaClient();
 
 const ROLE_PERMISSION_MAP: Record<Role, string[]> = {
   CUSTOMER: [],
-  EMPLOYEE: ["attendance.own"],
-  RECEPTION: ["bookings.walkin", "bookings.manage", "customers.manage", "attendance.manage", "ledger.write"],
-  ACCOUNTANT: ["ledger.read", "ledger.write", "reports.read", "suppliers.manage", "invoices.manage", "salaries.manage"],
-  MANAGER: [
-    "bookings.manage",
-    "bookings.walkin",
-    "customers.manage",
-    "reviews.moderate",
-    "membership.manage",
-    "attendance.manage",
-    "salaries.manage",
-    "services.manage",
-    "offers.manage",
-    "about.manage",
-    "hours.manage",
-    "ledger.read",
-    "ledger.write",
-    "reports.read",
-    "suppliers.manage",
-    "invoices.manage"
-  ],
+  EMPLOYEE: [],
   ADMIN: [
-    "bookings.manage",
-    "bookings.walkin",
-    "customers.manage",
-    "reviews.moderate",
-    "membership.manage",
-    "membership.adjust",
-    "users.manage",
-    "attendance.own",
-    "attendance.manage",
-    "salaries.manage",
-    "services.manage",
-    "offers.manage",
-    "about.manage",
-    "hours.manage",
-    "ledger.read",
-    "ledger.write",
-    "reports.read",
-    "suppliers.manage",
-    "invoices.manage",
-    "audit.read",
-    "backup.manage",
-    "system.admin"
+    "accounting",
+    "warehouse",
+    "bookings",
+    "hr",
+    "memberships",
+    "analytics",
+    "services"
   ]
 };
 
@@ -316,6 +281,20 @@ async function main(): Promise<void> {
   await prisma.systemSetting.upsert({
     where: { id: 1 },
     update: {
+      businessName: "Mohammad Khwaileh Center",
+      businessPhone: "+15551234567",
+      businessAddress: "Amman, Jordan",
+      workingHours: [
+        { day: 0, open: "09:00", close: "18:00", closed: false },
+        { day: 1, open: "09:00", close: "18:00", closed: false },
+        { day: 2, open: "09:00", close: "18:00", closed: false },
+        { day: 3, open: "09:00", close: "18:00", closed: false },
+        { day: 4, open: "09:00", close: "18:00", closed: false },
+        { day: 5, open: "09:00", close: "18:00", closed: true },
+        { day: 6, open: "09:00", close: "18:00", closed: false }
+      ],
+      holidays: [],
+      currency: "USD",
       cancellationPolicyHours: 24,
       lateCancellationHours: 2,
       defaultCurrency: "USD",
@@ -323,6 +302,20 @@ async function main(): Promise<void> {
     },
     create: {
       id: 1,
+      businessName: "Mohammad Khwaileh Center",
+      businessPhone: "+15551234567",
+      businessAddress: "Amman, Jordan",
+      workingHours: [
+        { day: 0, open: "09:00", close: "18:00", closed: false },
+        { day: 1, open: "09:00", close: "18:00", closed: false },
+        { day: 2, open: "09:00", close: "18:00", closed: false },
+        { day: 3, open: "09:00", close: "18:00", closed: false },
+        { day: 4, open: "09:00", close: "18:00", closed: false },
+        { day: 5, open: "09:00", close: "18:00", closed: true },
+        { day: 6, open: "09:00", close: "18:00", closed: false }
+      ],
+      holidays: [],
+      currency: "USD",
       cancellationPolicyHours: 24,
       lateCancellationHours: 2,
       defaultCurrency: "USD",

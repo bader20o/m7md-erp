@@ -10,7 +10,7 @@ type Params = { params: Promise<{ id: string }> };
 
 export async function POST(request: Request, context: Params): Promise<Response> {
   try {
-    const actor = requireRoles(await getSession(), [Role.CUSTOMER, Role.RECEPTION, Role.MANAGER, Role.ADMIN]);
+    const actor = requireRoles(await getSession(), [Role.CUSTOMER, Role.EMPLOYEE, Role.ADMIN]);
     const body = await parseJsonBody(request, useEntitlementSchema);
     const { id } = await context.params;
 

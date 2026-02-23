@@ -30,7 +30,7 @@ export async function GET(): Promise<Response> {
 
 export async function PUT(request: Request): Promise<Response> {
   try {
-    const actor = requireRoles(await getSession(), [Role.MANAGER, Role.ADMIN]);
+    const actor = requireRoles(await getSession(), [Role.EMPLOYEE, Role.ADMIN]);
     const body = await parseJsonBody(request, updateAboutSchema);
 
     const item = await prisma.aboutSettings.upsert({
@@ -51,3 +51,4 @@ export async function PUT(request: Request): Promise<Response> {
     return fail(error);
   }
 }
+

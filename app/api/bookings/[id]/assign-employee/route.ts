@@ -9,7 +9,7 @@ type Params = { params: Promise<{ id: string }> };
 
 export async function POST(request: Request, context: Params): Promise<Response> {
   try {
-    requireRoles(await getSession(), [Role.RECEPTION, Role.MANAGER, Role.ADMIN]);
+    requireRoles(await getSession(), [Role.EMPLOYEE, Role.ADMIN]);
     const body = await parseJsonBody(request, assignBookingEmployeeSchema);
     const { id } = await context.params;
 

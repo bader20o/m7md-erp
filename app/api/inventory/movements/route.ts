@@ -13,7 +13,7 @@ import { createMovementSchema, listMovementsQuerySchema } from "@/lib/validators
 
 export async function GET(request: Request): Promise<Response> {
   try {
-    requireRoles(await getSession(), [Role.MANAGER, Role.ADMIN]);
+    requireRoles(await getSession(), [Role.EMPLOYEE, Role.ADMIN]);
     const url = new URL(request.url);
     const query = await listMovementsQuerySchema.parseAsync({
       partId: url.searchParams.get("partId") ?? undefined,
@@ -52,7 +52,7 @@ export async function GET(request: Request): Promise<Response> {
 
 export async function POST(request: Request): Promise<Response> {
   try {
-    const actor = requireRoles(await getSession(), [Role.MANAGER, Role.ADMIN]);
+    const actor = requireRoles(await getSession(), [Role.EMPLOYEE, Role.ADMIN]);
     const body = await parseJsonBody(request, createMovementSchema);
 
     if (body.type === "ADJUST" && !body.adjustDirection) {
@@ -159,3 +159,4 @@ export async function POST(request: Request): Promise<Response> {
     return fail(error);
   }
 }
+

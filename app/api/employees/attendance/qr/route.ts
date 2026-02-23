@@ -7,7 +7,7 @@ import { requireRoles } from "@/lib/rbac";
 
 export async function GET(request: Request): Promise<Response> {
   try {
-    requireRoles(await getSession(), [Role.EMPLOYEE, Role.RECEPTION, Role.MANAGER, Role.ADMIN]);
+    requireRoles(await getSession(), [Role.EMPLOYEE, Role.ADMIN]);
 
     const url = new URL(request.url);
     const employeeId = url.searchParams.get("employeeId");
@@ -35,4 +35,5 @@ export async function GET(request: Request): Promise<Response> {
     return fail(error);
   }
 }
+
 

@@ -48,7 +48,7 @@ export const menuItems: MenuItemConfig[] = [
     key: "dashboard",
     labelKey: "menuDashboard",
     href: "/",
-    rolesAllowed: ["CUSTOMER", "EMPLOYEE", "RECEPTION", "ACCOUNTANT", "MANAGER", "ADMIN"],
+    rolesAllowed: ["CUSTOMER", "EMPLOYEE", "ADMIN"],
     group: "main",
     icon: "LayoutDashboard"
   },
@@ -80,7 +80,7 @@ export const menuItems: MenuItemConfig[] = [
     key: "profile",
     labelKey: "menuProfile",
     href: "/profile",
-    rolesAllowed: ["CUSTOMER", "EMPLOYEE", "RECEPTION", "ACCOUNTANT", "MANAGER", "ADMIN"],
+    rolesAllowed: ["CUSTOMER", "EMPLOYEE", "ADMIN"],
     group: "main",
     icon: "UserRound"
   },
@@ -88,7 +88,7 @@ export const menuItems: MenuItemConfig[] = [
     key: "chat",
     labelKey: "menuChat",
     href: "/chat",
-    rolesAllowed: ["CUSTOMER", "EMPLOYEE", "RECEPTION", "ACCOUNTANT", "MANAGER", "ADMIN"],
+    rolesAllowed: ["CUSTOMER", "EMPLOYEE", "ADMIN"],
     group: "main",
     icon: "MessageSquare"
   },
@@ -96,7 +96,7 @@ export const menuItems: MenuItemConfig[] = [
     key: "admin_bookings",
     labelKey: "menuBookings",
     href: "/admin/bookings",
-    rolesAllowed: ["RECEPTION", "MANAGER", "ADMIN"],
+    rolesAllowed: ["EMPLOYEE", "ADMIN"],
     group: "customers",
     icon: "CalendarRange"
   },
@@ -104,7 +104,7 @@ export const menuItems: MenuItemConfig[] = [
     key: "admin_reviews",
     labelKey: "menuReviews",
     href: "/admin/reviews",
-    rolesAllowed: ["MANAGER", "ADMIN"],
+    rolesAllowed: ["EMPLOYEE", "ADMIN"],
     group: "customers",
     icon: "MessageSquare"
   },
@@ -112,7 +112,7 @@ export const menuItems: MenuItemConfig[] = [
     key: "admin_membership_orders",
     labelKey: "menuMembershipOrders",
     href: "/admin/membership-orders",
-    rolesAllowed: ["RECEPTION", "MANAGER", "ADMIN"],
+    rolesAllowed: ["EMPLOYEE", "ADMIN"],
     group: "customers",
     icon: "BadgeDollarSign"
   },
@@ -120,7 +120,7 @@ export const menuItems: MenuItemConfig[] = [
     key: "admin_users",
     labelKey: "menuUsers",
     href: "/admin/users",
-    rolesAllowed: ["MANAGER", "ADMIN"],
+    rolesAllowed: ["ADMIN"],
     group: "customers",
     icon: "UsersRound"
   },
@@ -128,7 +128,7 @@ export const menuItems: MenuItemConfig[] = [
     key: "admin_attendance",
     labelKey: "menuAttendance",
     href: "/admin/attendance",
-    rolesAllowed: ["RECEPTION", "MANAGER", "ADMIN"],
+    rolesAllowed: ["EMPLOYEE", "ADMIN"],
     group: "employees",
     icon: "ScanLine"
   },
@@ -136,7 +136,7 @@ export const menuItems: MenuItemConfig[] = [
     key: "admin_salaries",
     labelKey: "menuSalaries",
     href: "/admin/salaries",
-    rolesAllowed: ["ACCOUNTANT", "MANAGER", "ADMIN"],
+    rolesAllowed: ["EMPLOYEE", "ADMIN"],
     group: "employees",
     icon: "Wallet"
   },
@@ -144,7 +144,7 @@ export const menuItems: MenuItemConfig[] = [
     key: "admin_services",
     labelKey: "menuServices",
     href: "/admin/services",
-    rolesAllowed: ["MANAGER", "ADMIN"],
+    rolesAllowed: ["EMPLOYEE", "ADMIN"],
     group: "center",
     icon: "Wrench"
   },
@@ -152,7 +152,7 @@ export const menuItems: MenuItemConfig[] = [
     key: "admin_offers",
     labelKey: "menuOffersSlider",
     href: "/admin/offers",
-    rolesAllowed: ["MANAGER", "ADMIN"],
+    rolesAllowed: ["EMPLOYEE", "ADMIN"],
     group: "center",
     icon: "Presentation"
   },
@@ -160,7 +160,7 @@ export const menuItems: MenuItemConfig[] = [
     key: "admin_about_settings",
     labelKey: "menuAboutSettings",
     href: "/admin/about-settings",
-    rolesAllowed: ["MANAGER", "ADMIN"],
+    rolesAllowed: ["EMPLOYEE", "ADMIN"],
     group: "center",
     icon: "Settings2"
   },
@@ -168,7 +168,7 @@ export const menuItems: MenuItemConfig[] = [
     key: "admin_working_hours",
     labelKey: "menuWorkingHours",
     href: "/admin/working-hours",
-    rolesAllowed: ["MANAGER", "ADMIN"],
+    rolesAllowed: ["EMPLOYEE", "ADMIN"],
     group: "center",
     icon: "Clock3"
   },
@@ -176,7 +176,7 @@ export const menuItems: MenuItemConfig[] = [
     key: "admin_inventory",
     labelKey: "menuInventory",
     href: "/admin/inventory",
-    rolesAllowed: ["MANAGER", "ADMIN"],
+    rolesAllowed: ["EMPLOYEE", "ADMIN"],
     group: "center",
     icon: "Boxes"
   },
@@ -184,7 +184,7 @@ export const menuItems: MenuItemConfig[] = [
     key: "admin_transactions",
     labelKey: "menuTransactions",
     href: "/admin/transactions",
-    rolesAllowed: ["ACCOUNTANT", "MANAGER", "ADMIN"],
+    rolesAllowed: ["EMPLOYEE", "ADMIN"],
     group: "accounting",
     icon: "Landmark"
   },
@@ -192,7 +192,7 @@ export const menuItems: MenuItemConfig[] = [
     key: "admin_invoices",
     labelKey: "menuInvoices",
     href: "/admin/invoices",
-    rolesAllowed: ["ACCOUNTANT", "MANAGER", "ADMIN"],
+    rolesAllowed: ["EMPLOYEE", "ADMIN"],
     group: "accounting",
     icon: "Receipt"
   },
@@ -200,7 +200,7 @@ export const menuItems: MenuItemConfig[] = [
     key: "admin_suppliers",
     labelKey: "menuSuppliers",
     href: "/admin/suppliers",
-    rolesAllowed: ["ACCOUNTANT", "MANAGER", "ADMIN"],
+    rolesAllowed: ["EMPLOYEE", "ADMIN"],
     group: "accounting",
     icon: "Truck"
   },
@@ -208,7 +208,7 @@ export const menuItems: MenuItemConfig[] = [
     key: "admin_reports",
     labelKey: "menuReports",
     href: "/admin/reports/analytics",
-    rolesAllowed: ["ACCOUNTANT", "MANAGER", "ADMIN"],
+    rolesAllowed: ["EMPLOYEE", "ADMIN"],
     group: "accounting",
     icon: "ChartNoAxesCombined"
   },
@@ -243,7 +243,7 @@ export function getVisibleMenuItems(role: Role): MenuItemConfig[] {
 }
 
 export function isAdminRole(role: Role): boolean {
-  return role === "RECEPTION" || role === "ACCOUNTANT" || role === "MANAGER" || role === "ADMIN";
+  return role === "EMPLOYEE" || role === "ADMIN";
 }
 
 export function withLocale(locale: string, href: string): string {

@@ -8,6 +8,7 @@ import { requireRoles } from "@/lib/rbac";
 const updateServiceSchema = z.object({
   nameEn: z.string().min(2).max(160).optional(),
   nameAr: z.string().min(2).max(160).optional(),
+  imageUrl: z.string().max(1000).nullable().optional(),
   descriptionEn: z.string().max(1000).nullable().optional(),
   descriptionAr: z.string().max(1000).nullable().optional(),
   durationMinutes: z.coerce.number().int().min(15).max(600).optional(),
@@ -31,7 +32,7 @@ export async function GET(_: Request, context: Params): Promise<Response> {
 
 export async function PATCH(request: Request, context: Params): Promise<Response> {
   try {
-    requireRoles(await getSession(), [Role.ADMIN, Role.MANAGER]);
+    requireRoles(await getSession(), [Role.ADMIN, Role.EMPLOYEE]);
     const { id } = await context.params;
     const body = await parseJsonBody(request, updateServiceSchema);
 

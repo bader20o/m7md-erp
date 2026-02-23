@@ -33,7 +33,7 @@ export async function GET(): Promise<Response> {
 
 export async function POST(request: Request): Promise<Response> {
   try {
-    const actor = requireRoles(await getSession(), [Role.MANAGER, Role.ADMIN]);
+    const actor = requireRoles(await getSession(), [Role.EMPLOYEE, Role.ADMIN]);
     const body = await parseJsonBody(request, createOfferSchema);
     const uniqueServiceIds = body.serviceIds ? Array.from(new Set(body.serviceIds)) : [];
 
@@ -82,3 +82,4 @@ export async function POST(request: Request): Promise<Response> {
     return fail(error);
   }
 }
+
