@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
 type SupplierOption = {
@@ -17,6 +17,21 @@ type PartOption = {
   id: string;
   name: string;
   sku: string | null;
+  vehicleModel: string | null;
+  vehicleType: string | null;
+  category: string | null;
+  sellPrice: number | null;
+  stockQty: number;
+};
+
+type SaleCartLine = {
+  partId: string;
+  partName: string;
+  vehicleCategory: string;
+  carModel: string;
+  quantity: number;
+  unitPrice: number;
+  note: string;
 };
 
 type Props = {
@@ -35,7 +50,12 @@ function getErrorMessage(payload: unknown, fallback: string): string {
   return typed?.error?.message ?? fallback;
 }
 
-export function AccountingEntryForms({ suppliers, invoices, parts, recordedByName }: Props): React.ReactElement {
+export function AccountingEntryForms({
+  suppliers,
+  invoices,
+  parts,
+  recordedByName
+}: Props): React.ReactElement {
   const router = useRouter();
 
   const [walkinItemName, setWalkinItemName] = useState("");
@@ -46,7 +66,9 @@ export function AccountingEntryForms({ suppliers, invoices, parts, recordedByNam
   const [expenseItemName, setExpenseItemName] = useState("");
   const [expenseUnitPrice, setExpenseUnitPrice] = useState("");
   const [expenseQuantity, setExpenseQuantity] = useState("1");
-  const [expenseCategory, setExpenseCategory] = useState<"SUPPLIER" | "GENERAL" | "SALARY">("GENERAL");
+  const [expenseCategory, setExpenseCategory] = useState<"SUPPLIER" | "GENERAL" | "SALARY">(
+    "GENERAL"
+  );
   const [expensePartId, setExpensePartId] = useState("");
   const [expenseNote, setExpenseNote] = useState("");
   const [expenseSupplierId, setExpenseSupplierId] = useState("");
@@ -54,11 +76,131 @@ export function AccountingEntryForms({ suppliers, invoices, parts, recordedByNam
   const [expenseDate, setExpenseDate] = useState("");
   const [loadingWalkin, setLoadingWalkin] = useState(false);
   const [loadingExpense, setLoadingExpense] = useState(false);
+  const [loadingCartCheckout, setLoadingCartCheckout] = useState(false);
+  const [saleSearch, setSaleSearch] = useState("");
+  const [salePartId, setSalePartId] = useState("");
+  const [saleDate, setSaleDate] = useState("");
+  const [saleCart, setSaleCart] = useState<SaleCartLine[]>([]);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [modalQuantity, setModalQuantity] = useState("1");
+  const [modalUnitPrice, setModalUnitPrice] = useState("");
+  const [modalNote, setModalNote] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+
   const walkinTotal = Number(walkinUnitPrice || 0) * Number(walkinQuantity || 0);
   const expenseTotal = Number(expenseUnitPrice || 0) * Number(expenseQuantity || 0);
   const selectedPart = parts.find((part) => part.id === expensePartId) ?? null;
+  const selectedSalePart = parts.find((part) => part.id === salePartId) ?? null;
+  const filteredSaleParts = useMemo(() => {
+    const q = saleSearch.trim().toLowerCase();
+    if (!q) return parts;
+    return parts.filter((part) => {
+      return (
+        part.name.toLowerCase().includes(q) ||
+        (part.sku ?? "").toLowerCase().includes(q) ||
+        (part.vehicleModel ?? "").toLowerCase().includes(q) ||
+        (part.vehicleType ?? "").toLowerCase().includes(q)
+      );
+    });
+  }, [parts, saleSearch]);
+  const modalTotal = Number(modalQuantity || 0) * Number(modalUnitPrice || 0);
+  const cartTotal = saleCart.reduce((sum, line) => sum + line.quantity * line.unitPrice, 0);
+
+  function openAddToCartModal(): void {
+    if (!selectedSalePart) {
+      setError("Please select an inventory item first.");
+      return;
+    }
+    setError(null);
+    setSuccess(null);
+    setModalQuantity("1");
+    setModalUnitPrice(String(selectedSalePart.sellPrice ?? 0));
+    setModalNote("");
+    setModalOpen(true);
+  }
+
+  function confirmAddToCart(): void {
+    if (!selectedSalePart) {
+      setError("Selected inventory item not found.");
+      return;
+    }
+    const qty = Number(modalQuantity);
+    const unitPrice = Number(modalUnitPrice);
+    if (!Number.isFinite(qty) || qty < 1) {
+      setError("Quantity must be at least 1.");
+      return;
+    }
+    if (!Number.isFinite(unitPrice) || unitPrice < 0) {
+      setError("Unit price must be zero or greater.");
+      return;
+    }
+
+    setSaleCart((prev) => [
+      ...prev,
+      {
+        partId: selectedSalePart.id,
+        partName: selectedSalePart.name,
+        vehicleCategory: selectedSalePart.vehicleType ?? "-",
+        carModel: selectedSalePart.vehicleModel ?? "-",
+        quantity: qty,
+        unitPrice,
+        note: modalNote.trim()
+      }
+    ]);
+    setModalOpen(false);
+    setSuccess("Item added to cart.");
+  }
+
+  function removeCartLine(index: number): void {
+    setSaleCart((prev) => prev.filter((_, idx) => idx !== index));
+  }
+
+  async function checkoutCart(): Promise<void> {
+    if (!saleCart.length) {
+      setError("Cart is empty.");
+      return;
+    }
+    setLoadingCartCheckout(true);
+    setError(null);
+    setSuccess(null);
+
+    const invoiceNumber = `SALE-${Date.now()}`;
+    const payload: Record<string, unknown> = {
+      number: invoiceNumber,
+      note: "Sale from accounting cart",
+      lines: saleCart.map((line) => ({
+        partId: line.partId,
+        lineType: "INVENTORY",
+        description: line.partName,
+        quantity: line.quantity,
+        unitAmount: line.unitPrice
+      }))
+    };
+    if (saleDate) {
+      payload.issueDate = new Date(saleDate).toISOString();
+    }
+
+    const response = await fetch("/api/accounting/sale-invoices", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    const json = (await response.json()) as unknown;
+    setLoadingCartCheckout(false);
+
+    if (!response.ok) {
+      setError(getErrorMessage(json, "Failed to checkout cart."));
+      return;
+    }
+
+    setSaleCart([]);
+    setSaleDate("");
+    setSalePartId("");
+    setSaleSearch("");
+    setSuccess("Cart sale confirmed and inventory updated.");
+    router.refresh();
+  }
 
   async function createWalkinIncome(event: React.FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
@@ -144,6 +286,170 @@ export function AccountingEntryForms({ suppliers, invoices, parts, recordedByNam
 
   return (
     <div className="grid gap-4 lg:grid-cols-2">
+      <section className="rounded-xl border border-slate-200 bg-white p-4 lg:col-span-2">
+        <h2 className="text-lg font-semibold">Sale From Inventory</h2>
+        <p className="mt-1 text-xs text-slate-500">Recorded by: {recordedByName}</p>
+
+        <div className="mt-3 grid gap-3 md:grid-cols-2">
+          <input
+            value={saleSearch}
+            onChange={(event) => setSaleSearch(event.target.value)}
+            className="rounded-md border border-slate-300 px-3 py-2 md:col-span-2"
+            placeholder="Search item by name/SKU/model/category"
+          />
+          <select
+            value={salePartId}
+            onChange={(event) => setSalePartId(event.target.value)}
+            className="rounded-md border border-slate-300 px-3 py-2 md:col-span-2"
+          >
+            <option value="">Select inventory item</option>
+            {filteredSaleParts.map((part) => (
+              <option key={part.id} value={part.id}>
+                {part.name}
+                {part.vehicleModel ? ` - ${part.vehicleModel}` : ""}
+                {part.vehicleType ? ` (${part.vehicleType})` : ""}
+              </option>
+            ))}
+          </select>
+          <button
+            type="button"
+            onClick={openAddToCartModal}
+            className="rounded-md bg-brand-700 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-800 md:col-span-2"
+          >
+            Add To Cart
+          </button>
+          <input
+            value={saleDate}
+            onChange={(event) => setSaleDate(event.target.value)}
+            className="rounded-md border border-slate-300 px-3 py-2 md:col-span-2"
+            type="datetime-local"
+            placeholder="Sale date"
+          />
+        </div>
+
+        <div className="mt-4 overflow-x-auto rounded-lg border border-slate-200">
+          <table className="w-full text-sm">
+            <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-600">
+              <tr>
+                <th className="px-3 py-2">Item</th>
+                <th className="px-3 py-2">Category</th>
+                <th className="px-3 py-2">Car Model</th>
+                <th className="px-3 py-2">Qty</th>
+                <th className="px-3 py-2">Unit Price</th>
+                <th className="px-3 py-2">Line Total</th>
+                <th className="px-3 py-2">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {saleCart.map((line, index) => (
+                <tr key={`${line.partId}-${index}`} className="border-t border-slate-100">
+                  <td className="px-3 py-2">{line.partName}</td>
+                  <td className="px-3 py-2">{line.vehicleCategory}</td>
+                  <td className="px-3 py-2">{line.carModel}</td>
+                  <td className="px-3 py-2">{line.quantity}</td>
+                  <td className="px-3 py-2">{line.unitPrice.toFixed(2)}</td>
+                  <td className="px-3 py-2 font-medium">
+                    {(line.quantity * line.unitPrice).toFixed(2)}
+                  </td>
+                  <td className="px-3 py-2">
+                    <button
+                      type="button"
+                      onClick={() => removeCartLine(index)}
+                      className="rounded-md border border-red-200 px-2 py-1 text-xs font-semibold text-red-700"
+                    >
+                      Remove
+                    </button>
+                  </td>
+                </tr>
+              ))}
+              {saleCart.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="px-3 py-3 text-center text-slate-500">
+                    Cart is empty.
+                  </td>
+                </tr>
+              ) : null}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+          <p className="text-sm font-semibold text-slate-800">Cart Total: {cartTotal.toFixed(2)}</p>
+          <button
+            type="button"
+            disabled={loadingCartCheckout || saleCart.length === 0}
+            onClick={() => {
+              void checkoutCart();
+            }}
+            className="rounded-md bg-emerald-700 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-800 disabled:opacity-70"
+          >
+            {loadingCartCheckout ? "Processing..." : "Confirm Cart Sale"}
+          </button>
+        </div>
+      </section>
+
+      {modalOpen && selectedSalePart ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-lg rounded-xl bg-white p-4 shadow-xl">
+            <h3 className="text-lg font-semibold">Item Details</h3>
+            <p className="mt-1 text-sm text-slate-600">
+              Review details and edit default price before adding to cart.
+            </p>
+            <div className="mt-3 grid gap-3 md:grid-cols-2">
+              <input value={selectedSalePart.name} className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2" readOnly />
+              <input value={selectedSalePart.vehicleType ?? ""} className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2" readOnly />
+              <input value={selectedSalePart.vehicleModel ?? ""} className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2" readOnly />
+              <input value={String(selectedSalePart.stockQty)} className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2" readOnly />
+              <input
+                value={modalQuantity}
+                onChange={(event) => setModalQuantity(event.target.value)}
+                className="rounded-md border border-slate-300 px-3 py-2"
+                type="number"
+                min="1"
+                step="1"
+                placeholder="Quantity"
+              />
+              <input
+                value={modalUnitPrice}
+                onChange={(event) => setModalUnitPrice(event.target.value)}
+                className="rounded-md border border-slate-300 px-3 py-2"
+                type="number"
+                min="0"
+                step="0.01"
+                placeholder="Unit Price"
+              />
+              <input
+                value={modalTotal ? modalTotal.toFixed(2) : "0.00"}
+                className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 md:col-span-2"
+                readOnly
+              />
+              <textarea
+                value={modalNote}
+                onChange={(event) => setModalNote(event.target.value)}
+                className="rounded-md border border-slate-300 px-3 py-2 md:col-span-2"
+                placeholder="Note (optional)"
+              />
+            </div>
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setModalOpen(false)}
+                className="rounded-md border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={confirmAddToCart}
+                className="rounded-md bg-brand-700 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-800"
+              >
+                Confirm Add To Cart
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       <section className="rounded-xl border border-slate-200 bg-white p-4">
         <h2 className="text-lg font-semibold">Record Walk-in Income</h2>
         <p className="mt-1 text-xs text-slate-500">Recorded by: {recordedByName}</p>
@@ -331,4 +637,3 @@ export function AccountingEntryForms({ suppliers, invoices, parts, recordedByNam
     </div>
   );
 }
-

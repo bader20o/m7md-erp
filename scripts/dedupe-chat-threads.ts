@@ -64,8 +64,7 @@ async function dedupeParticipantSets(): Promise<number> {
             data: missingParticipants.map((userId) => ({
               threadId: canonical.id,
               userId
-            })),
-            skipDuplicates: true
+            }))
           });
 
           for (const userId of missingParticipants) {

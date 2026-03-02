@@ -1,4 +1,5 @@
 import { BookingStatus, Role } from "@prisma/client";
+import { z } from "zod";
 import { ApiError, fail, ok } from "@/lib/api";
 import { logAudit } from "@/lib/audit";
 import { assertBookingTransition } from "@/lib/booking-status";
@@ -7,10 +8,23 @@ import { prisma } from "@/lib/prisma";
 import { requireRoles } from "@/lib/rbac";
 
 type Params = { params: Promise<{ id: string }> };
+const approveBookingSchema = z.object({
+  finalPrice: z.coerce.number().positive()
+});
 
-export async function POST(_: Request, context: Params): Promise<Response> {
+export async function POST(request: Request, context: Params): Promise<Response> {
   try {
     const actor = requireRoles(await getSession(), [Role.EMPLOYEE, Role.ADMIN]);
+    const rawBody = await request.text();
+    let parsedBody: unknown = {};
+    if (rawBody) {
+      try {
+        parsedBody = JSON.parse(rawBody);
+      } catch {
+        throw new ApiError(400, "INVALID_JSON", "Request body must be valid JSON.");
+      }
+    }
+    const body = approveBookingSchema.parse(parsedBody);
     const { id } = await context.params;
 
     const booking = await prisma.booking.findUnique({
@@ -27,6 +41,7 @@ export async function POST(_: Request, context: Params): Promise<Response> {
       where: { id },
       data: {
         status: BookingStatus.APPROVED,
+        finalPrice: body.finalPrice,
         rejectReason: null,
         cancelReason: null,
         cancelledByUserId: null
@@ -38,7 +53,7 @@ export async function POST(_: Request, context: Params): Promise<Response> {
       entity: "Booking",
       entityId: item.id,
       actorId: actor.sub,
-      payload: { from: booking.status, to: item.status }
+      payload: { from: booking.status, to: item.status, finalPrice: body.finalPrice }
     });
 
     return ok({ item });

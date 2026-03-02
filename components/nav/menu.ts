@@ -76,14 +76,7 @@ export const menuItems: MenuItemConfig[] = [
     group: "main",
     icon: "CreditCard"
   },
-  {
-    key: "profile",
-    labelKey: "menuProfile",
-    href: "/profile",
-    rolesAllowed: ["CUSTOMER", "EMPLOYEE", "ADMIN"],
-    group: "main",
-    icon: "UserRound"
-  },
+
   {
     key: "chat",
     labelKey: "menuChat",
@@ -91,6 +84,14 @@ export const menuItems: MenuItemConfig[] = [
     rolesAllowed: ["CUSTOMER", "EMPLOYEE", "ADMIN"],
     group: "main",
     icon: "MessageSquare"
+  },
+  {
+    key: "tasks",
+    labelKey: "menuTasks",
+    href: "/tasks",
+    rolesAllowed: ["EMPLOYEE"],
+    group: "main",
+    icon: "CalendarCheck"
   },
   {
     key: "admin_bookings",
@@ -131,6 +132,14 @@ export const menuItems: MenuItemConfig[] = [
     rolesAllowed: ["EMPLOYEE", "ADMIN"],
     group: "employees",
     icon: "ScanLine"
+  },
+  {
+    key: "admin_tasks",
+    labelKey: "menuAdminTasks",
+    href: "/admin/tasks",
+    rolesAllowed: ["ADMIN"],
+    group: "employees",
+    icon: "CalendarCheck"
   },
   {
     key: "admin_salaries",

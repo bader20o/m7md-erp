@@ -1,6 +1,8 @@
 import { Role } from "@prisma/client";
 import { ApiError, fail, ok } from "@/lib/api";
 import { getSession } from "@/lib/auth";
+import { assertCanAccessConversation } from "@/lib/chat";
+import { publishChatEvent } from "@/lib/chat-events";
 import { prisma } from "@/lib/prisma";
 import { requireSession } from "@/lib/rbac";
 
@@ -11,13 +13,12 @@ export async function DELETE(_: Request, context: Params): Promise<Response> {
     const actor = requireSession(await getSession());
     const { id } = await context.params;
 
-    const target = await prisma.chatMessage.findUnique({
+    const target = await prisma.conversationMessage.findUnique({
       where: { id },
       select: {
         id: true,
-        threadId: true,
+        conversationId: true,
         senderId: true,
-        createdAt: true,
         deletedAt: true
       }
     });
@@ -26,54 +27,35 @@ export async function DELETE(_: Request, context: Params): Promise<Response> {
       throw new ApiError(404, "MESSAGE_NOT_FOUND", "Message not found.");
     }
 
-    if (target.deletedAt) {
-      return ok({ deleted: true });
-    }
-
-    const participant = await prisma.chatParticipant.findUnique({
-      where: {
-        threadId_userId: {
-          threadId: target.threadId,
-          userId: actor.sub
-        }
-      },
-      select: { id: true }
-    });
-
-    if (!participant) {
-      throw new ApiError(403, "FORBIDDEN", "Not a participant in this thread.");
-    }
+    await assertCanAccessConversation(prisma, target.conversationId, actor);
 
     if (actor.role !== Role.ADMIN && actor.sub !== target.senderId) {
       throw new ApiError(403, "FORBIDDEN", "Only sender or admin can delete this message.");
     }
 
-    const receiverReply = await prisma.chatMessage.findFirst({
-      where: {
-        threadId: target.threadId,
-        createdAt: { gt: target.createdAt },
-        senderId: { not: target.senderId },
-        deletedAt: null
-      },
-      select: { id: true }
-    });
-
-    if (receiverReply) {
-      throw new ApiError(409, "MESSAGE_DELETE_BLOCKED", "Cannot delete message after receiver replied.");
+    if (!target.deletedAt) {
+      await prisma.conversationMessage.update({
+        where: { id: target.id },
+        data: {
+          deletedAt: new Date(),
+          deletedBy: actor.sub,
+          content: ""
+        }
+      });
     }
 
-    await prisma.chatMessage.update({
-      where: { id: target.id },
-      data: {
-        deletedAt: new Date(),
-        deletedById: actor.sub,
-        body: ""
-      }
+    const recipients = await prisma.conversationParticipant.findMany({
+      where: { conversationId: target.conversationId },
+      select: { userId: true }
     });
+    publishChatEvent(
+      "message:deleted",
+      recipients.map((item) => item.userId),
+      { conversationId: target.conversationId, messageId: target.id, deletedBy: actor.sub }
+    );
 
     return ok({ deleted: true });
   } catch (error) {
     return fail(error);
   }
 }
-

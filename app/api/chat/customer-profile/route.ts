@@ -1,12 +1,13 @@
-import { Role } from "@prisma/client";
+import { ConversationType, Role } from "@prisma/client";
 import { z } from "zod";
 import { ApiError, fail, ok } from "@/lib/api";
 import { getSession } from "@/lib/auth";
+import { assertCanAccessConversation } from "@/lib/chat";
 import { prisma } from "@/lib/prisma";
 import { requireSession } from "@/lib/rbac";
 
 const querySchema = z.object({
-  threadId: z.string().min(1)
+  conversationId: z.string().min(1)
 });
 
 export async function GET(request: Request): Promise<Response> {
@@ -18,26 +19,18 @@ export async function GET(request: Request): Promise<Response> {
 
     const url = new URL(request.url);
     const query = await querySchema.parseAsync({
-      threadId: url.searchParams.get("threadId") ?? undefined
+      conversationId: url.searchParams.get("conversationId") ?? url.searchParams.get("threadId") ?? undefined
     });
 
-    const participant = await prisma.chatParticipant.findUnique({
-      where: {
-        threadId_userId: {
-          threadId: query.threadId,
-          userId: actor.sub
-        }
-      },
-      select: { id: true }
-    });
-    if (!participant) {
-      throw new ApiError(403, "FORBIDDEN", "Not a participant in this thread.");
+    const conversation = await assertCanAccessConversation(prisma, query.conversationId, actor);
+    if (conversation.type !== ConversationType.SUPPORT) {
+      return ok({ customer: null, lastBooking: null });
     }
 
-    const customerParticipant = await prisma.chatParticipant.findFirst({
+    const customerParticipant = await prisma.conversationParticipant.findFirst({
       where: {
-        threadId: query.threadId,
-        user: { role: { not: Role.ADMIN } }
+        conversationId: query.conversationId,
+        user: { role: Role.CUSTOMER }
       },
       include: {
         user: {
@@ -45,7 +38,8 @@ export async function GET(request: Request): Promise<Response> {
             id: true,
             fullName: true,
             phone: true,
-            role: true
+            role: true,
+            avatarUrl: true
           }
         }
       }

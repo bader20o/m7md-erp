@@ -1,131 +1,147 @@
 import { apiFetch, buildQuery } from "../../lib/api.js";
+import { DateInput } from "../../components/ui/DateInput.js";
 import { TableRowSkeleton } from "../../components/ui/Skeleton.js";
+import { AlertModal, ConfirmActionModal, ConfirmKeywordModal, ConfirmModal } from "../../components/ui/Modal.js";
 import { uploadLocalFile } from "../../lib/uploads.js";
 
 const LOCAL_PHONE_REGEX = /^07\d{8}$/;
+const CREATE_PERMISSIONS = ["accounting", "warehouse", "bookings", "hr", "memberships", "analytics", "services"];
 
-const PERMISSIONS = [
-  "accounting",
-  "warehouse",
-  "bookings",
-  "hr",
-  "memberships",
-  "analytics",
-  "services"
-];
+const esc = (value) =>
+  String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;");
+
+const dt = (value) => (value ? new Date(value).toLocaleString() : "Not available");
+const d = (value) => (value ? new Date(value).toLocaleDateString() : "-");
+
+const isZeroLike = (value) => ["0", "0.0", "0.00", "0 min", "0.0 min", "0.00 min"].includes(String(value ?? "").trim());
+const formatIpAddress = (value) => (value && value !== "::1" ? value : "Not available");
+const formatDeviceBrowser = (security) => (security?.device && security?.browser ? `${security.device} / ${security.browser}` : "Not available");
+const formatSuspendedUntil = (value) => (value ? `Suspended until ${new Date(value).toLocaleDateString()}` : "Suspended");
+const disableClass = "disabled:cursor-not-allowed disabled:opacity-50";
+
+function getStatusMeta(item) {
+  if (item.status === "BANNED") return { badge: toneBadge("BANNED", "danger"), detail: "Account permanently disabled.", tone: "text-danger" };
+  if (item.status === "SUSPENDED") {
+    return {
+      badge: toneBadge("SUSPENDED", "warn"),
+      detail: formatSuspendedUntil(item.suspendedUntil),
+      tone: "text-amber-500"
+    };
+  }
+  if (item.status === "ON_LEAVE") return { badge: toneBadge("ON_LEAVE", "info"), detail: "", tone: "text-blue-500" };
+  return { badge: toneBadge("ACTIVE", "success"), detail: "", tone: "text-emerald-500" };
+}
+
+function normalizeKpiCards(performance) {
+  const cards = performance?.cards || [];
+  const hasRows = Boolean(performance?.rows?.length);
+  return cards.map((card) => ({
+    ...card,
+    value: !hasRows && isZeroLike(card.value) ? "No data yet" : card.value
+  }));
+}
+
+function avatarMarkup(name, url, small = false) {
+  const cls = small ? "w-10 h-10 text-sm rounded-xl" : "w-20 h-20 text-3xl rounded-2xl";
+  return url
+    ? `<img src="${url}" alt="${esc(name || "Employee")}" class="${cls} border border-border object-cover">`
+    : `<div class="${cls} border border-border bg-bg flex items-center justify-center font-bold text-primary">${esc((name || "E").charAt(0).toUpperCase())}</div>`;
+}
+
+function toneBadge(label, type) {
+  const tone =
+    type === "danger"
+      ? "border-danger/30 bg-danger/10 text-danger"
+      : type === "warn"
+        ? "border-amber-500/30 bg-amber-500/10 text-amber-500"
+        : type === "info"
+          ? "border-blue-500/30 bg-blue-500/10 text-blue-500"
+          : type === "success"
+            ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-500"
+            : "border-border bg-bg text-text";
+  return `<span class="inline-flex items-center rounded-full border px-3 py-1 text-[11px] font-semibold tracking-wide ${tone}">${esc(label)}</span>`;
+}
 
 function statusBadge(status) {
-  if (status === "banned") return `<span class="px-2.5 py-1 bg-danger/15 text-danger rounded-md text-[10px] font-bold uppercase tracking-wider">Banned</span>`;
-  if (status === "suspended") return `<span class="px-2.5 py-1 bg-amber-500/15 text-amber-500 rounded-md text-[10px] font-bold uppercase tracking-wider">Suspended</span>`;
-  return `<span class="px-2.5 py-1 bg-success/15 text-success rounded-md text-[10px] font-bold uppercase tracking-wider">Active</span>`;
+  if (status === "banned") return toneBadge("BANNED", "danger");
+  if (status === "suspended") return toneBadge("SUSPENDED", "warn");
+  if (status === "on_leave") return toneBadge("ON_LEAVE", "info");
+  return toneBadge("ACTIVE", "success");
 }
 
-function formatDate(value) {
-  if (!value) return "-";
-  return new Date(value).toLocaleDateString();
+function roleBadge(role) {
+  return toneBadge(role || "EMPLOYEE");
 }
 
-function permissionChips(permissions) {
-  if (!permissions || !permissions.length) {
-    return `<span class="text-xs text-muted">No permissions</span>`;
-  }
-  const chips = permissions
-    .map(
-      (permission) =>
-        `<span class="px-2 py-1 bg-primary/10 text-primary rounded-md text-[10px] uppercase font-semibold">${permission}</span>`
-    )
-    .join("");
-  return `<div class="flex flex-wrap gap-1 max-w-[220px]">${chips}</div>`;
+function kpiCard(card) {
+  return `<div class="rounded-2xl border border-border px-4 py-4"><div class="text-xs uppercase tracking-wide text-muted">${esc(card.label)}</div><div class="mt-2 text-2xl font-semibold text-text">${esc(card.value)}</div></div>`;
 }
 
-function avatarFor(fullName, avatarUrl) {
-  if (avatarUrl) {
-    return `<img src="${avatarUrl}" class="w-10 h-10 rounded-full object-cover border border-border" alt="avatar">`;
-  }
-  return `<div class="w-10 h-10 rounded-full bg-primary/10 text-primary font-bold flex items-center justify-center border border-border">${(fullName || "E").charAt(0).toUpperCase()}</div>`;
+function infoRow(label, value) {
+  return `<div class="flex items-start justify-between gap-4 border-b border-border/70 py-3 last:border-b-0"><span class="text-xs uppercase tracking-wide text-muted">${label}</span><span class="text-sm text-right text-text">${esc(value || "-")}</span></div>`;
+}
+
+function actionButton(label, attrs = "", extraClass = "") {
+  return `<button type="button" ${attrs} class="rounded-xl border border-border px-4 py-3 text-sm font-medium text-text hover:border-text ${disableClass} ${extraClass}">${label}</button>`;
 }
 
 export function AdminEmployees() {
   window.onMount = () => {
     const tbody = document.getElementById("employees-tbody");
     const pagination = document.getElementById("employees-pagination");
-    const queryInput = document.getElementById("employees-search");
-    const statusFilter = document.getElementById("employees-status");
-    const joinFromFilter = document.getElementById("employees-join-from");
-    const joinToFilter = document.getElementById("employees-join-to");
-    const createToggle = document.getElementById("toggle-employee-create");
-    const createContainer = document.getElementById("employee-create-container");
     const createForm = document.getElementById("employee-create-form");
-    const fullNameInput = document.getElementById("employee-full-name");
-    const phoneInput = document.getElementById("employee-phone");
-    const nationalIdInput = document.getElementById("employee-national-id");
-    const duplicateWarning = document.getElementById("employee-duplicate-warning");
-    const idCardImageInput = document.getElementById("employee-id-card-file");
-    const idCardImageUrlInput = document.getElementById("employee-id-card-url");
-    const idCardImageHint = document.getElementById("employee-id-card-hint");
-    const idCardImagePreview = document.getElementById("employee-id-card-preview");
-    const profilePhotoInput = document.getElementById("employee-profile-photo-file");
-    const profilePhotoUrlInput = document.getElementById("employee-profile-photo-url");
-    const profilePhotoHint = document.getElementById("employee-profile-photo-hint");
-    const profilePhotoPreview = document.getElementById("employee-profile-photo-preview");
+    const createContainer = document.getElementById("employee-create-container");
+    const warning = document.getElementById("employee-duplicate-warning");
+    const state = { q: "", status: "", joinFrom: "", joinTo: "", page: 1, limit: 10, total: 0, loading: false, quickItem: null };
 
-    const state = {
-      q: "",
-      status: "",
-      joinFrom: "",
-      joinTo: "",
-      page: 1,
-      limit: 10,
-      total: 0,
-      loading: false,
-      duplicateBlocked: false,
-      permissionsByEmployee: {}
+    const pickPermissions = (selector) => Array.from(document.querySelectorAll(selector)).filter((i) => i.checked).map((i) => i.value);
+    const setPreview = (id, url, label) => {
+      const node = document.getElementById(id);
+      node.innerHTML = url ? `<img src="${url}" alt="${label}" class="h-full w-full object-cover">` : `<div class="flex h-full w-full items-center justify-center text-[10px] text-muted">No image</div>`;
     };
 
-    let searchDebounce = null;
-    let duplicateDebounce = null;
-
-    function setImagePreview(container, url, alt) {
-      if (!container) return;
-      if (!url) {
-        container.innerHTML = `<div class="w-full h-full flex items-center justify-center text-[10px] text-muted">No image</div>`;
-        return;
-      }
-      container.innerHTML = `<img src="${url}" alt="${alt}" class="w-full h-full object-cover">`;
-    }
-
-    function resetCreateImageFields() {
-      if (idCardImageUrlInput) idCardImageUrlInput.value = "";
-      if (profilePhotoUrlInput) profilePhotoUrlInput.value = "";
-      if (idCardImageHint) idCardImageHint.textContent = "Choose image from device.";
-      if (profilePhotoHint) profilePhotoHint.textContent = "Choose image from device.";
-      if (idCardImageInput) idCardImageInput.value = "";
-      if (profilePhotoInput) profilePhotoInput.value = "";
-      setImagePreview(idCardImagePreview, "", "ID Card Image");
-      setImagePreview(profilePhotoPreview, "", "Profile Photo");
-    }
-
-    async function uploadEmployeeImage({ file, folder, urlInput, hintNode, previewNode, label }) {
-      if (!file || !urlInput || !hintNode) return;
+    async function loadEmployees() {
+      if (state.loading) return;
+      state.loading = true;
+      tbody.innerHTML = TableRowSkeleton(6).repeat(5);
       try {
-        hintNode.textContent = "Uploading...";
-        const fileUrl = await uploadLocalFile(file, { folder });
-        urlInput.value = fileUrl;
-        setImagePreview(previewNode, fileUrl, label);
-        hintNode.textContent = "Image uploaded.";
-        window.toast(`${label} uploaded.`, "success");
+        const res = await apiFetch(`/admin/employees${buildQuery({ q: state.q, status: state.status, joinFrom: state.joinFrom, joinTo: state.joinTo, page: state.page, limit: state.limit })}`);
+        state.total = res.total || 0;
+        const items = res.items || [];
+        tbody.innerHTML = items.length
+          ? items
+              .map(
+                (item) => `
+                  <tr class="border-b border-border text-center hover:bg-bg">
+                    <td class="px-4 py-3 text-left">
+                      <button type="button" data-open="${item.id}" class="flex w-full items-center gap-3 text-left">
+                        ${avatarMarkup(item.fullName, item.avatar, true)}
+                        <div>
+                          <div class="text-sm font-semibold text-text">${esc(item.fullName || "Unnamed Employee")}</div>
+                          <div class="text-xs text-muted">${esc(item.phone)}</div>
+                        </div>
+                      </button>
+                    </td>
+                    <td class="px-4 py-3 text-sm">${esc(item.phone)}</td>
+                    <td class="px-4 py-3 text-sm">${roleBadge(item.roleProfile)}</td>
+                    <td class="px-4 py-3 text-sm">${statusBadge(item.status)}</td>
+                    <td class="px-4 py-3 text-sm">${d(item.joinedAt)}</td>
+                    <td class="px-4 py-3 text-sm"><button type="button" data-open="${item.id}" class="font-semibold text-primary">View</button></td>
+                  </tr>
+                `
+              )
+              .join("")
+          : `<tr><td colspan="6" class="py-12 text-center text-sm text-muted">No employees found.</td></tr>`;
       } catch (error) {
-        urlInput.value = "";
-        setImagePreview(previewNode, "", label);
-        hintNode.textContent = "Upload failed.";
-        window.toast(error.message || `Failed to upload ${label}.`, "error");
+        tbody.innerHTML = `<tr><td colspan="6" class="py-12 text-center text-sm text-danger">${esc(error.message)}</td></tr>`;
+      } finally {
+        state.loading = false;
+        renderPagination();
       }
-    }
-
-    function getSelectedPermissions() {
-      return Array.from(document.querySelectorAll(".employee-permission-checkbox"))
-        .filter((input) => input.checked)
-        .map((input) => input.value);
     }
 
     function renderPagination() {
@@ -133,510 +149,270 @@ export function AdminEmployees() {
       pagination.innerHTML = `
         <div class="text-xs text-muted">Page ${state.page} of ${pages} (${state.total} employees)</div>
         <div class="flex items-center gap-2">
-          <button id="employees-prev-page" class="px-3 py-1.5 rounded-lg border border-border text-sm ${state.page <= 1 ? "opacity-50 cursor-not-allowed" : "hover:border-primary"}">Prev</button>
-          <button id="employees-next-page" class="px-3 py-1.5 rounded-lg border border-border text-sm ${state.page >= pages ? "opacity-50 cursor-not-allowed" : "hover:border-primary"}">Next</button>
+          <button id="employees-prev" class="rounded-xl border border-border px-3 py-2 text-sm ${state.page <= 1 ? "pointer-events-none opacity-50" : ""}">Prev</button>
+          <button id="employees-next" class="rounded-xl border border-border px-3 py-2 text-sm ${state.page >= pages ? "pointer-events-none opacity-50" : ""}">Next</button>
         </div>
       `;
-
-      document.getElementById("employees-prev-page").addEventListener("click", () => {
-        if (state.page <= 1) return;
-        state.page -= 1;
-        loadEmployees();
-      });
-
-      document.getElementById("employees-next-page").addEventListener("click", () => {
-        if (state.page >= pages) return;
-        state.page += 1;
-        loadEmployees();
-      });
+      pagination.querySelector("#employees-prev").addEventListener("click", () => { state.page -= 1; loadEmployees(); });
+      pagination.querySelector("#employees-next").addEventListener("click", () => { state.page += 1; loadEmployees(); });
     }
 
-    async function checkDuplicates() {
-      const phone = phoneInput.value.trim();
-      const nationalId = nationalIdInput.value.trim();
-      const fullName = fullNameInput.value.trim();
-
-      if (!phone && !nationalId && !fullName) {
-        duplicateWarning.classList.add("hidden");
-        duplicateWarning.textContent = "";
-        state.duplicateBlocked = false;
+    function renderQuickPanel() {
+      const modal = document.getElementById("employee-quick-modal");
+      const content = document.getElementById("employee-quick-content");
+      if (!state.quickItem) {
+        modal.classList.add("hidden");
+        modal.classList.remove("flex");
         return;
       }
-
-      try {
-        const query = buildQuery({
-          phone: phone || undefined,
-          nationalId: nationalId || undefined,
-          fullName: fullName || undefined
-        });
-        const result = await apiFetch(`/admin/users/check-duplicate${query}`);
-        const messages = [];
-
-        if (result.phone?.exists) {
-          messages.push(`Phone exists (${result.phone.profile.fullName || result.phone.profile.phone}).`);
-        }
-        if (result.nationalId?.exists) {
-          messages.push(`National ID already belongs to ${result.nationalId.profile.fullName || "an employee"}.`);
-        }
-        if (result.nameWarnings?.length) {
-          messages.push(`Similar names detected: ${result.nameWarnings.map((item) => item.fullName).join(", ")}.`);
-        }
-
-        if (messages.length) {
-          duplicateWarning.classList.remove("hidden");
-          duplicateWarning.textContent = messages.join(" ");
-          state.duplicateBlocked = true;
-        } else {
-          duplicateWarning.classList.add("hidden");
-          duplicateWarning.textContent = "";
-          state.duplicateBlocked = false;
-        }
-      } catch (error) {
-        duplicateWarning.classList.add("hidden");
-        duplicateWarning.textContent = "";
-        state.duplicateBlocked = false;
-      }
-    }
-
-    async function loadEmployees() {
-      if (state.loading) return;
-      state.loading = true;
-      tbody.innerHTML = TableRowSkeleton(6).repeat(5);
-
-      try {
-        const query = buildQuery({
-          q: state.q,
-          status: state.status,
-          joinFrom: state.joinFrom,
-          joinTo: state.joinTo,
-          page: state.page,
-          limit: state.limit
-        });
-        const response = await apiFetch(`/admin/employees${query}`);
-        state.total = response.total || 0;
-        const items = response.items || [];
-
-        if (!items.length) {
-          tbody.innerHTML = `<tr><td colspan="6" class="py-12 text-center text-muted text-sm">No employees found.</td></tr>`;
-        } else {
-          tbody.innerHTML = items
-            .map(
-              (item) => `
-            <tr class="border-b border-border hover:bg-bg cursor-pointer transition-colors" onclick="window.openEmployeeDetails('${item.id}')">
-              <td class="px-4 py-3">
-                <div class="flex items-center gap-3">
-                  ${avatarFor(item.fullName, item.avatar)}
-                  <div>
-                    <div class="text-sm font-semibold text-text">${item.fullName || "Unnamed Employee"}</div>
-                    <div class="text-xs text-muted">${item.phone}</div>
-                  </div>
-                </div>
-              </td>
-              <td class="px-4 py-3 text-sm">${item.phone}</td>
-              <td class="px-4 py-3 text-sm">${formatDate(item.joinedAt)}</td>
-              <td class="px-4 py-3">${statusBadge(item.status)}</td>
-              <td class="px-4 py-3 text-xs">${permissionChips(item.permissions)}</td>
-              <td class="px-4 py-3 text-right text-sm text-primary font-semibold">View</td>
-            </tr>
-          `
-            )
-            .join("");
-        }
-      } catch (error) {
-        tbody.innerHTML = `<tr><td colspan="6" class="py-12 text-center text-danger text-sm">${error.message}</td></tr>`;
-      } finally {
-        state.loading = false;
-        renderPagination();
-      }
-    }
-
-    async function loadEmployeeDetails(id) {
-      const drawer = document.getElementById("employee-details-drawer");
-      const content = document.getElementById("employee-details-content");
-      const title = document.getElementById("employee-drawer-title");
-      drawer.classList.remove("translate-x-full");
-      content.innerHTML = `<div class="py-10 text-center text-muted">Loading...</div>`;
-
-      try {
-        const response = await apiFetch(`/admin/employees/${id}`);
-        const employee = response.item;
-        state.permissionsByEmployee[id] = employee.permissions || [];
-        title.textContent = employee.fullName || "Employee";
-        content.innerHTML = `
-          <div class="space-y-5">
-            <div class="flex items-center gap-3">
-              ${avatarFor(employee.fullName, employee.hr.profilePhotoUrl)}
-              <div>
-                <div class="text-base font-bold">${employee.fullName || "Unnamed"}</div>
-                <div class="text-xs text-muted">${employee.phone}</div>
+      const item = state.quickItem;
+      const security = item.security || {};
+      const statusMeta = getStatusMeta(item);
+      const editingDisabled = item.status === "BANNED";
+      const kpis = normalizeKpiCards(item.performance);
+      const attendanceSnapshot = item.attendance?.snapshot || {};
+      content.innerHTML = `
+        <div class="space-y-6">
+          <div class="flex flex-col gap-4 rounded-[24px] border border-border px-6 py-6 lg:flex-row lg:items-center lg:justify-between">
+            <div class="flex items-start gap-4">
+              ${avatarMarkup(item.fullName, item.avatar)}
+              <div class="space-y-2">
+                <div class="text-2xl font-semibold text-text">${esc(item.fullName || "Employee")}</div>
+                <div class="text-sm text-muted">${esc(item.phone || "-")}</div>
+                <div class="flex flex-wrap gap-2">${roleBadge(item.roleProfile)} ${statusMeta.badge}</div>
+                ${statusMeta.detail ? `<div class="text-sm font-medium ${statusMeta.tone}">${esc(statusMeta.detail)}</div>` : ""}
               </div>
             </div>
-
-            <div class="grid grid-cols-2 gap-3 text-xs">
-              <div class="rounded-lg border border-border p-3">
-                <div class="text-muted uppercase">Joined</div>
-                <div class="font-semibold mt-1">${formatDate(employee.joinedAt)}</div>
-              </div>
-              <div class="rounded-lg border border-border p-3">
-                <div class="text-muted uppercase">Status</div>
-                <div class="mt-1">${statusBadge(employee.status)}</div>
-              </div>
-            </div>
-
-            <div class="rounded-lg border border-border p-3 text-xs space-y-2">
-              <div><span class="text-muted uppercase">National ID:</span> <span class="font-semibold">${employee.hr.nationalId}</span></div>
-              <div><span class="text-muted uppercase">Birth Date:</span> <span class="font-semibold">${formatDate(employee.hr.birthDate)}</span></div>
-              <div><span class="text-muted uppercase">Job Title:</span> <span class="font-semibold">${employee.hr.jobTitle}</span></div>
-              <div><span class="text-muted uppercase">Permissions:</span> ${permissionChips(employee.permissions)}</div>
-            </div>
-
-            <div class="grid grid-cols-2 gap-2">
-              <button class="px-3 py-2 rounded-lg border border-border text-sm hover:border-primary" onclick="window.employeeAction('${id}','suspend')">Suspend</button>
-              <button class="px-3 py-2 rounded-lg border border-border text-sm hover:border-primary" onclick="window.employeeAction('${id}','ban')">Ban</button>
-              <button class="px-3 py-2 rounded-lg border border-border text-sm hover:border-primary" onclick="window.employeeAction('${id}','reset_password')">Reset Password</button>
-              <button class="px-3 py-2 rounded-lg border border-border text-sm hover:border-primary" onclick="window.employeeAction('${id}','resend_credentials')">Resend Credentials</button>
-              <button class="px-3 py-2 rounded-lg border border-border text-sm hover:border-primary col-span-2" onclick="window.employeeAction('${id}','activate')">Activate</button>
-              <button class="px-3 py-2 rounded-lg border border-border text-sm hover:border-primary col-span-2" onclick="window.employeeEditPermissions('${id}')">Edit Permissions</button>
-              <button class="px-3 py-2 rounded-lg border border-border text-sm hover:border-primary col-span-2" onclick="window.employeeEditHr('${id}')">Edit HR</button>
+            <div class="flex flex-wrap gap-3">
+              ${item.status === "ACTIVE" ? actionButton("Suspend 1 day", `data-action="suspend" data-days="1" ${editingDisabled ? "disabled" : ""}`) : ""}
+              ${item.status === "ACTIVE" ? actionButton("Suspend 7 days", `data-action="suspend" data-days="7" ${editingDisabled ? "disabled" : ""}`) : ""}
+              ${item.status === "ACTIVE" ? actionButton("Suspend 30 days", `data-action="suspend" data-days="30" ${editingDisabled ? "disabled" : ""}`) : ""}
+              ${item.status !== "ACTIVE" ? actionButton("Activate", `data-action="activate"`) : ""}
+              ${actionButton("Ban", `data-action="ban" ${editingDisabled ? "disabled" : ""}`, "border-danger/30 text-danger hover:border-danger")}
             </div>
           </div>
-        `;
+          <div class="grid grid-cols-1 gap-4 md:grid-cols-3">${kpis.map(kpiCard).join("") || `<div class="rounded-2xl border border-border px-4 py-10 text-center text-sm text-muted md:col-span-3">No performance data available.</div>`}</div>
+          <div class="rounded-[24px] border border-border px-6 py-6">
+            <div class="mb-4 text-sm font-semibold text-text">Attendance Snapshot</div>
+            ${
+              attendanceSnapshot.lastCheckInAt || attendanceSnapshot.lastCheckOutAt
+                ? `${infoRow("Last Check-in", dt(attendanceSnapshot.lastCheckInAt))}${infoRow("Last Check-out", dt(attendanceSnapshot.lastCheckOutAt))}`
+                : `<div class="text-sm text-muted">No attendance records yet.</div>`
+            }
+          </div>
+          <div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
+            <div class="rounded-[24px] border border-border px-6 py-6">
+              <div class="mb-4 text-sm font-semibold text-text">Security Snapshot</div>
+              ${infoRow("Last login", dt(security.lastLoginAt))}
+              ${infoRow("Last active", dt(security.lastActiveAt))}
+              ${infoRow("Device / Browser", formatDeviceBrowser(security))}
+              ${infoRow("IP address", formatIpAddress(security.ipAddress))}
+            </div>
+            <div class="rounded-[24px] border border-border px-6 py-6">
+              <div class="mb-4 text-sm font-semibold text-text">Recent Activity</div>
+              <div class="space-y-3">${(item.recentActivity || []).length ? item.recentActivity.map((entry) => `<div class="rounded-2xl border border-border px-4 py-3"><div class="text-sm font-medium text-text">${esc(entry.action)}</div><div class="text-xs text-muted">${dt(entry.createdAt)}</div></div>`).join("") : `<div class="text-sm text-muted">No recent activity.</div>`}</div>
+            </div>
+          </div>
+          <div class="rounded-[24px] border border-border px-6 py-6">
+            <div class="mb-4 text-sm font-semibold text-text">Actions</div>
+            <div class="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+              ${actionButton("Reset password", `data-action="reset_password" ${editingDisabled ? "disabled" : ""}`)}
+              ${actionButton("Resend credentials", `data-action="resend_credentials" ${editingDisabled ? "disabled" : ""}`)}
+              ${actionButton("Edit permissions", `data-open-tab="permissions" ${editingDisabled ? "disabled" : ""}`)}
+              ${actionButton("Edit HR", `data-open-tab="hr" ${editingDisabled ? "disabled" : ""}`)}
+              ${actionButton("Open Full Profile", `data-open-tab="profile"`)}
+            </div>
+            <div class="mt-4 text-xs text-muted">Suspend = temporary restriction. Ban = permanent disable until manually reactivated.</div>
+          </div>
+        </div>
+      `;
+      modal.classList.remove("hidden");
+      modal.classList.add("flex");
+
+      content.querySelectorAll("[data-open-tab]").forEach((button) =>
+        button.addEventListener("click", () => {
+          if (button.disabled) return;
+          window.navigate(null, `/admin/profile?employeeId=${item.id}&tab=${button.dataset.openTab}`);
+        })
+      );
+      content.querySelectorAll("[data-action]").forEach((button) =>
+        button.addEventListener("click", () => {
+          if (button.disabled) return;
+          runQuickAction(item.id, button.dataset.action, button.dataset.days);
+        })
+      );
+    }
+
+    async function openQuickPanel(id) {
+      document.getElementById("employee-quick-content").innerHTML = `<div class="py-16 text-center text-sm text-muted">Loading employee details...</div>`;
+      document.getElementById("employee-quick-modal").classList.remove("hidden");
+      document.getElementById("employee-quick-modal").classList.add("flex");
+      try {
+        state.quickItem = (await apiFetch(`/admin/employees/${id}`)).item;
+        renderQuickPanel();
       } catch (error) {
-        content.innerHTML = `<div class="py-10 text-center text-danger text-sm">${error.message}</div>`;
+        document.getElementById("employee-quick-content").innerHTML = `<div class="py-16 text-center text-sm text-danger">${esc(error.message)}</div>`;
       }
     }
 
-    window.openEmployeeDetails = (id) => {
-      loadEmployeeDetails(id);
-    };
-
-    window.employeeAction = async (id, action) => {
+    async function runQuickAction(id, action, days) {
       try {
-        if (action === "suspend") {
-          const reason = prompt("Suspension reason (optional):") || undefined;
-          await apiFetch(`/admin/employees/${id}`, { method: "PATCH", body: { action, reason } });
-        } else if (action === "ban") {
-          const durationInput = prompt("Ban duration in days (leave empty for permanent):");
-          const banMessage = prompt("Ban message shown to employee (optional):") || undefined;
-          const banReason = prompt("Internal reason (optional):") || undefined;
-          await apiFetch(`/admin/employees/${id}`, {
-            method: "PATCH",
-            body: {
-              action,
-              durationDays: durationInput ? Number(durationInput) : undefined,
-              banReason,
-              banMessage
-            }
+        if (action === "ban") {
+          const result = await ConfirmKeywordModal({
+            title: "Ban Employee",
+            message: "This employee account will be permanently disabled until manually reactivated.",
+            warning: "This action permanently disables the account.",
+            keyword: "BAN",
+            inputLabel: "Type",
+            confirmText: "Ban",
+            cancelText: "Cancel",
+            intent: "danger"
           });
+          if (!result.confirmed) return;
+          await apiFetch(`/admin/employees/${id}`, { method: "PATCH", body: { action } });
         } else if (action === "reset_password" || action === "resend_credentials") {
-          const response = await apiFetch(`/admin/employees/${id}`, {
-            method: "PATCH",
-            body: { action }
-          });
-          if (response.temporaryPassword) {
-            alert(`Temporary password: ${response.temporaryPassword}`);
-          }
+          const confirmed = await ConfirmModal({ title: action === "reset_password" ? "Reset Password" : "Resend Credentials", message: "A temporary password will be generated for this employee.", confirmText: "Continue", cancelText: "Cancel", intent: "primary" });
+          if (!confirmed) return;
+          const res = await apiFetch(`/admin/employees/${id}`, { method: "PATCH", body: { action } });
+          if (res.temporaryPassword) await AlertModal({ title: "Temporary Password", message: res.temporaryPassword, intent: "success", confirmText: "Close" });
+        } else if (action === "suspend") {
+          const result = await ConfirmActionModal({ title: "Suspend Employee", message: `Suspend this employee for ${days} day(s)?`, notePlaceholder: "Suspension reason", confirmText: "Suspend", cancelText: "Cancel", intent: "danger" });
+          if (!result.confirmed) return;
+          await apiFetch(`/admin/employees/${id}`, { method: "PATCH", body: { action, durationDays: Number(days), reason: result.note || undefined } });
         } else {
           await apiFetch(`/admin/employees/${id}`, { method: "PATCH", body: { action } });
         }
         window.toast("Employee updated", "success");
         await loadEmployees();
-        await loadEmployeeDetails(id);
+        await openQuickPanel(id);
       } catch (error) {
         window.toast(error.message, "error");
       }
+    }
+
+    document.getElementById("employees-tbody").addEventListener("click", (event) => {
+      const button = event.target.closest("[data-open]");
+      if (!button) return;
+      openQuickPanel(button.dataset.open);
+    });
+    document.getElementById("close-employee-quick").addEventListener("click", () => {
+      state.quickItem = null;
+      renderQuickPanel();
+    });
+
+    document.getElementById("employees-search").addEventListener("input", (event) => { state.q = event.target.value.trim(); state.page = 1; loadEmployees(); });
+    document.getElementById("employees-status").addEventListener("change", (event) => { state.status = event.target.value; state.page = 1; loadEmployees(); });
+    document.getElementById("employees-join-from").addEventListener("change", (event) => { state.joinFrom = event.target.value; state.page = 1; loadEmployees(); });
+    document.getElementById("employees-join-to").addEventListener("change", (event) => { state.joinTo = event.target.value; state.page = 1; loadEmployees(); });
+
+    document.getElementById("toggle-employee-create").addEventListener("click", () => {
+      createContainer.classList.remove("hidden");
+      createContainer.classList.add("flex");
+    });
+    window.closeEmployeeCreateModal = () => {
+      createContainer.classList.add("hidden");
+      createContainer.classList.remove("flex");
+      createForm.reset();
+      warning.classList.add("hidden");
+      setPreview("employee-id-card-preview", "", "ID Card");
+      setPreview("employee-profile-photo-preview", "", "Profile");
+      document.getElementById("employee-id-card-url").value = "";
+      document.getElementById("employee-profile-photo-url").value = "";
     };
 
-    window.employeeEditPermissions = async (id) => {
-      const currentPermissions = state.permissionsByEmployee[id] || [];
-      const input = prompt(
-        "Permissions (comma separated): accounting, warehouse, bookings, hr, memberships, analytics, services",
-        currentPermissions.join(", ")
-      );
-      if (input === null) return;
-      const permissions = input
-        .split(",")
-        .map((item) => item.trim().toLowerCase())
-        .filter(Boolean);
-
-      try {
-        await apiFetch(`/admin/employees/${id}`, {
-          method: "PATCH",
-          body: {
-            action: "update_permissions",
-            permissions
-          }
-        });
-        window.toast("Permissions updated", "success");
-        await loadEmployees();
-        await loadEmployeeDetails(id);
-      } catch (error) {
-        window.toast(error.message, "error");
-      }
-    };
-
-    window.employeeEditHr = async (id) => {
-      try {
-        const details = await apiFetch(`/admin/employees/${id}`);
-        const employee = details.item;
-
-        const fullName = prompt("Full name (4 parts):", employee.fullName || "");
-        if (fullName === null) return;
-        const nationalId = prompt("National ID:", employee.hr.nationalId || "");
-        if (nationalId === null) return;
-        const birthDate = prompt("Birth date (YYYY-MM-DD):", employee.hr.birthDate ? employee.hr.birthDate.slice(0, 10) : "");
-        if (birthDate === null) return;
-        const jobTitle = prompt("Job title:", employee.hr.jobTitle || "");
-        if (jobTitle === null) return;
-
-        await apiFetch(`/admin/employees/${id}`, {
-          method: "PATCH",
-          body: {
-            action: "update_hr",
-            data: {
-              fullName: fullName || undefined,
-              nationalId: nationalId || undefined,
-              birthDate: birthDate || undefined,
-              jobTitle: jobTitle || undefined
-            }
-          }
-        });
-        window.toast("HR updated", "success");
-        await loadEmployees();
-        await loadEmployeeDetails(id);
-      } catch (error) {
-        window.toast(error.message, "error");
-      }
-    };
-
-    document.getElementById("close-employee-drawer").addEventListener("click", () => {
-      document.getElementById("employee-details-drawer").classList.add("translate-x-full");
-    });
-
-    queryInput.addEventListener("input", (event) => {
-      clearTimeout(searchDebounce);
-      searchDebounce = setTimeout(() => {
-        state.q = event.target.value.trim();
-        state.page = 1;
-        loadEmployees();
-      }, 300);
-    });
-
-    statusFilter.addEventListener("change", (event) => {
-      state.status = event.target.value;
-      state.page = 1;
-      loadEmployees();
-    });
-
-    joinFromFilter.addEventListener("change", (event) => {
-      state.joinFrom = event.target.value;
-      state.page = 1;
-      loadEmployees();
-    });
-
-    joinToFilter.addEventListener("change", (event) => {
-      state.joinTo = event.target.value;
-      state.page = 1;
-      loadEmployees();
-    });
-
-    createToggle.addEventListener("click", () => {
-      createContainer.classList.toggle("hidden");
-    });
-
-    phoneInput.addEventListener("input", () => {
-      clearTimeout(duplicateDebounce);
-      duplicateDebounce = setTimeout(checkDuplicates, 250);
-    });
-
-    nationalIdInput.addEventListener("input", () => {
-      clearTimeout(duplicateDebounce);
-      duplicateDebounce = setTimeout(checkDuplicates, 250);
-    });
-
-    fullNameInput.addEventListener("input", () => {
-      clearTimeout(duplicateDebounce);
-      duplicateDebounce = setTimeout(checkDuplicates, 250);
-    });
-
-    idCardImageInput?.addEventListener("change", async (event) => {
-      const file = event.target.files?.[0];
-      await uploadEmployeeImage({
-        file,
-        folder: "employee-id-cards",
-        urlInput: idCardImageUrlInput,
-        hintNode: idCardImageHint,
-        previewNode: idCardImagePreview,
-        label: "ID card image"
+    ["employee-id-card-file", "employee-profile-photo-file"].forEach((inputId) => {
+      document.getElementById(inputId).addEventListener("change", async (event) => {
+        const file = event.target.files?.[0];
+        if (!file) return;
+        try {
+          const folder = inputId.includes("id-card") ? "employee-id-cards" : "employee-profiles";
+          const url = await uploadLocalFile(file, { folder });
+          const hiddenId = inputId.includes("id-card") ? "employee-id-card-url" : "employee-profile-photo-url";
+          const previewId = inputId.includes("id-card") ? "employee-id-card-preview" : "employee-profile-photo-preview";
+          document.getElementById(hiddenId).value = url;
+          setPreview(previewId, url, "Employee image");
+          window.toast("Image uploaded", "success");
+        } catch (error) {
+          window.toast(error.message, "error");
+        } finally {
+          event.target.value = "";
+        }
       });
-      event.target.value = "";
-    });
-
-    profilePhotoInput?.addEventListener("change", async (event) => {
-      const file = event.target.files?.[0];
-      await uploadEmployeeImage({
-        file,
-        folder: "employee-profiles",
-        urlInput: profilePhotoUrlInput,
-        hintNode: profilePhotoHint,
-        previewNode: profilePhotoPreview,
-        label: "Profile photo"
-      });
-      event.target.value = "";
     });
 
     createForm.addEventListener("submit", async (event) => {
       event.preventDefault();
       const form = event.target;
-
-      if (state.duplicateBlocked) {
-        window.toast("Duplicate phone or national ID detected.", "error");
-        return;
-      }
-      if (!LOCAL_PHONE_REGEX.test(form.phone.value.trim())) {
-        window.toast("Phone must start with 07 and contain 10 digits.", "error");
-        return;
-      }
-      if (!idCardImageUrlInput?.value || !profilePhotoUrlInput?.value) {
-        window.toast("Choose ID Card Image and Profile Photo from your device.", "error");
-        return;
-      }
-
+      if (!LOCAL_PHONE_REGEX.test(form.phone.value.trim())) return window.toast("Phone must start with 07 and contain 10 digits.", "error");
+      if (!form.birthDate.value) return window.toast("Birth date is required.", "error");
+      if (!document.getElementById("employee-id-card-url").value || !document.getElementById("employee-profile-photo-url").value) return window.toast("Choose ID card and profile images.", "error");
       try {
-        const payload = {
-          fullName: form.fullName.value,
-          phone: form.phone.value,
-          nationalId: form.nationalId.value,
-          birthDate: form.birthDate.value,
-          jobTitle: form.jobTitle.value,
-          idCardImageUrl: idCardImageUrlInput.value,
-          profilePhotoUrl: profilePhotoUrlInput.value,
-          permissions: getSelectedPermissions(),
-          defaultSalaryInfo: {
-            monthlyBase: form.monthlyBase.value ? Number(form.monthlyBase.value) : undefined
-          },
-          workSchedule: {
-            text: form.workSchedule.value
-          }
-        };
-
-        const response = await apiFetch("/admin/employees", {
+        await apiFetch("/admin/employees", {
           method: "POST",
-          body: payload
+          body: {
+            fullName: form.fullName.value,
+            phone: form.phone.value,
+            nationalId: form.nationalId.value,
+            birthDate: form.birthDate.value,
+            jobTitle: form.jobTitle.value,
+            idCardImageUrl: document.getElementById("employee-id-card-url").value,
+            profilePhotoUrl: document.getElementById("employee-profile-photo-url").value,
+            permissions: pickPermissions(".employee-permission-checkbox"),
+            defaultSalaryInfo: { monthlyBase: form.monthlyBase.value ? Number(form.monthlyBase.value) : undefined },
+            workSchedule: { text: form.workSchedule.value }
+          }
+        }).then(async (res) => {
+          if (res?.item?.temporaryPassword) await AlertModal({ title: "Employee Created", message: res.item.temporaryPassword, intent: "success", confirmText: "Close" });
         });
-
-        form.reset();
-        resetCreateImageFields();
-        createContainer.classList.add("hidden");
-        duplicateWarning.classList.add("hidden");
-        duplicateWarning.textContent = "";
-        state.duplicateBlocked = false;
+        window.closeEmployeeCreateModal();
         window.toast("Employee created", "success");
-        if (response?.item?.temporaryPassword) {
-          alert(`Temporary password: ${response.item.temporaryPassword}`);
-        }
-        loadEmployees();
+        await loadEmployees();
       } catch (error) {
         window.toast(error.message, "error");
       }
     });
 
-    resetCreateImageFields();
     loadEmployees();
+    setPreview("employee-id-card-preview", "", "ID Card");
+    setPreview("employee-profile-photo-preview", "", "Profile");
   };
 
-  const permissionCheckboxes = PERMISSIONS.map(
-    (permission) => `
-      <label class="flex items-center gap-2 rounded-lg border border-border bg-surface px-3 py-2 cursor-pointer hover:border-primary/70 transition-colors">
-        <input type="checkbox" value="${permission}" class="employee-permission-checkbox sr-only peer">
-        <span class="inline-flex h-4 w-4 items-center justify-center rounded border border-border bg-bg peer-checked:bg-primary peer-checked:border-primary transition-colors">
-          <svg class="w-3 h-3 text-white opacity-0 peer-checked:opacity-100 transition-opacity" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-            <path fill-rule="evenodd" d="M16.704 5.29a1 1 0 010 1.414l-7.07 7.07a1 1 0 01-1.414 0l-3.535-3.535a1 1 0 011.414-1.414l2.828 2.828 6.363-6.363a1 1 0 011.414 0z" clip-rule="evenodd"></path>
-          </svg>
-        </span>
-        <span class="uppercase text-xs font-semibold tracking-wide peer-checked:text-primary">${permission}</span>
-      </label>
-    `
-  ).join("");
-
   return `
-    <div class="w-full flex flex-col gap-5 relative">
-      <div class="relative bg-surface border border-border rounded-xl p-4">
+    <div class="flex w-full flex-col gap-5">
+      <div class="relative rounded-[24px] border border-border bg-surface px-6 py-6">
         <div class="text-center">
-          <h1 class="text-2xl font-heading font-bold">Employees</h1>
-          <p class="text-sm text-muted">Manage employees, HR fields, permissions, and account controls.</p>
+          <h1 class="text-2xl font-heading font-bold text-text">Employees</h1>
+          <p class="mt-1 text-sm text-muted">Manage employees, account controls, permissions, and HR records.</p>
         </div>
-        <div class="mt-3 flex justify-center md:mt-0 md:absolute md:right-4 md:top-1/2 md:-translate-y-1/2">
-          <button id="toggle-employee-create" class="px-4 py-2 rounded-lg bg-primary text-white text-sm font-semibold hover:bg-primary-hover">Create Employee</button>
+        <div class="mt-4 flex justify-center md:absolute md:right-6 md:top-1/2 md:mt-0 md:-translate-y-1/2">
+          <button id="toggle-employee-create" class="rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-white">Create Employee</button>
         </div>
       </div>
 
-      <div id="employee-create-container" class="hidden bg-surface border border-border rounded-xl p-4">
-        <form id="employee-create-form" class="grid grid-cols-1 md:grid-cols-3 gap-3">
-          <input id="employee-full-name" name="fullName" required placeholder="Full Name (4 parts)" class="px-3 py-2 rounded-lg border border-border bg-bg">
-          <input id="employee-phone" name="phone" required maxlength="10" pattern="07[0-9]{8}" placeholder="07XXXXXXXX" class="px-3 py-2 rounded-lg border border-border bg-bg">
-          <input id="employee-national-id" name="nationalId" required placeholder="National ID" class="px-3 py-2 rounded-lg border border-border bg-bg">
-          <input name="birthDate" type="date" required class="employee-date-input px-3 py-2 rounded-lg border border-border bg-bg">
-          <input name="jobTitle" required placeholder="Job Title" class="px-3 py-2 rounded-lg border border-border bg-bg">
-          <input name="monthlyBase" type="number" step="0.01" placeholder="Default Salary Monthly Base" class="px-3 py-2 rounded-lg border border-border bg-bg">
-
-          <div class="rounded-lg border border-border bg-bg p-3 space-y-2">
-            <div class="text-xs uppercase text-muted">ID Card Image</div>
-            <input id="employee-id-card-file" type="file" accept="image/*" class="hidden">
-            <input id="employee-id-card-url" name="idCardImageUrl" type="hidden">
-            <div class="flex items-center gap-2">
-              <label for="employee-id-card-file" class="inline-flex items-center px-3 py-1.5 rounded-md border border-border text-xs font-semibold cursor-pointer hover:border-primary hover:text-primary transition-colors">Choose File</label>
-              <div id="employee-id-card-hint" class="text-xs text-muted">Choose image from device.</div>
-            </div>
-            <div id="employee-id-card-preview" class="w-20 h-20 rounded-lg border border-border bg-surface overflow-hidden"></div>
-          </div>
-
-          <div class="rounded-lg border border-border bg-bg p-3 space-y-2">
-            <div class="text-xs uppercase text-muted">Profile Photo</div>
-            <input id="employee-profile-photo-file" type="file" accept="image/*" class="hidden">
-            <input id="employee-profile-photo-url" name="profilePhotoUrl" type="hidden">
-            <div class="flex items-center gap-2">
-              <label for="employee-profile-photo-file" class="inline-flex items-center px-3 py-1.5 rounded-md border border-border text-xs font-semibold cursor-pointer hover:border-primary hover:text-primary transition-colors">Choose File</label>
-              <div id="employee-profile-photo-hint" class="text-xs text-muted">Choose image from device.</div>
-            </div>
-            <div id="employee-profile-photo-preview" class="w-20 h-20 rounded-lg border border-border bg-surface overflow-hidden"></div>
-          </div>
-
-          <input name="workSchedule" placeholder="Work Schedule (text)" class="px-3 py-2 rounded-lg border border-border bg-bg">
-          <div class="md:col-span-3 rounded-lg border border-border p-3 bg-bg">
-            <div class="text-xs uppercase text-muted mb-2">Permissions</div>
-            <div class="grid grid-cols-2 md:grid-cols-4 gap-2">${permissionCheckboxes}</div>
-          </div>
-          <div id="employee-duplicate-warning" class="hidden md:col-span-3 text-xs text-danger bg-danger/10 border border-danger/20 rounded-lg px-3 py-2"></div>
-          <button class="md:col-span-3 px-4 py-2 rounded-lg bg-primary text-white font-semibold">Save Employee</button>
-        </form>
-      </div>
-
-      <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
-        <input id="employees-search" placeholder="Search by name or phone" class="md:col-span-2 px-3 py-2 rounded-lg border border-border bg-surface">
-        <select id="employees-status" class="px-3 py-2 rounded-lg border border-border bg-surface">
-          <option value="">All Status</option>
+      <div class="grid grid-cols-1 gap-3 md:grid-cols-5">
+        <input id="employees-search" placeholder="Search by name or phone" class="md:col-span-2 rounded-xl border border-border bg-surface px-4 py-3">
+        <select id="employees-status" class="rounded-xl border border-border bg-surface px-4 py-3">
+          <option value="">All status</option>
           <option value="active">Active</option>
           <option value="suspended">Suspended</option>
           <option value="banned">Banned</option>
+          <option value="on_leave">On leave</option>
         </select>
-        <div class="grid grid-cols-2 gap-2">
-          <input id="employees-join-from" type="date" class="employee-date-input px-3 py-2 rounded-lg border border-border bg-surface">
-          <input id="employees-join-to" type="date" class="employee-date-input px-3 py-2 rounded-lg border border-border bg-surface">
-        </div>
+        <div>${DateInput({ id: "employees-join-from", className: "employee-date-input w-full rounded-xl border border-border bg-surface px-4 py-3" })}</div>
+        <div>${DateInput({ id: "employees-join-to", className: "employee-date-input w-full rounded-xl border border-border bg-surface px-4 py-3" })}</div>
       </div>
 
-      <div class="bg-surface border border-border rounded-xl overflow-hidden">
+      <div class="overflow-hidden rounded-[24px] border border-border bg-surface">
         <div class="overflow-auto">
-          <table class="w-full min-w-[980px] text-left">
-            <thead class="bg-bg border-b border-border">
+          <table class="min-w-[960px] w-full text-left">
+            <thead class="bg-bg">
               <tr>
-                <th class="px-4 py-3 text-xs uppercase text-muted">Employee</th>
-                <th class="px-4 py-3 text-xs uppercase text-muted">Phone</th>
-                <th class="px-4 py-3 text-xs uppercase text-muted">Joined</th>
-                <th class="px-4 py-3 text-xs uppercase text-muted">Status</th>
-                <th class="px-4 py-3 text-xs uppercase text-muted">Permissions</th>
-                <th class="px-4 py-3 text-xs uppercase text-muted text-right">Actions</th>
+                <th class="px-4 py-3 text-xs uppercase tracking-wide text-muted">Employee</th>
+                <th class="px-4 py-3 text-xs uppercase tracking-wide text-muted">Phone</th>
+                <th class="px-4 py-3 text-xs uppercase tracking-wide text-muted">Role</th>
+                <th class="px-4 py-3 text-xs uppercase tracking-wide text-muted">Status</th>
+                <th class="px-4 py-3 text-xs uppercase tracking-wide text-muted">Joined</th>
+                <th class="px-4 py-3 text-xs uppercase tracking-wide text-muted">Action</th>
               </tr>
             </thead>
             <tbody id="employees-tbody"></tbody>
@@ -646,13 +422,59 @@ export function AdminEmployees() {
 
       <div id="employees-pagination" class="flex items-center justify-between"></div>
 
-      <aside id="employee-details-drawer" class="fixed top-0 right-0 h-full w-full max-w-lg bg-surface border-l border-border z-[70] p-5 overflow-y-auto transform translate-x-full transition-transform duration-300">
-        <div class="flex items-center justify-between mb-4">
-          <h3 id="employee-drawer-title" class="text-lg font-bold">Employee</h3>
-          <button id="close-employee-drawer" class="w-8 h-8 rounded-full border border-border hover:border-primary">&times;</button>
+      <div id="employee-create-container" class="fixed inset-0 z-[100] hidden items-center justify-center bg-black/50 px-4 py-10">
+        <div class="max-h-[90vh] w-full max-w-3xl overflow-auto rounded-[24px] border border-border bg-surface px-6 py-6">
+          <div class="mb-4 flex items-center justify-between">
+            <h3 class="text-xl font-semibold text-text">Create Employee</h3>
+            <button type="button" onclick="window.closeEmployeeCreateModal()" class="rounded-xl border border-border px-3 py-2 text-sm text-text">Close</button>
+          </div>
+          <form id="employee-create-form" class="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <input name="fullName" required placeholder="Full Name (4 parts)" class="rounded-xl border border-border bg-bg px-4 py-3">
+            <input name="phone" required maxlength="10" placeholder="07XXXXXXXX" class="rounded-xl border border-border bg-bg px-4 py-3">
+            <input name="nationalId" required placeholder="National ID" class="rounded-xl border border-border bg-bg px-4 py-3">
+            ${DateInput({ id: "employee-birthdate", name: "birthDate", className: "employee-date-input w-full rounded-xl border border-border bg-bg px-4 py-3" })}
+            <input name="jobTitle" required placeholder="Job Title" class="rounded-xl border border-border bg-bg px-4 py-3">
+            <input name="monthlyBase" type="number" step="0.01" placeholder="Default Salary Monthly Base" class="rounded-xl border border-border bg-bg px-4 py-3">
+            <div class="rounded-2xl border border-border bg-bg px-4 py-4">
+              <div class="mb-3 text-xs uppercase tracking-wide text-muted">ID Card Image</div>
+              <input id="employee-id-card-file" type="file" accept="image/*" class="hidden">
+              <input id="employee-id-card-url" type="hidden">
+              <label for="employee-id-card-file" class="inline-flex cursor-pointer rounded-xl border border-border px-4 py-2 text-sm font-medium text-text">Choose file</label>
+              <div id="employee-id-card-preview" class="mt-3 h-20 w-20 overflow-hidden rounded-xl border border-border bg-surface"></div>
+            </div>
+            <div class="rounded-2xl border border-border bg-bg px-4 py-4">
+              <div class="mb-3 text-xs uppercase tracking-wide text-muted">Profile Photo</div>
+              <input id="employee-profile-photo-file" type="file" accept="image/*" class="hidden">
+              <input id="employee-profile-photo-url" type="hidden">
+              <label for="employee-profile-photo-file" class="inline-flex cursor-pointer rounded-xl border border-border px-4 py-2 text-sm font-medium text-text">Choose file</label>
+              <div id="employee-profile-photo-preview" class="mt-3 h-20 w-20 overflow-hidden rounded-xl border border-border bg-surface"></div>
+            </div>
+            <input name="workSchedule" placeholder="Work Schedule" class="md:col-span-2 rounded-xl border border-border bg-bg px-4 py-3">
+            <div class="md:col-span-2 rounded-2xl border border-border bg-bg px-4 py-4">
+              <div class="mb-3 text-xs uppercase tracking-wide text-muted">Initial permissions</div>
+              <div class="grid grid-cols-2 gap-3 md:grid-cols-4">${CREATE_PERMISSIONS.map((p) => `<label class="flex items-center gap-2 rounded-xl border border-border px-3 py-2 text-sm text-text"><input type="checkbox" value="${p}" class="employee-permission-checkbox h-4 w-4 rounded border-border bg-bg text-primary"><span>${p}</span></label>`).join("")}</div>
+            </div>
+            <div id="employee-duplicate-warning" class="hidden md:col-span-2 rounded-xl border border-danger/20 bg-danger/10 px-4 py-3 text-sm text-danger"></div>
+            <div class="md:col-span-2 flex justify-end gap-3">
+              <button type="button" onclick="window.closeEmployeeCreateModal()" class="rounded-xl border border-border px-4 py-3 text-sm font-medium text-text">Cancel</button>
+              <button class="rounded-xl bg-primary px-5 py-3 text-sm font-semibold text-white">Save Employee</button>
+            </div>
+          </form>
         </div>
-        <div id="employee-details-content"></div>
-      </aside>
+      </div>
+
+      <div id="employee-quick-modal" class="fixed inset-0 z-[90] hidden items-center justify-center bg-black/50 px-4 py-10">
+        <div class="max-h-[90vh] w-full max-w-5xl overflow-auto rounded-[28px] border border-border bg-surface px-6 py-6">
+          <div class="mb-4 flex items-center justify-between">
+            <div>
+              <h3 class="text-xl font-semibold text-text">Quick Employee Control Panel</h3>
+              <p class="mt-1 text-sm text-muted">Security, performance, and account actions in one place.</p>
+            </div>
+            <button id="close-employee-quick" type="button" class="rounded-xl border border-border px-3 py-2 text-sm text-text">Close</button>
+          </div>
+          <div id="employee-quick-content"></div>
+        </div>
+      </div>
     </div>
   `;
 }

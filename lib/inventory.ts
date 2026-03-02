@@ -29,16 +29,12 @@ export function computeStockQty(currentQty: number, delta: number): number {
   return currentQty + delta;
 }
 
-export function canOverrideNegativeStock(role: Role): boolean {
-  return role === "ADMIN";
+export function canOverrideNegativeStock(_role: Role): boolean {
+  return false;
 }
 
-export function isStockChangeAllowed(currentQty: number, delta: number, role: Role): boolean {
-  if (computeStockQty(currentQty, delta) >= 0) {
-    return true;
-  }
-
-  return canOverrideNegativeStock(role);
+export function isStockChangeAllowed(currentQty: number, delta: number, _role: Role): boolean {
+  return computeStockQty(currentQty, delta) >= 0;
 }
 
 export function isLowStock(stockQty: number, lowStockThreshold: number): boolean {

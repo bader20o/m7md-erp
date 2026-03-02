@@ -41,7 +41,7 @@ export function LoginForm({ locale }: { locale: string }): React.ReactElement {
           value={phone}
           onChange={(event) => setPhone(event.target.value)}
           className="rounded-md border border-slate-300 px-3 py-2"
-          placeholder="+15550000000"
+          placeholder="0780000000"
           required
         />
       </label>
@@ -69,4 +69,3 @@ export function LoginForm({ locale }: { locale: string }): React.ReactElement {
     </form>
   );
 }
-

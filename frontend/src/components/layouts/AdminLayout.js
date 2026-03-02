@@ -1,10 +1,20 @@
 import { ADMIN_NAV_ITEMS } from "../../lib/navigation.js";
 import { hasPermission, isAdminRole } from "../../lib/roles.js";
 import { store } from "../../lib/store.js";
+import { apiFetch } from "../../lib/api.js";
 
 export function AdminLayout(children) {
   const { user, lang, theme } = store.state;
   if (!user) return "";
+  const isRtl = document.documentElement.dir === "rtl";
+  const isDesktop = window.matchMedia("(min-width: 768px)").matches;
+  const drawerHiddenClass = isRtl ? "translate-x-full" : "-translate-x-full";
+  const drawerBaseStateClass = isDesktop ? "translate-x-0" : drawerHiddenClass;
+  const drawerEdgeClass = isRtl ? "right-0 border-l" : "left-0 border-r";
+  const contentOffsetClass = isDesktop ? (isRtl ? "pr-64" : "pl-64") : "";
+  const overlayStateClass = isDesktop ? "hidden pointer-events-none" : "opacity-0 pointer-events-none";
+  const mobileOnlyClass = isDesktop ? "hidden" : "";
+  const headerJustifyClass = isDesktop ? "justify-end" : "justify-between";
   const initial = user.fullName ? user.fullName.charAt(0).toUpperCase() : "U";
   const sidebarAvatar = user.avatarUrl
     ? `<img src="${user.avatarUrl}" alt="${user.fullName || "User"}" class="w-8 h-8 rounded-full object-cover border border-border shrink-0">`
@@ -28,13 +38,79 @@ export function AdminLayout(children) {
     App.navigate(path);
   };
 
-  window.toggleTheme = () => {
-    store.setTheme(isDark ? "light" : "dark");
+  const positionAdminChatFab = () => {
+    const fab = document.getElementById("admin-chat-fab");
+    if (!fab) return;
+    const vv = window.visualViewport;
+    const keyboardOffset = vv ? Math.max(0, window.innerHeight - (vv.height + vv.offsetTop)) : 0;
+    fab.style.bottom = `${20 + keyboardOffset}px`;
+  };
+
+  const updateAdminChatFabUnread = async () => {
+    try {
+      const res = await apiFetch("/chat/unread-count");
+      const dot = document.getElementById("admin-chat-fab-dot");
+      if (!dot) return;
+      if (Number(res?.unreadCount || 0) > 0) dot.classList.remove("hidden");
+      else dot.classList.add("hidden");
+    } catch {
+      // Ignore unread badge errors in shell.
+    }
+  };
+
+  if (window.__adminChatFabTimer) {
+    window.clearInterval(window.__adminChatFabTimer);
+  }
+  window.setTimeout(() => {
+    void updateAdminChatFabUnread();
+  }, 0);
+  window.__adminChatFabTimer = window.setInterval(() => {
+    void updateAdminChatFabUnread();
+  }, 15000);
+
+  if (window.__adminChatFabPositionCleanup) {
+    window.__adminChatFabPositionCleanup();
+  }
+  window.setTimeout(() => {
+    positionAdminChatFab();
+  }, 0);
+  const adminFabResizeHandler = () => positionAdminChatFab();
+  window.addEventListener("resize", adminFabResizeHandler);
+  window.addEventListener("orientationchange", adminFabResizeHandler);
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener("resize", adminFabResizeHandler);
+    window.visualViewport.addEventListener("scroll", adminFabResizeHandler);
+  }
+  window.__adminChatFabPositionCleanup = () => {
+    window.removeEventListener("resize", adminFabResizeHandler);
+    window.removeEventListener("orientationchange", adminFabResizeHandler);
+    if (window.visualViewport) {
+      window.visualViewport.removeEventListener("resize", adminFabResizeHandler);
+      window.visualViewport.removeEventListener("scroll", adminFabResizeHandler);
+    }
+  };
+
+  window.toggleTheme = async () => {
+    const newTheme = isDark ? "light" : "dark";
+    store.setTheme(newTheme);
+    try {
+      await apiFetch("/profile", { method: "PATCH", body: { action: "update_profile", theme: newTheme } });
+    } catch (e) {
+      console.error(e);
+      window.toast?.(e.message, "error");
+    }
     App.render();
   };
 
-  window.toggleLang = () => {
-    store.setLang(lang === "en" ? "ar" : "en");
+  window.toggleLang = async () => {
+    const newLang = lang === "en" ? "ar" : "en";
+    store.setLang(newLang);
+    try {
+      await apiFetch("/profile", { method: "PATCH", body: { action: "update_profile", locale: newLang } });
+    } catch (e) {
+      console.error(e);
+      window.toast?.(e.message, "error");
+    }
     App.render();
   };
 
@@ -45,18 +121,34 @@ export function AdminLayout(children) {
   };
 
   window.toggleAdminDrawer = () => {
+    if (isDesktop) return;
     const drawer = document.getElementById("admin-drawer");
     const overlay = document.getElementById("admin-drawer-overlay");
     if (!drawer || !overlay) return;
 
-    if (drawer.classList.contains("-translate-x-full")) {
-      drawer.classList.remove("-translate-x-full");
+    if (drawer.classList.contains(drawerHiddenClass)) {
+      drawer.classList.remove(drawerHiddenClass);
       overlay.classList.remove("opacity-0", "pointer-events-none");
     } else {
-      drawer.classList.add("-translate-x-full");
+      drawer.classList.add(drawerHiddenClass);
       overlay.classList.add("opacity-0", "pointer-events-none");
     }
   };
+
+  window.toggleAdminProfileMenu = () => {
+    const menu = document.getElementById("admin-profile-menu");
+    if (menu) {
+      menu.classList.toggle("hidden");
+    }
+  };
+
+  document.addEventListener('click', (e) => {
+    const btn = document.getElementById('admin-profile-btn');
+    const menu = document.getElementById('admin-profile-menu');
+    if (btn && menu && !btn.contains(e.target) && !menu.contains(e.target)) {
+      menu.classList.add('hidden');
+    }
+  });
 
   const filteredNav = ADMIN_NAV_ITEMS.filter((item) => {
     if (!item.roles.includes(user.role)) return false;
@@ -76,16 +168,16 @@ export function AdminLayout(children) {
   }).join("");
 
   return `
-    <div class="min-h-screen bg-bg flex fade-in">
-      <div id="admin-drawer-overlay" class="fixed inset-0 bg-black/50 z-40 opacity-0 pointer-events-none transition-opacity duration-300 md:hidden" onclick="toggleAdminDrawer()"></div>
+    <div class="min-h-screen bg-bg flex">
+      <div id="admin-drawer-overlay" class="fixed inset-0 bg-black/50 z-40 ${overlayStateClass} transition-opacity duration-300" onclick="toggleAdminDrawer()"></div>
 
-      <aside id="admin-drawer" class="fixed md:static inset-y-0 left-0 w-64 bg-surface border-r border-border h-screen z-50 transform -translate-x-full md:translate-x-0 transition-transform duration-300 flex flex-col">
-        <div class="p-6 border-b border-border flex items-center justify-between">
+      <aside id="admin-drawer" class="fixed inset-y-0 ${drawerEdgeClass} w-64 bg-surface border-border h-screen z-50 transform ${drawerBaseStateClass} transition-transform duration-300 flex flex-col">
+        <div class="px-6 h-16 border-b border-border flex items-center justify-between shrink-0">
           <div class="flex items-center gap-3">
             <div class="w-8 h-8 bg-gray-900 dark:bg-gray-100 rounded-lg flex items-center justify-center text-surface dark:text-gray-900 font-bold text-sm shadow">CMD</div>
             <span class="font-heading font-bold tracking-tight">Admin Center</span>
           </div>
-          <button class="md:hidden text-muted" onclick="toggleAdminDrawer()">
+          <button class="${mobileOnlyClass} text-muted" onclick="toggleAdminDrawer()">
             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
           </button>
         </div>
@@ -94,52 +186,79 @@ export function AdminLayout(children) {
           <div class="text-xs font-semibold text-muted tracking-wide uppercase mb-3 px-2 mt-2">Modules</div>
           ${listNav}
         </div>
-
-        <div class="p-4 border-t border-border">
-          <div class="flex items-center justify-between bg-bg rounded-xl p-3 border border-border">
-            <a href="/admin/profile" onclick="navigate(event, '/admin/profile')" class="flex items-center gap-3 overflow-hidden flex-1 min-w-0" title="View Profile">
-              ${sidebarAvatar}
-              <div class="overflow-hidden">
-                <div class="text-xs font-bold text-text truncate hover:text-primary transition-colors">${user.fullName || "User"}</div>
-                <div class="text-[10px] text-muted truncate">${user.phone || "-"}</div>
-              </div>
-            </a>
-            <button onclick="handleLogout(event)" class="text-muted hover:text-danger p-2 transition-colors ml-1" title="Logout">
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
-            </button>
-          </div>
-        </div>
       </aside>
 
-      <div class="flex-1 flex flex-col w-full min-w-0">
-        <header class="min-h-16 bg-surface border-b border-border flex items-center px-4 md:px-8 py-3 sticky top-0 z-30 justify-between md:justify-end">
-          <div class="flex items-center gap-3 md:hidden">
+      <div class="flex-1 flex flex-col w-full min-w-0 ${contentOffsetClass}">
+        <header class="h-16 shrink-0 bg-surface border-b border-border flex items-center px-4 md:px-8 lg:px-10 sticky top-0 z-30 ${headerJustifyClass}">
+          <div class="${mobileOnlyClass ? `${mobileOnlyClass} ` : ""}flex items-center gap-3">
             <button onclick="toggleAdminDrawer()" class="p-2 -ml-2 text-text">
               <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
             </button>
             <div class="font-heading font-bold">Admin Center</div>
           </div>
-          <div class="flex items-center gap-4">
-            <a href="/admin/profile" onclick="navigate(event, '/admin/profile')" class="hidden sm:inline-flex items-center gap-2 px-2 py-1 rounded-full border border-border hover:border-primary transition-colors max-w-[180px]" title="Profile">
+          <div class="flex items-center gap-4 relative mr-2 md:mr-4">
+            <button id="admin-profile-btn" onclick="toggleAdminProfileMenu()" class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-border hover:border-primary transition-colors focus:outline-none" title="Profile Menu">
               ${headerAvatar}
-              <span class="text-sm font-semibold text-text truncate">${user.fullName || "User"}</span>
-            </a>
-            <a href="/admin/profile" onclick="navigate(event, '/admin/profile')" class="inline-flex items-center justify-center w-8 h-8 rounded-full border border-border text-muted hover:text-primary hover:border-primary transition-colors" title="Profile">
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
-            </a>
-            <button onclick="handleLogout(event)" class="inline-flex items-center justify-center w-8 h-8 rounded-full border border-border text-muted hover:text-danger hover:border-danger transition-colors" title="Logout">
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
+              <span class="text-sm font-semibold text-text truncate hidden sm:block max-w-[150px]">${user.fullName || "User"}</span>
+              <svg class="w-4 h-4 text-muted hidden sm:block" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
             </button>
-            <button onclick="window.toggleLang()" class="text-xs font-bold text-muted hover:text-text transition-colors w-8 h-8 rounded-full border border-border flex items-center justify-center">${langIcon}</button>
-            <button onclick="window.toggleTheme()" class="text-muted hover:text-primary transition-colors focus:outline-none">
-              ${themeIcon}
-            </button>
+
+            <div id="admin-profile-menu" class="hidden absolute top-full mt-2 w-56 ltr:right-1 rtl:left-1 md:ltr:right-2 md:rtl:left-2 bg-surface border border-border rounded-xl shadow-xl overflow-hidden pt-1 z-50">
+              <div class="px-4 py-3 border-b border-border bg-bg">
+                <p class="text-sm font-semibold text-text truncate">${user.fullName || "User"}</p>
+                <p class="text-xs text-muted truncate">${user.phone}</p>
+                <p class="text-[10px] uppercase font-bold text-primary mt-1">${user.role}</p>
+              </div>
+              
+              <div class="py-1">
+                <a href="/admin/profile" onclick="navigate(event, '/admin/profile'); toggleAdminProfileMenu()" class="flex items-center gap-3 px-4 py-2 text-sm text-text hover:bg-bg transition-colors">
+                  <svg class="w-4 h-4 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
+                  Profile Settings
+                </a>
+                
+                <button onclick="window.toggleLang(); toggleAdminProfileMenu()" class="w-full flex items-center justify-between px-4 py-2 text-sm text-text hover:bg-bg transition-colors">
+                  <span class="flex items-center gap-3">
+                    <svg class="w-4 h-4 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129"></path></svg>
+                    Language
+                  </span>
+                  <span class="text-xs font-bold text-primary bg-primary/10 px-2 py-0.5 rounded">${langIcon}</span>
+                </button>
+
+                <button onclick="window.toggleTheme(); toggleAdminProfileMenu()" class="w-full flex items-center justify-between px-4 py-2 text-sm text-text hover:bg-bg transition-colors">
+                  <span class="flex items-center gap-3">
+                    ${themeIcon}
+                    Theme
+                  </span>
+                  <span class="text-xs text-muted capitalize">${isDark ? 'Dark' : 'Light'}</span>
+                </button>
+              </div>
+
+              <div class="border-t border-border mt-1 py-1">
+                <button onclick="handleLogout(event)" class="w-full flex items-center gap-3 px-4 py-2 text-sm text-danger hover:bg-danger/10 transition-colors">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
+                  Logout
+                </button>
+              </div>
+            </div>
           </div>
         </header>
 
-        <main class="flex-1 overflow-x-hidden p-4 md:p-8">
+        <main class="flex-1 overflow-x-hidden p-4 md:p-8 lg:p-10">
           ${children}
         </main>
+
+        <button
+          id="admin-chat-fab"
+          onclick="navigate(event, '/admin/chat')"
+          class="fixed right-5 z-40 h-14 w-14 rounded-full bg-primary text-white shadow-xl ring-1 ring-primary/30 hover:bg-primary-hover transition-colors flex items-center justify-center"
+          title="Open Messages"
+          aria-label="Open Messages"
+        >
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h8M8 14h5m-9 6l2.5-3H19a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v11a2 2 0 002 2h.5L4 20z"></path>
+          </svg>
+          <span id="admin-chat-fab-dot" class="hidden absolute top-2 right-2 h-2.5 w-2.5 rounded-full bg-white shadow"></span>
+        </button>
       </div>
     </div>
   `;

@@ -2,153 +2,153 @@ import { t } from '../../lib/i18n.js';
 import { apiFetch } from '../../lib/api.js';
 import { store } from '../../lib/store.js';
 import { CardSkeleton } from '../../components/ui/Skeleton.js';
+import { DateInput } from '../../components/ui/DateInput.js';
 
 export function BookService() {
 
-    let currentStep = 1;
-    let selectedService = null;
-    let selectedDate = null;
-    let selectedTime = null;
-    let servicesParams = [];
+  let currentStep = 1;
+  let selectedService = null;
+  let selectedDate = null;
+  let selectedTime = null;
+  let servicesParams = [];
 
-    window.onMount = async () => {
-        loadServices();
+  window.onMount = async () => {
+    loadServices();
 
-        document.getElementById('date-input').addEventListener('change', (e) => {
-            selectedDate = e.target.value;
-            if (selectedDate) generateTimeSlots();
-        });
-    };
+    document.getElementById('date-input').addEventListener('change', (e) => {
+      selectedDate = e.target.value;
+      if (selectedDate) generateTimeSlots();
+    });
+  };
 
-    async function loadServices() {
-        const list = document.getElementById('step-1-list');
-        list.innerHTML = Array(3).fill(CardSkeleton()).join('');
-        try {
-            const res = await apiFetch('/services');
-            if (res && res.items) {
-                servicesParams = res.items.filter(s => s.isActive);
-                const lang = store.state.lang;
+  async function loadServices() {
+    const list = document.getElementById('step-1-list');
+    list.innerHTML = Array(3).fill(CardSkeleton()).join('');
+    try {
+      const res = await apiFetch('/services');
+      if (res && res.items) {
+        servicesParams = res.items.filter(s => s.isActive);
+        const lang = store.state.lang;
 
-                list.className = 'grid grid-cols-1 md:grid-cols-3 gap-4';
-                list.innerHTML = servicesParams.map(s => {
-                    const title = lang === 'ar' ? s.nameAr : s.nameEn;
-                    const price = s.basePrice ? `From ${s.basePrice} JOD` : 'Variable';
-                    return `
+        list.className = 'grid grid-cols-1 md:grid-cols-3 gap-4';
+        list.innerHTML = servicesParams.map(s => {
+          const title = lang === 'ar' ? s.nameAr : s.nameEn;
+          return `
             <div id="service-card-${s.id}" class="bg-surface border border-border rounded-xl p-5 cursor-pointer transition-all hover:border-primary group" onclick="window.selectService('${s.id}')">
               <h4 class="font-heading font-bold text-text mb-2 group-hover:text-primary transition-colors">${title}</h4>
               <p class="text-xs text-muted mb-4 line-clamp-2">${lang === 'ar' ? (s.descriptionAr || '') : (s.descriptionEn || '')}</p>
               <div class="flex justify-between items-center mt-auto">
                 <span class="text-xs font-semibold px-2 py-1 bg-muted/10 rounded">${s.durationMinutes} min</span>
-                <span class="text-sm font-bold text-text">${price}</span>
+                <span class="text-xs font-semibold text-muted">Price after approval</span>
               </div>
             </div>
           `;
-                }).join('');
-            }
-        } catch (e) {
-            list.innerHTML = `<div class="text-danger p-4 container text-center">${t('common.error')}</div>`;
-        }
+        }).join('');
+      }
+    } catch (e) {
+      list.innerHTML = `<div class="text-danger p-4 container text-center">${t('common.error')}</div>`;
     }
+  }
 
-    window.selectService = (id) => {
-        // Clear previous selection
-        document.querySelectorAll('[id^="service-card-"]').forEach(el => {
-            el.classList.remove('border-primary', 'bg-primary/5', 'ring-2', 'ring-primary/20');
-            el.classList.add('border-border');
-        });
+  window.selectService = (id) => {
+    // Clear previous selection
+    document.querySelectorAll('[id^="service-card-"]').forEach(el => {
+      el.classList.remove('border-primary', 'bg-primary/5', 'ring-2', 'ring-primary/20');
+      el.classList.add('border-border');
+    });
 
-        selectedService = servicesParams.find(s => s.id === id);
-        const card = document.getElementById(`service-card-${id}`);
-        card.classList.remove('border-border');
-        card.classList.add('border-primary', 'bg-primary/5', 'ring-2', 'ring-primary/20');
+    selectedService = servicesParams.find(s => s.id === id);
+    const card = document.getElementById(`service-card-${id}`);
+    card.classList.remove('border-border');
+    card.classList.add('border-primary', 'bg-primary/5', 'ring-2', 'ring-primary/20');
 
-        document.getElementById('step-1-next').disabled = false;
-    };
+    document.getElementById('step-1-next').disabled = false;
+  };
 
-    window.nextStep = (step) => {
-        document.getElementById(`step-${currentStep}`).classList.add('hidden');
-        document.getElementById(`step-${step}`).classList.remove('hidden');
+  window.nextStep = (step) => {
+    document.getElementById(`step-${currentStep}`).classList.add('hidden');
+    document.getElementById(`step-${step}`).classList.remove('hidden');
 
-        // Update Stepper UI
-        document.getElementById(`stepper-num-${currentStep}`).classList.remove('bg-primary', 'text-white');
-        document.getElementById(`stepper-num-${currentStep}`).classList.add('bg-muted/20', 'text-muted');
-        document.getElementById(`stepper-num-${step}`).classList.remove('bg-muted/20', 'text-muted');
-        document.getElementById(`stepper-num-${step}`).classList.add('bg-primary', 'text-white');
+    // Update Stepper UI
+    document.getElementById(`stepper-num-${currentStep}`).classList.remove('bg-primary', 'text-white');
+    document.getElementById(`stepper-num-${currentStep}`).classList.add('bg-muted/20', 'text-muted');
+    document.getElementById(`stepper-num-${step}`).classList.remove('bg-muted/20', 'text-muted');
+    document.getElementById(`stepper-num-${step}`).classList.add('bg-primary', 'text-white');
 
-        currentStep = step;
+    currentStep = step;
 
-        if (step === 3) populateConfirmation();
-    };
+    if (step === 3) populateConfirmation();
+  };
 
-    window.prevStep = (step) => {
-        window.nextStep(step);
-    };
+  window.prevStep = (step) => {
+    window.nextStep(step);
+  };
 
-    function generateTimeSlots() {
-        const timeGrid = document.getElementById('time-grid');
-        const slots = ['09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00'];
+  function generateTimeSlots() {
+    const timeGrid = document.getElementById('time-grid');
+    const slots = ['09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00'];
 
-        timeGrid.innerHTML = slots.map(t => `
+    timeGrid.innerHTML = slots.map(t => `
       <div id="slot-${t.replace(':', '')}" class="p-3 border border-border rounded-xl text-center cursor-pointer hover:border-primary transition-colors text-sm font-medium" onclick="window.selectTime('${t}')">
         ${t}
       </div>
     `).join('');
-    }
+  }
 
-    window.selectTime = (time) => {
-        selectedTime = time;
-        document.querySelectorAll('[id^="slot-"]').forEach(el => {
-            el.classList.remove('border-primary', 'bg-primary/10', 'text-primary');
-            el.classList.add('border-border');
-        });
-        const slot = document.getElementById(`slot-${time.replace(':', '')}`);
-        slot.classList.remove('border-border');
-        slot.classList.add('border-primary', 'bg-primary/10', 'text-primary');
-        document.getElementById('step-2-next').disabled = false;
-    };
+  window.selectTime = (time) => {
+    selectedTime = time;
+    document.querySelectorAll('[id^="slot-"]').forEach(el => {
+      el.classList.remove('border-primary', 'bg-primary/10', 'text-primary');
+      el.classList.add('border-border');
+    });
+    const slot = document.getElementById(`slot-${time.replace(':', '')}`);
+    slot.classList.remove('border-border');
+    slot.classList.add('border-primary', 'bg-primary/10', 'text-primary');
+    document.getElementById('step-2-next').disabled = false;
+  };
 
-    function populateConfirmation() {
-        const lang = store.state.lang;
-        document.getElementById('conf-service').textContent = lang === 'ar' ? selectedService.nameAr : selectedService.nameEn;
-        document.getElementById('conf-datetime').textContent = `${selectedDate} at ${selectedTime}`;
-        document.getElementById('conf-price').textContent = selectedService.basePrice ? `${selectedService.basePrice} JOD` : 'Variable';
-    }
+  function populateConfirmation() {
+    const lang = store.state.lang;
+    document.getElementById('conf-service').textContent = lang === 'ar' ? selectedService.nameAr : selectedService.nameEn;
+    document.getElementById('conf-datetime').textContent = `${selectedDate} at ${selectedTime}`;
+    document.getElementById('conf-price').textContent = 'Price will appear after admin approval';
+  }
 
-    window.submitBooking = async () => {
-        const notes = document.getElementById('booking-notes').value;
-        const btn = document.getElementById('submit-btn');
+  window.submitBooking = async () => {
+    const notes = document.getElementById('booking-notes').value;
+    const btn = document.getElementById('submit-btn');
 
-        // Combine Date & Time to ISO
-        const appointmentAt = new Date(`${selectedDate}T${selectedTime}:00`).toISOString();
+    // Combine Date & Time to ISO
+    const appointmentAt = new Date(`${selectedDate}T${selectedTime}:00`).toISOString();
 
-        try {
-            btn.disabled = true;
-            btn.innerHTML = `<span class="skeleton w-5 h-5 rounded-full border-2 border-white/30 border-t-white !bg-transparent animate-spin"></span>`;
+    try {
+      btn.disabled = true;
+      btn.innerHTML = `<span class="skeleton w-5 h-5 rounded-full border-2 border-white/30 border-t-white !bg-transparent animate-spin"></span>`;
 
-            await apiFetch('/bookings', {
-                method: 'POST',
-                body: {
-                    serviceId: selectedService.id,
-                    appointmentAt,
-                    notes,
-                    branchId: 'MAIN' // Assuming MAIN default
-                }
-            });
-
-            window.toast('Booking confirmed successfully!', 'success');
-            App.navigate('/my-bookings');
-        } catch (e) {
-            window.toast(e.message || t('common.error'), 'error');
-            btn.disabled = false;
-            btn.innerHTML = 'Confirm & Book';
+      await apiFetch('/bookings', {
+        method: 'POST',
+        body: {
+          serviceId: selectedService.id,
+          appointmentAt,
+          notes,
+          branchId: 'MAIN' // Assuming MAIN default
         }
-    };
+      });
 
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    const minDate = tomorrow.toISOString().split('T')[0];
+      window.toast('Booking confirmed successfully!', 'success');
+      App.navigate('/my-bookings');
+    } catch (e) {
+      window.toast(e.message || t('common.error'), 'error');
+      btn.disabled = false;
+      btn.innerHTML = 'Confirm & Book';
+    }
+  };
 
-    return `
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const minDate = tomorrow.toISOString().split('T')[0];
+
+  return `
     <div class="flex flex-col gap-6 w-full max-w-4xl mx-auto">
       <div>
         <h1 class="text-2xl md:text-3xl font-heading font-bold text-text">Book highly-trained experts</h1>
@@ -191,7 +191,7 @@ export function BookService() {
         <div class="bg-surface border border-border rounded-xl p-6 mb-6 grid grid-cols-1 md:grid-cols-2 gap-8">
           <div>
             <h2 class="text-lg font-bold text-text mb-4">Choose a Date</h2>
-            <input type="date" id="date-input" min="${minDate}" class="w-full px-4 py-3 bg-bg border border-border rounded-xl focus:border-primary outline-none transition-colors text-text custom-calendar-icon">
+            ${DateInput({ id: 'date-input', min: minDate })}
           </div>
           <div>
              <h2 class="text-lg font-bold text-text mb-4">Available Slots</h2>
@@ -218,7 +218,7 @@ export function BookService() {
                 <div id="conf-service" class="font-heading font-bold text-lg text-text"></div>
               </div>
               <div class="text-right">
-                <p class="text-xs text-muted uppercase tracking-wider font-semibold mb-1">Est. Price</p>
+                <p class="text-xs text-muted uppercase tracking-wider font-semibold mb-1">Price</p>
                 <div id="conf-price" class="font-bold text-primary"></div>
               </div>
             </div>

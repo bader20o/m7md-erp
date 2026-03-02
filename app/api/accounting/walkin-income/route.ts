@@ -23,13 +23,18 @@ export async function POST(request: Request): Promise<Response> {
         unitPrice,
         quantity,
         amount,
+        sellPriceAtTimeOfSale: unitPrice,
+        costAtTimeOfSale: 0,
+        costTotal: 0,
+        profitAmount: amount,
         note: body.note,
         description: body.note || body.itemName,
         referenceType: "WALK_IN",
         referenceId: body.branchId ?? "MAIN",
         occurredAt,
         recordedAt: occurredAt,
-        createdById: actor.sub
+        createdById: actor.sub,
+        updatedById: actor.sub
       }
     });
 

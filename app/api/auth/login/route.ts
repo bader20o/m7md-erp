@@ -3,6 +3,7 @@ import { ApiError, fail, ok, parseJsonBody } from "@/lib/api";
 import { evaluateBan, toRemainingDurationLabel } from "@/lib/account-status";
 import { logAudit } from "@/lib/audit";
 import { setSessionCookie, signSession, verifyPassword } from "@/lib/auth";
+import { headers } from "next/headers";
 import { prisma } from "@/lib/prisma";
 import { loginSchema } from "@/lib/validators/auth";
 
@@ -18,7 +19,25 @@ export async function POST(request: Request): Promise<Response> {
       throw new ApiError(401, "INVALID_CREDENTIALS", "Invalid phone or password.");
     }
 
-    if (user.status === UserStatus.SUSPENDED || !user.isActive) {
+    if (user.status === UserStatus.SUSPENDED) {
+      if (user.bannedUntil && user.bannedUntil.getTime() <= Date.now()) {
+        await prisma.user.update({
+          where: { id: user.id },
+          data: {
+            status: UserStatus.ACTIVE,
+            isActive: true,
+            bannedUntil: null,
+            suspendedAt: null,
+            suspensionReason: null,
+            suspendedByAdminId: null
+          }
+        });
+      } else {
+        throw new ApiError(403, "ACCOUNT_SUSPENDED", "This account is suspended.");
+      }
+    }
+
+    if (!user.isActive && user.status !== UserStatus.BANNED) {
       throw new ApiError(403, "ACCOUNT_SUSPENDED", "This account is suspended.");
     }
 
@@ -52,10 +71,25 @@ export async function POST(request: Request): Promise<Response> {
       throw new ApiError(401, "INVALID_CREDENTIALS", "Invalid phone or password.");
     }
 
+    const requestHeaders = await headers();
+    const forwarded = requestHeaders.get("x-forwarded-for");
+    const ipAddress = forwarded?.split(",")[0]?.trim() ?? null;
+    const userAgent = requestHeaders.get("user-agent");
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        lastLoginAt: new Date(),
+        lastLoginIp: ipAddress,
+        lastLoginUserAgent: userAgent
+      }
+    });
+
     const token = await signSession({
       sub: user.id,
       phone: user.phone,
-      role: user.role
+      role: user.role,
+      sessionVersion: user.sessionVersion
     });
     await setSessionCookie(token);
 

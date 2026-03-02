@@ -40,7 +40,16 @@ export default async function AdminTransactionsPage(): Promise<React.ReactElemen
     }),
     prisma.part.findMany({
       where: { isActive: true },
-      select: { id: true, name: true, sku: true },
+      select: {
+        id: true,
+        name: true,
+        sku: true,
+        vehicleModel: true,
+        vehicleType: true,
+        category: true,
+        sellPrice: true,
+        stockQty: true
+      },
       orderBy: { name: "asc" }
     }),
     session
@@ -55,6 +64,14 @@ export default async function AdminTransactionsPage(): Promise<React.ReactElemen
   return (
     <section className="space-y-4">
       <h1 className="text-2xl font-semibold">Transactions</h1>
+      <div className="flex justify-end">
+        <a
+          href="/api/admin/reports/export-accounting"
+          className="rounded-md border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+        >
+          Export Accounting (.xlsx)
+        </a>
+      </div>
       <AccountingEntryForms
         suppliers={suppliers}
         invoices={invoices}

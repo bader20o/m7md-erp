@@ -1,0 +1,24 @@
+﻿app/[locale]/admin/inventory/page.tsx(54,9): error TS2322: Type '{ occurredAt: string; booking: { status: BookingStatus; id: string; } | null; supplier: { name: string; id: string; } | null; invoice: { number: string; id: string; } | null; part: { ...; }; ... 10 more ...; partId: string; }[]' is not assignable to type 'MovementItem[]'.
+  Type '{ occurredAt: string; booking: { status: $Enums.BookingStatus; id: string; } | null; supplier: { name: string; id: string; } | null; invoice: { number: string; id: string; } | null; part: { ...; }; ... 10 more ...; partId: string; }' is not assignable to type 'MovementItem'.
+    Types of property 'type' are incompatible.
+      Type 'StockMovementType' is not assignable to type '"IN" | "OUT" | "ADJUST"'.
+        Type '"SALE"' is not assignable to type '"IN" | "OUT" | "ADJUST"'.
+app/api/admin/users/check-duplicate/route.ts(63,17): error TS2353: Object literal may only specify known properties, and 'mode' does not exist in type 'StringNullableFilter<"User">'.
+app/api/chat/messages/route.ts(276,7): error TS2322: Type 'true' is not assignable to type 'never'.
+app/api/chat/users/route.ts(33,44): error TS2322: Type '{ OR?: ({ fullName: { contains: string; mode: string; }; } | { phone: { contains: string; mode: string; }; })[] | undefined; role?: "ADMIN" | undefined; id: { not: string; }; isActive: true; }' is not assignable to type 'UserWhereInput'.
+  Types of property 'OR' are incompatible.
+    Type '({ fullName: { contains: string; mode: string; }; } | { phone: { contains: string; mode: string; }; })[] | undefined' is not assignable to type 'UserWhereInput[] | undefined'.
+      Type '({ fullName: { contains: string; mode: string; }; } | { phone: { contains: string; mode: string; }; })[]' is not assignable to type 'UserWhereInput[]'.
+        Type '{ fullName: { contains: string; mode: string; }; } | { phone: { contains: string; mode: string; }; }' is not assignable to type 'UserWhereInput'.
+          Type '{ fullName: { contains: string; mode: string; }; }' is not assignable to type 'UserWhereInput'.
+            Types of property 'fullName' are incompatible.
+              Object literal may only specify known properties, and 'mode' does not exist in type 'StringNullableFilter<"User">'.
+app/api/inventory/parts/route.ts(24,38): error TS2322: Type '({ name: { contains: string; mode: string; }; } | { sku: { contains: string; mode: string; }; })[] | undefined' is not assignable to type 'PartWhereInput[] | undefined'.
+  Type '({ name: { contains: string; mode: string; }; } | { sku: { contains: string; mode: string; }; })[]' is not assignable to type 'PartWhereInput[]'.
+    Type '{ name: { contains: string; mode: string; }; } | { sku: { contains: string; mode: string; }; }' is not assignable to type 'PartWhereInput'.
+      Type '{ name: { contains: string; mode: string; }; }' is not assignable to type 'PartWhereInput'.
+        Types of property 'name' are incompatible.
+          Object literal may only specify known properties, and 'mode' does not exist in type 'StringFilter<"Part">'.
+app/api/reports/analytics/route.ts(241,11): error TS2741: Property 'INVOICE' is missing in type '{ BOOKING: number; WALK_IN: number; MEMBERSHIP: number; }' but required in type 'Record<IncomeSource, number>'.
+lib/analytics/overview.ts(518,9): error TS2741: Property 'INVOICE' is missing in type '{ BOOKING: number; WALK_IN: number; MEMBERSHIP: number; }' but required in type 'Record<IncomeSource, number>'.
+scripts/dedupe-chat-threads.ts(68,13): error TS2322: Type 'true' is not assignable to type 'never'.

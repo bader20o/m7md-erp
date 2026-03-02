@@ -1,0 +1,32 @@
+.next/types/app/api/admin/employees/[id]/tasks/[taskId]/review/route.ts(283,7): error TS2344: Type '{ __tag__: "PATCH"; __param_position__: "second"; __param_type__: { params: { id: string; taskId: string; }; }; }' does not satisfy the constraint 'ParamCheck<RouteContext>'.
+  The types of '__param_type__.params' are incompatible between these types.
+    Type '{ id: string; taskId: string; }' is missing the following properties from type 'Promise<any>': then, catch, finally, [Symbol.toStringTag]
+.next/types/app/api/admin/employees/[id]/tasks/[taskId]/submit/route.ts(283,7): error TS2344: Type '{ __tag__: "PATCH"; __param_position__: "second"; __param_type__: { params: { id: string; taskId: string; }; }; }' does not satisfy the constraint 'ParamCheck<RouteContext>'.
+  The types of '__param_type__.params' are incompatible between these types.
+    Type '{ id: string; taskId: string; }' is missing the following properties from type 'Promise<any>': then, catch, finally, [Symbol.toStringTag]
+.next/types/app/api/admin/employees/[id]/tasks/route.ts(49,7): error TS2344: Type '{ __tag__: "GET"; __param_position__: "second"; __param_type__: { params: { id: string; }; }; }' does not satisfy the constraint 'ParamCheck<RouteContext>'.
+  The types of '__param_type__.params' are incompatible between these types.
+    Type '{ id: string; }' is missing the following properties from type 'Promise<any>': then, catch, finally, [Symbol.toStringTag]
+.next/types/validator.ts(585,31): error TS2344: Type 'typeof import("C:/Users/bkhwe/final_mohammad/app/api/admin/employees/[id]/tasks/[taskId]/review/route")' does not satisfy the constraint 'RouteHandlerConfig<"/api/admin/employees/[id]/tasks/[taskId]/review">'.
+  Types of property 'PATCH' are incompatible.
+    Type '(request: Request, { params }: { params: { id: string; taskId: string; }; }) => Promise<NextResponse<{ error: string; }> | NextResponse<{ status: TaskStatus; id: string; createdAt: Date; ... 8 more ...; requireImages: boolean; }>>' is not assignable to type '(request: NextRequest, context: { params: Promise<{ id: string; taskId: string; }>; }) => void | Response | Promise<void | Response>'.
+      Types of parameters '__1' and 'context' are incompatible.
+        Type '{ params: Promise<{ id: string; taskId: string; }>; }' is not assignable to type '{ params: { id: string; taskId: string; }; }'.
+          Types of property 'params' are incompatible.
+            Type 'Promise<{ id: string; taskId: string; }>' is missing the following properties from type '{ id: string; taskId: string; }': id, taskId
+.next/types/validator.ts(594,31): error TS2344: Type 'typeof import("C:/Users/bkhwe/final_mohammad/app/api/admin/employees/[id]/tasks/[taskId]/submit/route")' does not satisfy the constraint 'RouteHandlerConfig<"/api/admin/employees/[id]/tasks/[taskId]/submit">'.
+  Types of property 'PATCH' are incompatible.
+    Type '(request: Request, { params }: { params: { id: string; taskId: string; }; }) => Promise<NextResponse<{ error: string; }> | NextResponse<{ status: TaskStatus; id: string; createdAt: Date; ... 6 more ...; approvedAt: Date | null; }>>' is not assignable to type '(request: NextRequest, context: { params: Promise<{ id: string; taskId: string; }>; }) => void | Response | Promise<void | Response>'.
+      Types of parameters '__1' and 'context' are incompatible.
+        Type '{ params: Promise<{ id: string; taskId: string; }>; }' is not assignable to type '{ params: { id: string; taskId: string; }; }'.
+          Types of property 'params' are incompatible.
+            Type 'Promise<{ id: string; taskId: string; }>' is missing the following properties from type '{ id: string; taskId: string; }': id, taskId
+.next/types/validator.ts(603,31): error TS2344: Type 'typeof import("C:/Users/bkhwe/final_mohammad/app/api/admin/employees/[id]/tasks/route")' does not satisfy the constraint 'RouteHandlerConfig<"/api/admin/employees/[id]/tasks">'.
+  Types of property 'GET' are incompatible.
+    Type '(request: Request, { params }: { params: { id: string; }; }) => Promise<NextResponse<{ error: string; }> | NextResponse<{ data: ({ assignedBy: { fullName: string | null; avatarUrl: string | null; }; submissions: ({ ...; } & { ...; })[]; } & { ...; })[]; pagination: { ...; }; }>>' is not assignable to type '(request: NextRequest, context: { params: Promise<{ id: string; }>; }) => void | Response | Promise<void | Response>'.
+      Types of parameters '__1' and 'context' are incompatible.
+        Type '{ params: Promise<{ id: string; }>; }' is not assignable to type '{ params: { id: string; }; }'.
+          Types of property 'params' are incompatible.
+            Property 'id' is missing in type 'Promise<{ id: string; }>' but required in type '{ id: string; }'.
+app/api/admin/employees/[id]/tasks/[taskId]/review/route.ts(53,25): error TS2322: Type 'string' is not assignable to type 'TaskStatus | EnumTaskStatusFieldUpdateOperationsInput | undefined'.
+app/api/admin/employees/[id]/tasks/[taskId]/review/route.ts(64,25): error TS2322: Type 'string' is not assignable to type 'TaskStatus | EnumTaskStatusFieldUpdateOperationsInput | undefined'.

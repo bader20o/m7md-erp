@@ -7,6 +7,9 @@ type PartItem = {
   id: string;
   name: string;
   sku: string | null;
+  vehicleModel: string | null;
+  vehicleType: string | null;
+  category: string | null;
   unit: string;
   costPrice: number | null;
   sellPrice: number | null;
@@ -63,6 +66,7 @@ type Props = {
 };
 
 type ApiErrorPayload = {
+  data?: { warnings?: Array<{ message?: string }> };
   error?: { message?: string };
 };
 
@@ -102,6 +106,9 @@ export function InventoryManager({
   const [search, setSearch] = useState("");
   const [partName, setPartName] = useState("");
   const [partSku, setPartSku] = useState("");
+  const [partVehicleModel, setPartVehicleModel] = useState("");
+  const [partVehicleType, setPartVehicleType] = useState<"EV" | "HYBRID">("EV");
+  const [partCategory, setPartCategory] = useState("");
   const [partUnit, setPartUnit] = useState("piece");
   const [partCostPrice, setPartCostPrice] = useState("");
   const [partSellPrice, setPartSellPrice] = useState("");
@@ -175,8 +182,11 @@ export function InventoryManager({
     };
 
     if (partSku.trim()) payload.sku = partSku.trim();
+    if (partVehicleModel.trim()) payload.vehicleModel = partVehicleModel.trim();
+    payload.vehicleType = partVehicleType;
+    if (partCategory.trim()) payload.category = partCategory.trim();
     if (partCostPrice.trim()) payload.costPrice = Number(partCostPrice);
-    if (partSellPrice.trim()) payload.sellPrice = Number(partSellPrice);
+    payload.sellPrice = Number(partSellPrice);
 
     const endpoint = editingPartId ? `/api/inventory/parts/${editingPartId}` : "/api/inventory/parts";
     const method = editingPartId ? "PATCH" : "POST";
@@ -193,8 +203,12 @@ export function InventoryManager({
       return;
     }
 
+    const warning = (json as ApiErrorPayload)?.data?.warnings?.[0]?.message;
     setPartName("");
     setPartSku("");
+    setPartVehicleModel("");
+    setPartVehicleType("EV");
+    setPartCategory("");
     setPartUnit("piece");
     setPartCostPrice("");
     setPartSellPrice("");
@@ -202,7 +216,7 @@ export function InventoryManager({
     setPartLowStockThreshold("0");
     setPartIsActive(true);
     setEditingPartId(null);
-    setSuccess(editingPartId ? "Part updated." : "Part created.");
+    setSuccess(warning ? warning : editingPartId ? "Part updated." : "Part created.");
     router.refresh();
   }
 
@@ -254,6 +268,9 @@ export function InventoryManager({
     setEditingPartId(part.id);
     setPartName(part.name);
     setPartSku(part.sku || "");
+    setPartVehicleModel(part.vehicleModel || "");
+    setPartVehicleType((part.vehicleType as "EV" | "HYBRID" | null) || "EV");
+    setPartCategory(part.category || "");
     setPartUnit(part.unit);
     setPartCostPrice(part.costPrice === null ? "" : part.costPrice.toString());
     setPartSellPrice(part.sellPrice === null ? "" : part.sellPrice.toString());
@@ -283,6 +300,18 @@ export function InventoryManager({
   return (
     <div className="space-y-4">
       <section className="rounded-xl border border-slate-200 bg-white p-4">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-lg font-semibold">{isArabic ? "Ø§Ù„ØªØµØ¯ÙŠØ±" : "Export"}</h2>
+          <a
+            href="/api/admin/reports/export-inventory"
+            className="rounded-md border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+          >
+            {isArabic ? "ØªØµØ¯ÙŠØ± Ø§Ù„Ù…Ø®Ø²ÙˆÙ† (.xlsx)" : "Export Inventory (.xlsx)"}
+          </a>
+        </div>
+      </section>
+
+      <section className="rounded-xl border border-slate-200 bg-white p-4">
         <h2 className="text-lg font-semibold">{isArabic ? "تنبيهات المخزون المنخفض" : "Low Stock Alerts"}</h2>
         {alerts.length ? (
           <div className="mt-3 grid gap-2 md:grid-cols-2">
@@ -308,11 +337,17 @@ export function InventoryManager({
         <form onSubmit={submitPart} className="mt-3 grid gap-3 md:grid-cols-2">
           <input value={partName} onChange={(event) => setPartName(event.target.value)} className="rounded-md border border-slate-300 px-3 py-2" placeholder={isArabic ? "اسم القطعة" : "Part Name"} required />
           <input value={partSku} onChange={(event) => setPartSku(event.target.value)} className="rounded-md border border-slate-300 px-3 py-2" placeholder="SKU (optional)" />
+          <input value={partVehicleModel} onChange={(event) => setPartVehicleModel(event.target.value)} className="rounded-md border border-slate-300 px-3 py-2" placeholder={isArabic ? "Car Model (Camry 2011)" : "Car Model (Camry 2011)"} required />
+          <select value={partVehicleType} onChange={(event) => setPartVehicleType(event.target.value as "EV" | "HYBRID")} className="rounded-md border border-slate-300 px-3 py-2" required>
+                        <option value="EV">EV</option>
+            <option value="HYBRID">HYBRID</option>
+          </select>
+          <input value={partCategory} onChange={(event) => setPartCategory(event.target.value)} className="rounded-md border border-slate-300 px-3 py-2" placeholder={isArabic ? "Category" : "Category"} />
           <input value={partUnit} onChange={(event) => setPartUnit(event.target.value)} className="rounded-md border border-slate-300 px-3 py-2" placeholder={isArabic ? "الوحدة" : "Unit"} required />
           <input value={partStockQty} onChange={(event) => setPartStockQty(event.target.value)} className="rounded-md border border-slate-300 px-3 py-2" placeholder={isArabic ? "المخزون الابتدائي" : "Stock Qty"} type="number" min="0" required />
           <input value={partLowStockThreshold} onChange={(event) => setPartLowStockThreshold(event.target.value)} className="rounded-md border border-slate-300 px-3 py-2" placeholder={isArabic ? "حد التنبيه" : "Low Stock Threshold"} type="number" min="0" required />
           <input value={partCostPrice} onChange={(event) => setPartCostPrice(event.target.value)} className="rounded-md border border-slate-300 px-3 py-2" placeholder={isArabic ? "سعر التكلفة" : "Cost Price"} type="number" min="0" step="0.01" />
-          <input value={partSellPrice} onChange={(event) => setPartSellPrice(event.target.value)} className="rounded-md border border-slate-300 px-3 py-2" placeholder={isArabic ? "سعر البيع المقترح" : "Sell Price"} type="number" min="0" step="0.01" />
+          <input value={partSellPrice} onChange={(event) => setPartSellPrice(event.target.value)} className="rounded-md border border-slate-300 px-3 py-2" placeholder={isArabic ? "سعر البيع المقترح" : "Default Price"} type="number" min="0" step="0.01" required />
           <label className="flex items-center gap-2 text-sm text-slate-700">
             <input type="checkbox" checked={partIsActive} onChange={(event) => setPartIsActive(event.target.checked)} />
             {isArabic ? "نشط" : "Active"}
@@ -328,6 +363,9 @@ export function InventoryManager({
                   setEditingPartId(null);
                   setPartName("");
                   setPartSku("");
+                  setPartVehicleModel("");
+                  setPartVehicleType("EV");
+                  setPartCategory("");
                   setPartUnit("piece");
                   setPartCostPrice("");
                   setPartSellPrice("");
@@ -403,6 +441,9 @@ export function InventoryManager({
             <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-600">
               <tr>
                 <th className="px-3 py-2">{isArabic ? "الاسم" : "Name"}</th>
+                <th className="px-3 py-2">{isArabic ? "Model" : "Model"}</th>
+                <th className="px-3 py-2">{isArabic ? "Type" : "Type"}</th>
+                <th className="px-3 py-2">{isArabic ? "Category" : "Category"}</th>
                 <th className="px-3 py-2">SKU</th>
                 <th className="px-3 py-2">{isArabic ? "المخزون" : "Stock"}</th>
                 <th className="px-3 py-2">{isArabic ? "حد التنبيه" : "Threshold"}</th>
@@ -414,6 +455,9 @@ export function InventoryManager({
               {filteredParts.map((part) => (
                 <tr key={part.id} className={`border-t border-slate-100 ${part.lowStock ? "bg-amber-50" : ""}`}>
                   <td className="px-3 py-2">{part.name}</td>
+                  <td className="px-3 py-2">{part.vehicleModel || "-"}</td>
+                  <td className="px-3 py-2">{part.vehicleType || "-"}</td>
+                  <td className="px-3 py-2">{part.category || "-"}</td>
                   <td className="px-3 py-2 text-xs text-slate-600">{part.sku || "-"}</td>
                   <td className="px-3 py-2">
                     {part.stockQty} {part.unit}
@@ -491,3 +535,11 @@ export function InventoryManager({
     </div>
   );
 }
+
+
+
+
+
+
+
+

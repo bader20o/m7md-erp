@@ -1,10 +1,15 @@
 import {
   BookingStatus,
+  CustomerAccountEntryType,
   ExpenseCategory,
   IncomeSource,
   MembershipOrderStatus,
-  TransactionType
+  Role,
+  StockMovementType,
+  TransactionType,
+  UserStatus
 } from "@prisma/client";
+import { isLowStock } from "@/lib/inventory";
 import { prisma } from "@/lib/prisma";
 import type { AnalyticsGroupBy } from "@/lib/validators/admin-analytics";
 
@@ -41,6 +46,55 @@ export type AnalyticsOverviewPayload = {
     from: string;
     to: string;
     groupBy: AnalyticsGroupBy;
+  };
+  todaySnapshot: {
+    income: number;
+    expenses: number;
+    bookings: number;
+    activeEmployees: number;
+  };
+  inventory: {
+    lowStockItems: Array<{
+      id: string;
+      name: string;
+      vehicleModel: string | null;
+      vehicleType: string | null;
+      stockQty: number;
+      lowStockThreshold: number;
+    }>;
+    totalPartsCount: number;
+    itemsSoldToday: number;
+  };
+  customerFunnel: {
+    newCustomers: number;
+    returningCustomers: number;
+    customersWithDebt: number;
+  };
+  employeePerformance: Array<{
+    employeeId: string;
+    name: string;
+    jobsCompleted: number;
+    revenue: number;
+    attendancePct: number;
+  }>;
+  alerts: {
+    lowInventory: Array<{
+      partId: string;
+      name: string;
+      stockQty: number;
+      lowStockThreshold: number;
+    }>;
+    overdueCustomerDebt: Array<{
+      customerId: string;
+      name: string;
+      phone: string;
+      balanceDue: number;
+      lastActivityAt: string | null;
+    }>;
+    absentEmployeesToday: Array<{
+      employeeId: string;
+      name: string;
+    }>;
   };
   kpis: {
     totalIncome: number;
@@ -121,6 +175,11 @@ export type OverviewInput = {
 
 function toDayStartUtc(value: Date): Date {
   return new Date(Date.UTC(value.getUTCFullYear(), value.getUTCMonth(), value.getUTCDate()));
+}
+
+function toDayEndUtc(value: Date): Date {
+  const start = toDayStartUtc(value);
+  return new Date(start.getTime() + DAY_MS - 1);
 }
 
 function formatDateOnly(value: Date): string {
@@ -214,6 +273,12 @@ function getDateRangeBounds(input: OverviewInput): { fromStart: Date; toStart: D
   return { fromStart, toStart, toEnd };
 }
 
+function daysInclusive(fromStart: Date, toStart: Date): number {
+  const diff = toStart.getTime() - fromStart.getTime();
+  if (diff < 0) return 1;
+  return Math.floor(diff / DAY_MS) + 1;
+}
+
 function computeMembershipNewRenewed(rangeOrders: Array<{ customerId: string; createdAt: Date }>, priorCustomers: Set<string>): {
   newCount: number;
   renewedCount: number;
@@ -237,6 +302,8 @@ function computeMembershipNewRenewed(rangeOrders: Array<{ customerId: string; cr
 
 export async function getAnalyticsOverview(input: OverviewInput): Promise<AnalyticsOverviewPayload> {
   const { fromStart, toStart, toEnd } = getDateRangeBounds(input);
+  const todayStart = toDayStartUtc(new Date());
+  const todayEnd = toDayEndUtc(todayStart);
   const key = cacheKey(fromStart, toStart, input.groupBy);
   const nowMs = Date.now();
   const cached = overviewCache.get(key);
@@ -259,10 +326,22 @@ export async function getAnalyticsOverview(input: OverviewInput): Promise<Analyt
     membershipRevenueAgg,
     priorMembershipCustomersRaw,
     membershipOrdersInRangeRaw,
-    expiredMemberships
+    expiredMemberships,
+    todayTransactionRows,
+    todayBookingsCount,
+    activeEmployeeRows,
+    activeAttendanceRowsInRange,
+    todayActiveAttendanceRows,
+    activeParts,
+    itemsSoldTodayAgg,
+    newCustomersInRangeCount,
+    bookingCustomersInRangeRows,
+    bookingCustomersBeforeRangeRows,
+    customerLedgerRows
   ] = await Promise.all([
     prisma.transaction.findMany({
       where: {
+        deletedAt: null,
         occurredAt: {
           gte: fromStart,
           lte: toEnd
@@ -278,6 +357,7 @@ export async function getAnalyticsOverview(input: OverviewInput): Promise<Analyt
     }),
     prisma.transaction.findMany({
       where: {
+        deletedAt: null,
         occurredAt: {
           gte: fromStart,
           lte: toEnd
@@ -419,6 +499,7 @@ export async function getAnalyticsOverview(input: OverviewInput): Promise<Analyt
       where: {
         type: TransactionType.INCOME,
         incomeSource: IncomeSource.MEMBERSHIP,
+        deletedAt: null,
         occurredAt: {
           gte: fromStart,
           lte: toEnd
@@ -450,6 +531,153 @@ export async function getAnalyticsOverview(input: OverviewInput): Promise<Analyt
           lte: toEnd
         }
       }
+    }),
+    prisma.transaction.findMany({
+      where: {
+        deletedAt: null,
+        occurredAt: {
+          gte: todayStart,
+          lte: todayEnd
+        }
+      },
+      select: {
+        type: true,
+        amount: true
+      }
+    }),
+    prisma.booking.count({
+      where: {
+        appointmentAt: {
+          gte: todayStart,
+          lte: todayEnd
+        }
+      }
+    }),
+    prisma.employee.findMany({
+      where: {
+        isActive: true,
+        user: {
+          status: UserStatus.ACTIVE
+        }
+      },
+      select: {
+        id: true,
+        user: {
+          select: {
+            fullName: true,
+            phone: true
+          }
+        }
+      }
+    }),
+    prisma.attendance.findMany({
+      where: {
+        checkInAt: {
+          gte: fromStart,
+          lte: toEnd
+        },
+        employee: {
+          isActive: true,
+          user: {
+            status: UserStatus.ACTIVE
+          }
+        }
+      },
+      select: {
+        employeeId: true,
+        checkInAt: true,
+        checkOutAt: true
+      }
+    }),
+    prisma.attendance.findMany({
+      where: {
+        checkInAt: {
+          gte: todayStart,
+          lte: todayEnd
+        },
+        employee: {
+          isActive: true,
+          user: {
+            status: UserStatus.ACTIVE
+          }
+        }
+      },
+      select: {
+        employeeId: true
+      },
+      distinct: ["employeeId"]
+    }),
+    prisma.part.findMany({
+      where: { isActive: true },
+      select: {
+        id: true,
+        name: true,
+        vehicleModel: true,
+        vehicleType: true,
+        stockQty: true,
+        lowStockThreshold: true
+      },
+      orderBy: [{ stockQty: "asc" }, { name: "asc" }]
+    }),
+    prisma.stockMovement.aggregate({
+      where: {
+        occurredAt: {
+          gte: todayStart,
+          lte: todayEnd
+        },
+        OR: [
+          { type: StockMovementType.SALE },
+          {
+            type: StockMovementType.OUT,
+            note: {
+              contains: "sold"
+            }
+          }
+        ]
+      },
+      _sum: {
+        quantity: true
+      }
+    }),
+    prisma.user.count({
+      where: {
+        role: Role.CUSTOMER,
+        createdAt: {
+          gte: fromStart,
+          lte: toEnd
+        }
+      }
+    }),
+    prisma.booking.findMany({
+      where: {
+        appointmentAt: {
+          gte: fromStart,
+          lte: toEnd
+        }
+      },
+      select: {
+        customerId: true
+      },
+      distinct: ["customerId"]
+    }),
+    prisma.booking.findMany({
+      where: {
+        appointmentAt: {
+          lt: fromStart
+        }
+      },
+      select: {
+        customerId: true
+      },
+      distinct: ["customerId"]
+    }),
+    prisma.customerAccountEntry.findMany({
+      select: {
+        customerId: true,
+        type: true,
+        amount: true,
+        occurredAt: true
+      }
     })
   ]);
 
@@ -460,55 +688,55 @@ export async function getAnalyticsOverview(input: OverviewInput): Promise<Analyt
   const [topEmployeeProfiles, attendanceRows, ratingRows] = await Promise.all([
     topEmployeeIds.length
       ? prisma.employee.findMany({
-          where: { id: { in: topEmployeeIds } },
-          select: {
-            id: true,
-            user: {
-              select: {
-                fullName: true,
-                phone: true
-              }
+        where: { id: { in: topEmployeeIds } },
+        select: {
+          id: true,
+          user: {
+            select: {
+              fullName: true,
+              phone: true
             }
           }
-        })
+        }
+      })
       : Promise.resolve([]),
     topEmployeeIds.length
       ? prisma.attendance.findMany({
-          where: {
-            employeeId: { in: topEmployeeIds },
-            checkInAt: {
-              gte: fromStart,
-              lte: toEnd
-            }
-          },
-          select: {
-            employeeId: true,
-            checkInAt: true,
-            checkOutAt: true
+        where: {
+          employeeId: { in: topEmployeeIds },
+          checkInAt: {
+            gte: fromStart,
+            lte: toEnd
           }
-        })
+        },
+        select: {
+          employeeId: true,
+          checkInAt: true,
+          checkOutAt: true
+        }
+      })
       : Promise.resolve([]),
     topEmployeeIds.length
       ? prisma.review.findMany({
-          where: {
-            booking: {
-              performedByEmployeeId: { in: topEmployeeIds },
-              status: BookingStatus.COMPLETED,
-              completedAt: {
-                gte: fromStart,
-                lte: toEnd
-              }
-            }
-          },
-          select: {
-            rating: true,
-            booking: {
-              select: {
-                performedByEmployeeId: true
-              }
+        where: {
+          booking: {
+            performedByEmployeeId: { in: topEmployeeIds },
+            status: BookingStatus.COMPLETED,
+            completedAt: {
+              gte: fromStart,
+              lte: toEnd
             }
           }
-        })
+        },
+        select: {
+          rating: true,
+          booking: {
+            select: {
+              performedByEmployeeId: true
+            }
+          }
+        }
+      })
       : Promise.resolve([])
   ]);
 
@@ -518,7 +746,9 @@ export async function getAnalyticsOverview(input: OverviewInput): Promise<Analyt
   const incomeBySourceMap: Record<IncomeSource, number> = {
     BOOKING: 0,
     WALK_IN: 0,
-    MEMBERSHIP: 0
+    MEMBERSHIP: 0,
+    INVOICE: 0,
+    INVENTORY_SALE: 0
   };
   const expensesByCategoryMap: Record<ExpenseCategory, number> = {
     SUPPLIER: 0,
@@ -608,11 +838,167 @@ export async function getAnalyticsOverview(input: OverviewInput): Promise<Analyt
     })
     .filter((item): item is NonNullable<typeof item> => Boolean(item));
 
+  let todayIncome = 0;
+  let todayExpenses = 0;
+  for (const row of todayTransactionRows) {
+    const amount = toNumber(row.amount);
+    if (row.type === TransactionType.INCOME) {
+      todayIncome += amount;
+    } else if (row.type === TransactionType.EXPENSE) {
+      todayExpenses += amount;
+    }
+  }
+
+  const lowStockItems = activeParts
+    .filter((part) => isLowStock(part.stockQty, part.lowStockThreshold))
+    .slice(0, 5);
+
+  const bookingCustomersInRange = new Set(bookingCustomersInRangeRows.map((row) => row.customerId));
+  const bookingCustomersBeforeRange = new Set(bookingCustomersBeforeRangeRows.map((row) => row.customerId));
+  let returningCustomers = 0;
+  for (const customerId of bookingCustomersInRange) {
+    if (bookingCustomersBeforeRange.has(customerId)) {
+      returningCustomers += 1;
+    }
+  }
+
+  const customerBalances = new Map<string, number>();
+  const customerLastActivity = new Map<string, Date>();
+  for (const row of customerLedgerRows) {
+    const current = customerBalances.get(row.customerId) ?? 0;
+    const amount = toNumber(row.amount);
+    if (row.type === CustomerAccountEntryType.PAYMENT) {
+      customerBalances.set(row.customerId, current - amount);
+    } else {
+      customerBalances.set(row.customerId, current + amount);
+    }
+
+    const previousLast = customerLastActivity.get(row.customerId);
+    if (!previousLast || row.occurredAt.getTime() > previousLast.getTime()) {
+      customerLastActivity.set(row.customerId, row.occurredAt);
+    }
+  }
+
+  const debtRows = Array.from(customerBalances.entries())
+    .filter(([, value]) => value > 0)
+    .sort((a, b) => b[1] - a[1]);
+
+  const overdueCutoff = new Date(todayStart.getTime() - 30 * DAY_MS);
+  const overdueDebtRows = debtRows
+    .filter(([customerId]) => {
+      const lastActivity = customerLastActivity.get(customerId);
+      return lastActivity ? lastActivity.getTime() < overdueCutoff.getTime() : false;
+    })
+    .slice(0, 5);
+
+  const overdueCustomers = overdueDebtRows.length
+    ? await prisma.user.findMany({
+      where: { id: { in: overdueDebtRows.map(([customerId]) => customerId) } },
+      select: {
+        id: true,
+        fullName: true,
+        phone: true
+      }
+    })
+    : [];
+  const overdueCustomerMap = new Map(overdueCustomers.map((item) => [item.id, item]));
+
+  const workingDays = daysInclusive(fromStart, toStart);
+  const jobsByEmployee = new Map<string, { jobsCompleted: number; revenue: number }>();
+  for (const row of topEmployeesRaw) {
+    const employeeId = row.performedByEmployeeId;
+    if (!employeeId) continue;
+    jobsByEmployee.set(employeeId, {
+      jobsCompleted: toGroupCount(row._count),
+      revenue: round2(toNumber(row._sum?.finalPrice))
+    });
+  }
+
+  const attendanceDaysByEmployee = new Map<string, Set<string>>();
+  for (const row of activeAttendanceRowsInRange) {
+    const dayKey = formatDateOnly(toDayStartUtc(row.checkInAt));
+    const seenDays = attendanceDaysByEmployee.get(row.employeeId) ?? new Set<string>();
+    seenDays.add(dayKey);
+    attendanceDaysByEmployee.set(row.employeeId, seenDays);
+  }
+
+  const employeePerformance = activeEmployeeRows
+    .map((employee) => {
+      const jobs = jobsByEmployee.get(employee.id) ?? { jobsCompleted: 0, revenue: 0 };
+      const attendanceDays = attendanceDaysByEmployee.get(employee.id)?.size ?? 0;
+      const attendancePct = workingDays > 0 ? round2((attendanceDays / workingDays) * 100) : 0;
+      return {
+        employeeId: employee.id,
+        name: employee.user.fullName ?? employee.user.phone ?? employee.id,
+        jobsCompleted: jobs.jobsCompleted,
+        revenue: jobs.revenue,
+        attendancePct
+      };
+    })
+    .sort((a, b) => {
+      if (b.jobsCompleted !== a.jobsCompleted) return b.jobsCompleted - a.jobsCompleted;
+      if (b.revenue !== a.revenue) return b.revenue - a.revenue;
+      return b.attendancePct - a.attendancePct;
+    })
+    .slice(0, 10);
+
+  const activeTodayEmployeeIds = new Set(todayActiveAttendanceRows.map((row) => row.employeeId));
+  const absentEmployeesToday = activeEmployeeRows
+    .filter((employee) => !activeTodayEmployeeIds.has(employee.id))
+    .slice(0, 5)
+    .map((employee) => ({
+      employeeId: employee.id,
+      name: employee.user.fullName ?? employee.user.phone ?? employee.id
+    }));
+
   const payload: AnalyticsOverviewPayload = {
     range: {
       from: formatDateOnly(fromStart),
       to: formatDateOnly(toStart),
       groupBy: input.groupBy
+    },
+    todaySnapshot: {
+      income: round2(todayIncome),
+      expenses: round2(todayExpenses),
+      bookings: todayBookingsCount,
+      activeEmployees: activeEmployeeRows.length
+    },
+    inventory: {
+      lowStockItems: lowStockItems.map((part) => ({
+        id: part.id,
+        name: part.name,
+        vehicleModel: part.vehicleModel,
+        vehicleType: part.vehicleType,
+        stockQty: part.stockQty,
+        lowStockThreshold: part.lowStockThreshold
+      })),
+      totalPartsCount: activeParts.length,
+      itemsSoldToday: Number(itemsSoldTodayAgg._sum.quantity ?? 0)
+    },
+    customerFunnel: {
+      newCustomers: newCustomersInRangeCount,
+      returningCustomers,
+      customersWithDebt: debtRows.length
+    },
+    employeePerformance,
+    alerts: {
+      lowInventory: lowStockItems.slice(0, 3).map((part) => ({
+        partId: part.id,
+        name: part.name,
+        stockQty: part.stockQty,
+        lowStockThreshold: part.lowStockThreshold
+      })),
+      overdueCustomerDebt: overdueDebtRows.map(([customerId, balanceDue]) => {
+        const customer = overdueCustomerMap.get(customerId);
+        return {
+          customerId,
+          name: customer?.fullName ?? customer?.phone ?? customerId,
+          phone: customer?.phone ?? "-",
+          balanceDue: round2(balanceDue),
+          lastActivityAt: customerLastActivity.get(customerId)?.toISOString() ?? null
+        };
+      }),
+      absentEmployeesToday
     },
     kpis: {
       totalIncome: round2(totalIncome),
@@ -628,7 +1014,8 @@ export async function getAnalyticsOverview(input: OverviewInput): Promise<Analyt
       incomeBySource: [
         { source: IncomeSource.BOOKING, amount: round2(incomeBySourceMap.BOOKING) },
         { source: IncomeSource.WALK_IN, amount: round2(incomeBySourceMap.WALK_IN) },
-        { source: IncomeSource.MEMBERSHIP, amount: round2(incomeBySourceMap.MEMBERSHIP) }
+        { source: IncomeSource.MEMBERSHIP, amount: round2(incomeBySourceMap.MEMBERSHIP) },
+        { source: IncomeSource.INVENTORY_SALE, amount: round2(incomeBySourceMap.INVENTORY_SALE) }
       ],
       expensesByCategory: [
         { category: ExpenseCategory.SUPPLIER, amount: round2(expensesByCategoryMap.SUPPLIER) },

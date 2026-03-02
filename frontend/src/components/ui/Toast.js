@@ -5,7 +5,7 @@ export function Toast(message, type = 'info') {
     const toast = document.createElement('div');
 
     // Style configurations
-    const baseClasses = 'px-4 py-3 rounded-lg shadow-lg text-sm font-medium transition-all duration-300 transform translate-y-4 opacity-0 flex items-center gap-3 backdrop-blur-md z-50';
+    const baseClasses = 'px-4 py-3 rounded-lg shadow-lg text-sm font-medium transition-all duration-300 transform translate-y-4 opacity-0 flex items-center gap-3 backdrop-blur-md z-[150]';
 
     let typeClasses = '';
     let iconHtml = '';

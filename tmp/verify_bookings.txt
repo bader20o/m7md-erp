@@ -1,0 +1,49 @@
+You are testing the new Booking Operations and Manage Booking modal on an auto-repair shop SPA interface running locally.
+
+Your goal is to perform a detailed end-to-end flow and capture images to prove the UI states to the user.
+
+1. Navigate to: http://localhost:3000/admin/bookings
+   - Wait for the table to load.
+   - You should see "Booking Operations" and a search bar.
+   - You should see different colored sematic badges in the "Status" column (PENDING in amber, CONFIRMED in blue, etc.)
+
+2. Screenshot #1 - Main Table View
+   - Once the table fully loads and badges are visible, take a clear screenshot showing the table design and Semantic Badges.
+   - Name the file: `booking_table_badges.png`.
+   - Save the image to the artifact directory.
+
+3. Find a booking in "PENDING" status.
+   - Click its corresponding "Manage" button in the Action column.
+   - The Manage Modal will open. You will see "Confirm Booking", "No Show", and "Cancel" buttons.
+   - Notice the "Audit Log" section at the bottom.
+
+4. Action Test 1: PENDING -> CONFIRMED
+   - Click the green "Confirm Booking" button.
+   - It will prompt you. Confirm the prompt.
+   - The modal should close, and a success toast should appear.
+   - Observe in the table that the booking's badge has changed from Amber "PENDING" to Blue "CONFIRMED".
+
+5. View Audit Log
+   - Click the "Manage" button for that exact SAME booking again.
+   - The modal now shows "Complete Servicing", "No Show", and "Cancel".
+   - Scroll or check the bottom "Audit Log". You should see an entry indicating the status changed from "PENDING -> CONFIRMED".
+   
+6. Screenshot #2 - Confirmed Modal & Audit Log
+   - While still inside this modal, take a screenshot clearly capturing the "Complete Servicing" button and the Audit Log entry at the bottom.
+   - Name the file: `booking_manage_confirmed_audit.png`.
+   - Save the image to the artifact directory.
+
+7. Action Test 2: CONFIRMED -> NO SHOW
+   - Click the "No Show" button.
+   - A prompt will ask for a reason. Enter "Customer didn't arrive".
+   - The modal will close.
+   - Notice the table badge is now Red "NO SHOW".
+
+8. Action Test 3: Terminal Return -> CONFIRMED
+   - Click "Manage" on the same booking.
+   - The modal now shows "Reopen Booking (Set Confirmed)", "View Invoice", and "Create Follow-up".
+   - Click "Reopen Booking".
+   - Confirm the prompt.
+   - The modal closes, and the table badge reverts to Blue "CONFIRMED".
+
+9. Verify all flows are smooth. Write a single line summary confirming success and terminate. There is no need for text extraction.

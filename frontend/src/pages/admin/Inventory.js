@@ -18,9 +18,11 @@ export function AdminInventory() {
     const alertsNode = document.getElementById('inventory-alerts');
     const detailsNode = document.getElementById('inventory-part-details');
     const searchInput = document.getElementById('inventory-search');
-    const addPartForm = document.getElementById('inventory-add-part-form');
     const addPartToggle = document.getElementById('inventory-add-part-toggle');
-    const addPartContainer = document.getElementById('inventory-add-part-container');
+    const addPartOverlay = document.getElementById('inventory-add-part-overlay');
+    const addPartForm = document.getElementById('inventory-add-part-modal-form');
+    const addPartClose = document.getElementById('inventory-add-part-close');
+    const addPartCancel = document.getElementById('inventory-add-part-cancel');
     const movementOverlay = document.getElementById('inventory-movement-overlay');
     const movementForm = document.getElementById('inventory-movement-form');
     const movementTitle = document.getElementById('inventory-movement-title');
@@ -47,6 +49,17 @@ export function AdminInventory() {
       movementTypeInput.value = '';
     }
 
+    function openAddPartModal() {
+      addPartOverlay.classList.remove('hidden');
+      const nameInput = addPartForm.querySelector('[name="name"]');
+      if (nameInput) nameInput.focus();
+    }
+
+    function closeAddPartModal(reset = true) {
+      addPartOverlay.classList.add('hidden');
+      if (reset) addPartForm.reset();
+    }
+
     function renderParts() {
       const items = state.parts;
       if (!items.length) {
@@ -61,16 +74,15 @@ export function AdminInventory() {
             <tr class="border-b border-border transition-colors cursor-pointer ${active ? 'bg-primary/5' : 'hover:bg-bg'}" onclick="window.openInventoryPart('${part.id}')">
               <td class="px-4 py-3">
                 <div class="text-sm font-semibold text-text">${part.name}</div>
-                <div class="text-xs text-muted">${part.unit}</div>
+                <div class="text-xs text-muted">${part.vehicleModel || '-'} &bull; ${part.vehicleType || '-'} &bull; ${part.category || '-'} &bull; ${part.unit}</div>
               </td>
               <td class="px-4 py-3 text-sm text-center font-bold ${part.lowStock ? 'text-danger' : 'text-text'}">${part.stockQty}</td>
               <td class="px-4 py-3 text-sm text-center">${part.lowStockThreshold}</td>
               <td class="px-4 py-3 text-center">
-                ${
-                  part.lowStock
-                    ? '<span class="px-2 py-1 rounded-md text-[10px] font-bold uppercase bg-danger/15 text-danger">Low</span>'
-                    : '<span class="px-2 py-1 rounded-md text-[10px] font-bold uppercase bg-success/15 text-success">OK</span>'
-                }
+                ${part.lowStock
+              ? '<span class="px-2 py-1 rounded-md text-[10px] font-bold uppercase bg-danger/15 text-danger">Low</span>'
+              : '<span class="px-2 py-1 rounded-md text-[10px] font-bold uppercase bg-success/15 text-success">OK</span>'
+            }
               </td>
             </tr>
           `;
@@ -87,8 +99,8 @@ export function AdminInventory() {
 
       const movementRows = state.movements.length
         ? state.movements
-            .map(
-              (movement) => `
+          .map(
+            (movement) => `
                 <tr class="border-b border-border">
                   <td class="px-3 py-2 text-xs">${formatDateTime(movement.occurredAt)}</td>
                   <td class="px-3 py-2 text-xs text-center">
@@ -98,8 +110,8 @@ export function AdminInventory() {
                   <td class="px-3 py-2 text-xs">${movement.note || '-'}</td>
                 </tr>
               `
-            )
-            .join('')
+          )
+          .join('')
         : '<tr><td colspan="4" class="px-3 py-6 text-center text-xs text-muted">No stock movements.</td></tr>';
 
       detailsNode.innerHTML = `
@@ -107,7 +119,9 @@ export function AdminInventory() {
           <div class="rounded-xl border border-border p-4 bg-bg">
             <div class="text-xs uppercase text-muted">Part</div>
             <div class="text-xl font-bold text-text mt-1">${part.name}</div>
-            <div class="text-xs text-muted mt-1">Type/Category: ${part.unit}</div>
+            <div class="text-xs text-muted mt-1">Car Model: ${part.vehicleModel || '-'} (${part.vehicleType || '-'})</div>
+            <div class="text-xs text-muted mt-1">Category & Unit: ${part.category || '-'} &bull; ${part.unit}</div>
+            <div class="text-xs text-muted mt-1">Pricing: ${part.costPrice ? part.costPrice + ' JOD Cost / ' : ''}${part.sellPrice || 0} JOD Default Price</div>
             <div class="text-sm mt-2">
               <span class="font-semibold text-text">Current stock:</span>
               <span class="${part.lowStock ? 'text-danger font-bold' : 'text-success font-bold'}">${part.stockQty}</span>
@@ -236,26 +250,61 @@ export function AdminInventory() {
       loadParts();
     });
 
-    addPartToggle.addEventListener('click', () => {
-      addPartContainer.classList.toggle('hidden');
-    });
+    addPartToggle.addEventListener('click', openAddPartModal);
 
     addPartForm.addEventListener('submit', async (event) => {
       event.preventDefault();
       const form = event.target;
+      const name = (form.name.value || '').trim();
+      const vehicleModel = (form.vehicleModel.value || '').trim();
+      const vehicleType = (form.vehicleType.value || '').trim();
+      const sellPriceRaw = form.sellPrice.value;
+      const minStockRaw = form.minStock.value;
+      const costPriceRaw = form.costPrice.value;
+      const sellPrice = Number(sellPriceRaw);
+      const minStock = Number(minStockRaw);
+
+      if (!name) {
+        window.toast('Item is required.', 'error');
+        return;
+      }
+      if (!vehicleModel) {
+        window.toast('Car name is required.', 'error');
+        return;
+      }
+      if (!['EV', 'HYBRID', 'REGULAR'].includes(vehicleType)) {
+        window.toast('Car type is invalid.', 'error');
+        return;
+      }
+      if (sellPriceRaw === '' || Number.isNaN(sellPrice) || sellPrice < 0) {
+        window.toast('Price must be 0 or greater.', 'error');
+        return;
+      }
+      if (minStockRaw === '' || Number.isNaN(minStock) || minStock < 0 || !Number.isInteger(minStock)) {
+        window.toast('Minimum quantity must be a whole number 0 or greater.', 'error');
+        return;
+      }
+      if (costPriceRaw !== '' && (Number.isNaN(Number(costPriceRaw)) || Number(costPriceRaw) < 0)) {
+        window.toast('Cost must be 0 or greater.', 'error');
+        return;
+      }
 
       try {
         await apiFetch('/inventory/parts', {
           method: 'POST',
           body: {
-            name: form.name.value,
-            unit: form.category.value,
-            lowStockThreshold: form.minStock.value ? Number(form.minStock.value) : 0
+            name,
+            vehicleModel,
+            vehicleType,
+            unit: 'piece',
+            costPrice: costPriceRaw !== '' ? Number(costPriceRaw) : undefined,
+            sellPrice,
+            stockQty: 0,
+            lowStockThreshold: minStock
           }
         });
         window.toast('Part created.', 'success');
-        form.reset();
-        addPartContainer.classList.add('hidden');
+        closeAddPartModal(true);
         await loadParts();
       } catch (error) {
         window.toast(error.message || 'Failed to create part.', 'error');
@@ -295,13 +344,33 @@ export function AdminInventory() {
 
     document.getElementById('inventory-movement-cancel').addEventListener('click', closeMovementModal);
     document.getElementById('inventory-movement-close').addEventListener('click', closeMovementModal);
+    addPartClose.addEventListener('click', () => closeAddPartModal(true));
+    addPartCancel.addEventListener('click', () => closeAddPartModal(true));
     movementOverlay.addEventListener('click', (event) => {
       if (event.target === movementOverlay) {
         closeMovementModal();
       }
     });
+    addPartOverlay.addEventListener('click', (event) => {
+      if (event.target === addPartOverlay) {
+        closeAddPartModal(true);
+      }
+    });
+    document.addEventListener('keydown', (event) => {
+      if (event.key !== 'Escape') return;
+      if (!addPartOverlay.classList.contains('hidden')) {
+        closeAddPartModal(true);
+      }
+      if (!movementOverlay.classList.contains('hidden')) {
+        closeMovementModal();
+      }
+    });
 
     await loadParts();
+
+    if (window.location.hash === '#add-part') {
+      openAddPartModal();
+    }
   };
 
   return `
@@ -312,15 +381,6 @@ export function AdminInventory() {
           <p class="text-sm text-muted">Track parts stock and movement notes.</p>
         </div>
         <button id="inventory-add-part-toggle" class="px-4 py-2 rounded-lg bg-primary text-white font-semibold hover:bg-primary-hover">Add Part</button>
-      </div>
-
-      <div id="inventory-add-part-container" class="hidden bg-surface border border-border rounded-xl p-4">
-        <form id="inventory-add-part-form" class="grid grid-cols-1 md:grid-cols-3 gap-3">
-          <input name="name" required placeholder="Part name" class="px-3 py-2 rounded-lg border border-border bg-bg">
-          <input name="category" required placeholder="Type / Category" class="px-3 py-2 rounded-lg border border-border bg-bg">
-          <input name="minStock" type="number" min="0" placeholder="Min stock (optional)" class="px-3 py-2 rounded-lg border border-border bg-bg">
-          <button class="md:col-span-3 px-4 py-2 rounded-lg bg-primary text-white font-semibold">Save Part</button>
-        </form>
       </div>
 
       <div class="bg-surface border border-border rounded-xl p-4">
@@ -370,6 +430,55 @@ export function AdminInventory() {
             <div class="flex justify-end gap-3">
               <button id="inventory-movement-cancel" type="button" class="px-4 py-2 rounded-lg border border-border text-text hover:border-text">Cancel</button>
               <button type="submit" class="px-5 py-2 rounded-lg bg-primary text-white font-semibold hover:bg-primary-hover">Confirm</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <div id="inventory-add-part-overlay" class="hidden fixed inset-0 z-[75] bg-black/55 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="w-full max-w-4xl bg-surface border border-border rounded-2xl shadow-2xl overflow-hidden">
+          <div class="flex items-center justify-between px-5 py-4 border-b border-border">
+            <h3 class="text-lg font-heading font-bold text-text">Add Inventory Item</h3>
+            <button id="inventory-add-part-close" type="button" class="w-8 h-8 rounded-full border border-border text-muted hover:text-text hover:border-text">&times;</button>
+          </div>
+          <form id="inventory-add-part-modal-form" class="p-5 space-y-4">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
+              <div>
+                <label class="block text-xs font-bold text-muted uppercase tracking-wider mb-1">Item</label>
+                <input name="name" required placeholder="Item name" class="w-full px-3 py-2 rounded-lg border border-border bg-bg text-text">
+              </div>
+              <div>
+                <label class="block text-xs font-bold text-muted uppercase tracking-wider mb-1">Cost</label>
+                <input name="costPrice" type="number" step="0.01" min="0" placeholder="0.00" class="w-full px-3 py-2 rounded-lg border border-border bg-bg text-text">
+              </div>
+              <div>
+                <label class="block text-xs font-bold text-muted uppercase tracking-wider mb-1">Price</label>
+                <input name="sellPrice" type="number" step="0.01" min="0" required placeholder="0.00" class="w-full px-3 py-2 rounded-lg border border-border bg-bg text-text">
+              </div>
+              <div>
+                <label class="block text-xs font-bold text-muted uppercase tracking-wider mb-1">Minimum Quantity</label>
+                <input name="minStock" type="number" min="0" required placeholder="0" class="w-full px-3 py-2 rounded-lg border border-border bg-bg text-text">
+              </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div>
+                <label class="block text-xs font-bold text-muted uppercase tracking-wider mb-1">Car Type</label>
+                <select name="vehicleType" required class="w-full px-3 py-2 rounded-lg border border-border bg-bg text-text">
+                  <option value="EV">EV</option>
+                  <option value="HYBRID">Hybrid</option>
+                  <option value="REGULAR">Regular Fuel</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-xs font-bold text-muted uppercase tracking-wider mb-1">Car Name</label>
+                <input name="vehicleModel" required placeholder="Toyota Camry 2011" class="w-full px-3 py-2 rounded-lg border border-border bg-bg text-text">
+              </div>
+            </div>
+
+            <div class="flex justify-end gap-3 pt-1">
+              <button id="inventory-add-part-cancel" type="button" class="px-4 py-2 rounded-lg border border-border text-text hover:border-text">Cancel</button>
+              <button type="submit" class="px-5 py-2 rounded-lg bg-primary text-white font-semibold hover:bg-primary-hover">Save Part</button>
             </div>
           </form>
         </div>

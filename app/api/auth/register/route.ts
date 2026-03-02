@@ -37,7 +37,8 @@ export async function POST(request: Request): Promise<Response> {
     const token = await signSession({
       sub: user.id,
       phone: user.phone,
-      role: user.role
+      role: user.role,
+      sessionVersion: 0
     });
     await setSessionCookie(token);
 
@@ -53,4 +54,3 @@ export async function POST(request: Request): Promise<Response> {
     return fail(error);
   }
 }
-

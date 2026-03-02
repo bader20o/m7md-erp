@@ -7,7 +7,8 @@ import { requireSession } from "@/lib/rbac";
 
 const listUsersQuerySchema = z.object({
   q: z.string().trim().max(80).optional(),
-  take: z.coerce.number().int().min(1).max(50).default(20)
+  take: z.coerce.number().int().min(1).max(50).default(20),
+  role: z.enum(["ADMIN", "EMPLOYEE", "CUSTOMER"]).optional()
 });
 
 export async function GET(request: Request): Promise<Response> {
@@ -16,23 +17,30 @@ export async function GET(request: Request): Promise<Response> {
     const url = new URL(request.url);
     const query = await listUsersQuerySchema.parseAsync({
       q: url.searchParams.get("q") ?? undefined,
-      take: url.searchParams.get("take") ?? undefined
+      take: url.searchParams.get("take") ?? undefined,
+      role: url.searchParams.get("role") ?? undefined
     });
 
     const q = query.q?.trim();
-    const restrictToAdmins = actor.role !== Role.ADMIN;
+    const roleFilter =
+      actor.role === Role.CUSTOMER
+        ? Role.ADMIN
+        : actor.role === Role.ADMIN
+          ? query.role ?? Role.EMPLOYEE
+          : null;
+
+    if (!roleFilter) {
+      return ok({ items: [] });
+    }
 
     const items = await prisma.user.findMany({
       where: {
         id: { not: actor.sub },
         isActive: true,
-        ...(restrictToAdmins ? { role: Role.ADMIN } : {}),
+        role: roleFilter,
         ...(q
           ? {
-              OR: [
-                { fullName: { contains: q, mode: "insensitive" } },
-                { phone: { contains: q, mode: "insensitive" } }
-              ]
+              OR: [{ fullName: { contains: q } }, { phone: { contains: q } }]
             }
           : {})
       },

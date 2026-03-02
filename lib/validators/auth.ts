@@ -1,9 +1,11 @@
 import { z } from "zod";
+import { normalizePhone } from "../utils/phone";
 
 const phoneSchema = z
   .string()
   .trim()
-  .regex(/^07\d{8}$/, "Phone must start with 07 and contain 10 digits.");
+  .transform((val) => normalizePhone(val) || val)
+  .refine((val) => /^07\d{8}$/.test(val), "Phone must be a valid Jordan mobile number starting with 07 and contain 10 digits.");
 
 export const registerSchema = z.object({
   phone: phoneSchema,

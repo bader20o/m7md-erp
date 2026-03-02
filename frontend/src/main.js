@@ -18,8 +18,10 @@ import { AdminCustomers } from "./pages/admin/Customers.js";
 import { AdminEmployees } from "./pages/admin/Employees.js";
 import { AdminInventory } from "./pages/admin/Inventory.js";
 import { AdminMemberships } from "./pages/admin/Memberships.js";
+import { AdminProfile } from "./pages/admin/Profile.js";
 import { AdminServices } from "./pages/admin/Services.js";
 import { AdminSettings } from "./pages/admin/Settings.js";
+import { AdminTasks } from "./pages/admin/Tasks.js";
 import { Profile } from "./pages/customer/Profile.js";
 import { BookService } from "./pages/customer/BookService.js";
 import { Chat } from "./pages/customer/Chat.js";
@@ -35,17 +37,22 @@ import { Services } from "./pages/public/Services.js";
 const PATH_ALIASES = {
   "/dashboard": "/home",
   "/my-bookings": "/history",
-  "/admin": "/admin/dashboard"
+  "/admin": "/admin/dashboard",
+  "/employee/tasks": "/tasks"
 };
 
 const ADMIN_ROUTES = new Set(Object.keys(ADMIN_ROUTE_ACCESS));
 
 function normalizePath(path) {
   if (!path) return "/";
-  if (path.length > 1 && path.endsWith("/")) {
-    return path.slice(0, -1);
+  // Extract just the pathname for normalization
+  const [base, ...rest] = path.split(/[?#]/);
+  let normal = base;
+  if (normal.length > 1 && normal.endsWith("/")) {
+    normal = normal.slice(0, -1);
   }
-  return path;
+  // Reattach query/hash if present (though navigate handles this mostly)
+  return normal + (rest.length ? path.substring(base.length) : '');
 }
 
 function canonicalizePath(path) {
@@ -76,11 +83,16 @@ const App = {
   },
 
   getRoute(path) {
-    return this.routes[path] || null;
+    const basePath = path.split(/[?#]/)[0];
+    return this.routes[basePath] || null;
   },
 
   async navigate(path, { replace = false } = {}) {
-    const targetPath = canonicalizePath(path);
+    const basePath = path.split(/[?#]/)[0];
+    const hashPart = path.includes('#') ? '#' + path.split('#')[1] : '';
+    const queryPart = path.includes('?') && !path.includes('#') ? '?' + path.split('?')[1] : '';
+    const targetPath = canonicalizePath(basePath) + queryPart + hashPart;
+
     if (replace) {
       window.history.replaceState({}, "", targetPath);
     } else {
@@ -172,11 +184,12 @@ const App = {
       this.currentPath = canonicalPath;
     }
 
-    await this.syncAuthForPath(canonicalPath);
+    const basePath = canonicalPath.split(/[?#]/)[0];
+    await this.syncAuthForPath(basePath);
 
-    const route = this.getRoute(canonicalPath);
-    const scope = route?.scope || inferRouteScope(canonicalPath);
-    const guard = this.resolveGuard(canonicalPath, scope);
+    const route = this.getRoute(basePath);
+    const scope = route?.scope || inferRouteScope(basePath);
+    const guard = this.resolveGuard(basePath, scope);
 
     if (guard.redirect) {
       const target = canonicalizePath(guard.redirect);
@@ -203,11 +216,11 @@ const App = {
 
   async init() {
     store.init();
-    this.currentPath = canonicalizePath(window.location.pathname);
-    await this.syncAuthForPath(this.currentPath);
+    this.currentPath = canonicalizePath(window.location.pathname + window.location.hash);
+    await this.syncAuthForPath(this.currentPath.split(/[?#]/)[0]);
 
     window.addEventListener("popstate", async () => {
-      this.currentPath = canonicalizePath(window.location.pathname);
+      this.currentPath = canonicalizePath(window.location.pathname + window.location.hash);
       this.lastAuthSyncPath = null;
       await this.render();
     });
@@ -272,10 +285,14 @@ App.register("/admin/services", adminRoute(AdminServices));
 App.register("/admin/employees", adminRoute(AdminEmployees));
 App.register("/admin/accounting", adminRoute(AdminAccounting));
 App.register("/admin/memberships", adminRoute(AdminMemberships));
+App.register("/tasks", adminRoute(AdminTasks));
+App.register("/admin/tasks", adminRoute(AdminTasks));
 App.register("/admin/settings", adminRoute(AdminSettings));
-App.register("/admin/profile", adminRoute(Profile));
+App.register("/admin/profile", adminRoute(AdminProfile));
 App.register("/forbidden", adminRoute(ForbiddenPage));
 
-document.addEventListener("DOMContentLoaded", () => {
+if (document.readyState === 'loading') {
+  document.addEventListener("DOMContentLoaded", () => App.init());
+} else {
   App.init();
-});
+}

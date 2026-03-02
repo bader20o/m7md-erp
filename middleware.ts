@@ -14,6 +14,15 @@ function isStaticAsset(pathname: string): boolean {
 export function middleware(request: NextRequest): NextResponse {
   const { pathname } = request.nextUrl;
 
+  if (pathname === "/favicon.ico") {
+    return new NextResponse(null, {
+      status: 204,
+      headers: {
+        "Cache-Control": "public, max-age=86400"
+      }
+    });
+  }
+
   if (pathname.startsWith("/api")) {
     // Handle CORS preflight
     if (request.method === "OPTIONS") {

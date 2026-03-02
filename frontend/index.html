@@ -13,57 +13,52 @@
     href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Inter:wght@400;500;600&display=swap"
     rel="stylesheet">
 
-  <!-- Tailwind CSS via CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = {
-      darkMode: 'class',
+      darkMode: "class",
       theme: {
         extend: {
           colors: {
-            primary: 'var(--primary)',
-            'primary-hover': 'var(--primary-hover)',
-            bg: 'var(--bg)',
-            surface: 'var(--surface)',
-            border: 'var(--border)',
-            text: 'var(--text)',
-            muted: 'var(--muted)',
-            danger: 'var(--danger)',
-            success: 'var(--success)',
+            bg: "var(--bg)",
+            surface: "var(--surface)",
+            border: "var(--border)",
+            text: "var(--text)",
+            muted: "var(--muted)",
+            primary: "var(--primary)",
+            "primary-hover": "var(--primary-hover)",
+            danger: "var(--danger)",
+            success: "var(--success)"
           },
           fontFamily: {
-            sans: ['Inter', 'sans-serif'],
-            heading: ['Outfit', 'sans-serif'],
+            heading: ["Outfit", "sans-serif"],
+            sans: ["Inter", "sans-serif"]
           }
         }
       }
-    }
+    };
   </script>
 
   <!-- Main Styles -->
   <link rel="stylesheet" href="/spa/src/styles/main.css">
 </head>
 
-<body class="bg-bg text-text transition-colors duration-300 font-sans antialiased selection:bg-primary/20">
-
-  <!-- Mounting point for Antigravity SPA -->
-  <div id="app"></div>
-
-  <!-- Toast Container -->
-  <div id="toast-container" class="fixed bottom-4 right-4 z-50 flex flex-col gap-2 pointer-events-none"></div>
-
-  <!-- Loading Overlay -->
+<body class="bg-bg text-text antialiased">
+  <!-- Global Loader -->
   <div id="global-loader"
-    class="fixed inset-0 z-[100] bg-bg flex items-center justify-center transition-opacity duration-300">
-    <div class="flex flex-col items-center gap-4">
-      <div class="h-[60px] w-[60px] rounded-full border-4 border-muted border-t-primary animate-spin"></div>
-      <p class="text-muted font-medium text-sm">Loading Application...</p>
-    </div>
+    class="fixed inset-0 z-[100] bg-bg flex flex-col items-center justify-center transition-opacity duration-300">
+    <div class="w-12 h-12 border-4 border-surface border-t-primary rounded-full animate-spin mb-4"></div>
+    <p class="text-muted font-medium text-sm">Loading Application...</p>
   </div>
 
-  <!-- Antigravity Mock / Setup Script (Placeholder for actual framework code) -->
-  <script type="module" src="/spa/src/main.js"></script>
+  <!-- App Mount Point -->
+  <div id="app" class="min-h-screen flex flex-col relative w-full overflow-hidden"></div>
 
+  <!-- Toasts Mount Point -->
+  <div id="toast-container" class="fixed bottom-4 right-4 z-[9999] flex flex-col gap-2 pointer-events-none"></div>
+
+  <!-- Main Entry Point -->
+  <script type="module" src="/spa/src/main.js"></script>
 </body>
 
 </html>

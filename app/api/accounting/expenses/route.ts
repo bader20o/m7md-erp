@@ -1,7 +1,13 @@
 import { Role, StockMovementType, TransactionType } from "@prisma/client";
+import { NextResponse } from "next/server";
 import { ApiError, fail, ok, parseJsonBody } from "@/lib/api";
 import { getSession } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
+import {
+  beginIdempotency,
+  finalizeIdempotencyFailure,
+  finalizeIdempotencySuccess
+} from "@/lib/idempotency";
 import { prisma } from "@/lib/prisma";
 import { requireRoles } from "@/lib/rbac";
 import { createExpenseSchema } from "@/lib/validators/accounting";
@@ -23,9 +29,20 @@ export async function GET(): Promise<Response> {
 }
 
 export async function POST(request: Request): Promise<Response> {
+  let idempotencyState: Awaited<ReturnType<typeof beginIdempotency>>["state"] = null;
   try {
     const actor = requireRoles(await getSession(), [Role.EMPLOYEE, Role.ADMIN]);
     const body = await parseJsonBody(request, createExpenseSchema);
+    const idempotency = await beginIdempotency({
+      request,
+      actorId: actor.sub,
+      payload: body
+    });
+    idempotencyState = idempotency.state;
+    if (idempotency.replayResponse) {
+      return idempotency.replayResponse;
+    }
+
     const occurredAt = body.occurredAt;
     const unitPrice = body.unitPrice;
     const quantity = body.quantity;
@@ -62,7 +79,14 @@ export async function POST(request: Request): Promise<Response> {
       throw new ApiError(400, "PART_INACTIVE", "Part is inactive.");
     }
 
-    const itemName = part?.name ?? body.itemName;
+    const itemName = part?.name ?? body.itemName.trim();
+    if (part && body.itemName.trim().toLowerCase() !== part.name.trim().toLowerCase()) {
+      throw new ApiError(
+        400,
+        "ITEM_NAME_MISMATCH",
+        "Selected catalog item name does not match the provided item name."
+      );
+    }
 
     const item = await prisma.$transaction(async (tx) => {
       const expense = await tx.expense.create({
@@ -84,13 +108,17 @@ export async function POST(request: Request): Promise<Response> {
           unitPrice,
           quantity,
           amount,
+          costAtTimeOfSale: unitPrice,
+          costTotal: amount,
+          profitAmount: -amount,
           note: body.note,
           description: body.note || itemName,
           expenseId: expense.id,
           expenseCategory: body.expenseCategory,
           occurredAt,
           recordedAt: occurredAt,
-          createdById: actor.sub
+          createdById: actor.sub,
+          updatedById: actor.sub
         }
       });
 
@@ -129,8 +157,11 @@ export async function POST(request: Request): Promise<Response> {
       }
     });
 
-    return ok({ item }, 201);
+    const responsePayload = { success: true, data: { item } };
+    await finalizeIdempotencySuccess(idempotencyState, responsePayload, 201);
+    return NextResponse.json(responsePayload, { status: 201 });
   } catch (error) {
+    await finalizeIdempotencyFailure(idempotencyState, error);
     return fail(error);
   }
 }

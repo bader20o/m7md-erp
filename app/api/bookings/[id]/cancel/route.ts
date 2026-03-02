@@ -7,7 +7,11 @@ import { requireRoles } from "@/lib/rbac";
 import { cancelBookingSchema } from "@/lib/validators/booking";
 
 type Params = { params: Promise<{ id: string }> };
-const CANCELLABLE_STATUSES: BookingStatus[] = [BookingStatus.PENDING, BookingStatus.APPROVED];
+const CANCELLABLE_STATUSES: BookingStatus[] = [
+  BookingStatus.PENDING,
+  BookingStatus.PRICE_SET,
+  BookingStatus.APPROVED
+];
 
 export async function POST(request: Request, context: Params): Promise<Response> {
   try {
@@ -31,7 +35,7 @@ export async function POST(request: Request, context: Params): Promise<Response>
       throw new ApiError(
         400,
         "INVALID_STATUS_TRANSITION",
-        "Only pending or approved bookings can be cancelled."
+        "Only pending, priced, or approved bookings can be cancelled."
       );
     }
 

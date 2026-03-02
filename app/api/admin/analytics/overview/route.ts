@@ -5,6 +5,13 @@ import { requireAnyPermission } from "@/lib/rbac";
 import { adminAnalyticsOverviewQuerySchema } from "@/lib/validators/admin-analytics";
 import { parseDateOnlyUtc } from "@/lib/validators/reports";
 
+function normalizeGroupBy(value: string | null): "day" | "week" | "month" {
+  if (value === "week" || value === "month") {
+    return value;
+  }
+  return "day";
+}
+
 export async function GET(request: Request): Promise<Response> {
   try {
     await requireAnyPermission(await getSession(), ["analytics"]);
@@ -12,7 +19,7 @@ export async function GET(request: Request): Promise<Response> {
     const query = await adminAnalyticsOverviewQuerySchema.parseAsync({
       from: url.searchParams.get("from") ?? "",
       to: url.searchParams.get("to") ?? "",
-      groupBy: url.searchParams.get("groupBy") ?? "day"
+      groupBy: normalizeGroupBy(url.searchParams.get("groupBy"))
     });
 
     const data = await getAnalyticsOverview({

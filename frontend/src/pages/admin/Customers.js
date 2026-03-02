@@ -1,5 +1,7 @@
 import { apiFetch, buildQuery } from "../../lib/api.js";
+import { DateInput } from "../../components/ui/DateInput.js";
 import { TableRowSkeleton } from "../../components/ui/Skeleton.js";
+import { AlertModal } from "../../components/ui/Modal.js";
 
 const LOCAL_PHONE_REGEX = /^07\d{8}$/;
 
@@ -108,7 +110,7 @@ export function AdminCustomers() {
     async function loadCustomers() {
       if (state.loading) return;
       state.loading = true;
-      tbody.innerHTML = TableRowSkeleton(6).repeat(5);
+      tbody.innerHTML = TableRowSkeleton(9).repeat(5); // Increased skeleton columns 
 
       try {
         const query = buildQuery({
@@ -124,7 +126,7 @@ export function AdminCustomers() {
         const items = response.items || [];
 
         if (!items.length) {
-          tbody.innerHTML = `<tr><td colspan="6" class="py-12 text-center text-muted text-sm">No customers found.</td></tr>`;
+          tbody.innerHTML = `<tr><td colspan="9" class="py-12 text-center text-muted text-sm">No customers found.</td></tr>`;
         } else {
           tbody.innerHTML = items
             .map(
@@ -140,9 +142,19 @@ export function AdminCustomers() {
                 </div>
               </td>
               <td class="px-4 py-3 text-sm">${item.phone}</td>
-              <td class="px-4 py-3 text-sm">${formatDate(item.joinedAt)}</td>
+              <td class="px-4 py-3 text-sm whitespace-nowrap">${formatDate(item.joinedAt)}</td>
               <td class="px-4 py-3">${statusBadge(item.status)}</td>
-              <td class="px-4 py-3 text-sm font-semibold ${Number(item.balanceDue) > 0 ? "text-danger" : "text-success"}">${formatMoney(item.balanceDue)}</td>
+              <td class="px-4 py-3 text-sm font-semibold text-text">${formatMoney(item.totalPaid)}</td>
+              <td class="px-4 py-3 text-sm font-semibold text-text">${formatMoney(item.totalServicesCost)}</td>
+              <td class="px-4 py-3 text-sm text-center">
+                <span class="px-2 py-0.5 rounded bg-bg border border-border text-xs font-semibold">
+                  ${item.completedJobs} / ${item.totalBookings}
+                </span>
+              </td>
+              <td class="px-4 py-3 text-sm whitespace-nowrap">${formatDate(item.lastActivityDate)}</td>
+              <td class="px-4 py-3 text-sm font-bold ${Number(item.balanceDue) <= 0 ? "text-success" :
+                  Number(item.balanceDue) <= 100 ? "text-amber-500" : "text-danger"
+                }">${formatMoney(item.balanceDue)}</td>
               <td class="px-4 py-3 text-right text-sm text-primary font-semibold">View</td>
             </tr>
           `
@@ -150,7 +162,7 @@ export function AdminCustomers() {
             .join("");
         }
       } catch (error) {
-        tbody.innerHTML = `<tr><td colspan="6" class="py-12 text-center text-danger text-sm">${error.message}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="9" class="py-12 text-center text-danger text-sm">${error.message}</td></tr>`;
       } finally {
         state.loading = false;
         renderPagination();
@@ -161,7 +173,8 @@ export function AdminCustomers() {
       const drawer = document.getElementById("customer-details-drawer");
       const content = document.getElementById("customer-details-content");
       const title = document.getElementById("customer-drawer-title");
-      drawer.classList.remove("translate-x-full");
+      drawer.classList.remove("hidden");
+      drawer.classList.add("flex");
       content.innerHTML = `<div class="py-10 text-center text-muted">Loading...</div>`;
 
       try {
@@ -173,8 +186,8 @@ export function AdminCustomers() {
         const ledgerHtml =
           ledgerRows.length > 0
             ? ledgerRows
-                .map(
-                  (entry) => `
+              .map(
+                (entry) => `
               <tr class="border-b border-border">
                 <td class="px-3 py-2 text-xs">${entry.type}</td>
                 <td class="px-3 py-2 text-xs font-semibold ${entry.type === "PAYMENT" ? "text-success" : "text-danger"}">${formatMoney(entry.amount)}</td>
@@ -182,20 +195,47 @@ export function AdminCustomers() {
                 <td class="px-3 py-2 text-xs">${entry.note || "-"}</td>
               </tr>
             `
-                )
-                .join("")
+              )
+              .join("")
             : `<tr><td colspan="4" class="px-3 py-6 text-center text-xs text-muted">No ledger entries.</td></tr>`;
 
-        content.innerHTML = `
-          <div class="space-y-5">
-            <div class="flex items-center gap-3">
-              ${avatarFor(customer.fullName, customer.avatarUrl)}
-              <div>
-                <div class="text-base font-bold">${customer.fullName || "Unnamed"}</div>
-                <div class="text-xs text-muted">${customer.phone}</div>
-              </div>
-            </div>
+        const bookingsRows = customer.customerBookings || [];
+        const bookingsHtml =
+          bookingsRows.length > 0
+            ? bookingsRows
+              .map(
+                (b) => `
+              <tr class="border-b border-border">
+                <td class="px-3 py-2 text-xs">
+                  <div class="font-semibold">${b.serviceNameSnapshotEn}</div>
+                </td>
+                <td class="px-3 py-2 text-xs">${statusBadge(b.status.toLowerCase())}</td>
+                <td class="px-3 py-2 text-xs whitespace-nowrap">${formatDate(b.appointmentAt)}</td>
+                <td class="px-3 py-2 text-xs font-semibold">${formatMoney(b.finalPrice)}</td>
+              </tr>
+            `
+              )
+              .join("")
+            : `<tr><td colspan="4" class="px-3 py-6 text-center text-xs text-muted">No bookings found.</td></tr>`;
 
+        content.innerHTML = `
+          <div class="flex items-center gap-3 mb-5">
+            ${avatarFor(customer.fullName, customer.avatarUrl)}
+            <div>
+              <div class="text-base font-bold">${customer.fullName || "Unnamed"}</div>
+              <div class="text-xs text-muted">${customer.phone}</div>
+            </div>
+          </div>
+
+          <!-- Tabs Header -->
+          <div class="flex items-center gap-4 border-b border-border mb-5">
+            <button id="customer-tab-btn-overview" onclick="window.switchCustomerTab('overview')" class="customer-tab-btn pb-2 text-sm font-semibold border-b-2 transition-colors border-primary text-primary">Overview</button>
+            <button id="customer-tab-btn-ledger" onclick="window.switchCustomerTab('ledger')" class="customer-tab-btn pb-2 text-sm font-semibold border-b-2 border-transparent text-muted hover:text-text transition-colors">Ledger</button>
+            <button id="customer-tab-btn-bookings" onclick="window.switchCustomerTab('bookings')" class="customer-tab-btn pb-2 text-sm font-semibold border-b-2 border-transparent text-muted hover:text-text transition-colors">Bookings</button>
+          </div>
+
+          <!-- Tab: Overview -->
+          <div id="customer-tab-overview" class="customer-tab-content space-y-5 animate-in fade-in">
             <div class="grid grid-cols-2 gap-3 text-xs">
               <div class="rounded-lg border border-border p-3">
                 <div class="text-muted uppercase">Joined</div>
@@ -211,34 +251,53 @@ export function AdminCustomers() {
               </div>
             </div>
 
+            <h4 class="text-sm font-bold mt-2">Account Actions</h4>
             <div class="grid grid-cols-2 gap-2">
               <button class="px-3 py-2 rounded-lg border border-border text-sm hover:border-primary" onclick="window.customerAction('${id}','suspend')">Suspend</button>
               <button class="px-3 py-2 rounded-lg border border-border text-sm hover:border-primary" onclick="window.customerAction('${id}','ban')">Ban</button>
               <button class="px-3 py-2 rounded-lg border border-border text-sm hover:border-primary" onclick="window.customerAction('${id}','reset_password')">Reset Password</button>
               <button class="px-3 py-2 rounded-lg border border-border text-sm hover:border-primary" onclick="window.customerAction('${id}','activate')">Activate</button>
             </div>
-
+            
+            <h4 class="text-sm font-bold mt-4">Ledger Actions</h4>
             <div class="grid grid-cols-3 gap-2">
-              <button class="px-3 py-2 rounded-lg bg-danger/10 text-danger text-xs font-semibold hover:bg-danger hover:text-white" onclick="window.customerLedgerAction('${id}','CHARGE')">Add Debt</button>
-              <button class="px-3 py-2 rounded-lg bg-success/10 text-success text-xs font-semibold hover:bg-success hover:text-white" onclick="window.customerLedgerAction('${id}','PAYMENT')">Record Payment</button>
-              <button class="px-3 py-2 rounded-lg bg-primary/10 text-primary text-xs font-semibold hover:bg-primary hover:text-white" onclick="window.customerLedgerAction('${id}','ADJUSTMENT')">Adjust</button>
+              <button class="px-3 py-2 rounded-lg bg-danger/10 text-danger text-xs font-semibold hover:bg-danger hover:text-white transition-colors" onclick="window.customerLedgerAction('${id}','CHARGE')">Add Debt</button>
+              <button class="px-3 py-2 rounded-lg bg-success/10 text-success text-xs font-semibold hover:bg-success hover:text-white transition-colors" onclick="window.customerLedgerAction('${id}','PAYMENT')">Record Payment</button>
+              <button class="px-3 py-2 rounded-lg bg-primary/10 text-primary text-xs font-semibold hover:bg-primary hover:text-white transition-colors" onclick="window.customerLedgerAction('${id}','ADJUSTMENT')">Adjust</button>
             </div>
+          </div>
 
-            <div>
-              <h4 class="text-sm font-bold mb-2">Ledger</h4>
-              <div class="max-h-64 overflow-auto border border-border rounded-lg">
-                <table class="w-full text-left">
-                  <thead class="sticky top-0 bg-bg border-b border-border">
-                    <tr>
-                      <th class="px-3 py-2 text-[10px] uppercase text-muted">Type</th>
-                      <th class="px-3 py-2 text-[10px] uppercase text-muted">Amount</th>
-                      <th class="px-3 py-2 text-[10px] uppercase text-muted">Date</th>
-                      <th class="px-3 py-2 text-[10px] uppercase text-muted">Note</th>
-                    </tr>
-                  </thead>
-                  <tbody>${ledgerHtml}</tbody>
-                </table>
-              </div>
+          <!-- Tab: Ledger -->
+          <div id="customer-tab-ledger" class="customer-tab-content hidden animate-in fade-in">
+            <div class="max-h-[400px] overflow-auto border border-border rounded-lg">
+              <table class="w-full text-left">
+                <thead class="sticky top-0 bg-bg border-b border-border">
+                  <tr>
+                    <th class="px-3 py-2 text-[10px] uppercase text-muted">Type</th>
+                    <th class="px-3 py-2 text-[10px] uppercase text-muted">Amount</th>
+                    <th class="px-3 py-2 text-[10px] uppercase text-muted">Date</th>
+                    <th class="px-3 py-2 text-[10px] uppercase text-muted">Note</th>
+                  </tr>
+                </thead>
+                <tbody>${ledgerHtml}</tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Tab: Bookings -->
+          <div id="customer-tab-bookings" class="customer-tab-content hidden animate-in fade-in">
+            <div class="max-h-[400px] overflow-auto border border-border rounded-lg">
+              <table class="w-full text-left">
+                <thead class="sticky top-0 bg-bg border-b border-border">
+                  <tr>
+                    <th class="px-3 py-2 text-[10px] uppercase text-muted">Service</th>
+                    <th class="px-3 py-2 text-[10px] uppercase text-muted">Status</th>
+                    <th class="px-3 py-2 text-[10px] uppercase text-muted">Date</th>
+                    <th class="px-3 py-2 text-[10px] uppercase text-muted">Price</th>
+                  </tr>
+                </thead>
+                <tbody>${bookingsHtml}</tbody>
+              </table>
             </div>
           </div>
         `;
@@ -251,70 +310,181 @@ export function AdminCustomers() {
       loadCustomerDetails(id);
     };
 
-    window.customerAction = async (id, action) => {
-      try {
-        if (action === "suspend") {
-          const reason = prompt("Suspension reason (optional):") || undefined;
-          await apiFetch(`/admin/customers/${id}`, { method: "PATCH", body: { action, reason } });
-        } else if (action === "ban") {
-          const durationInput = prompt("Ban duration in days (leave empty for permanent):");
-          const message = prompt("Ban message shown to user (optional):") || undefined;
-          const banReason = prompt("Internal ban reason (optional):") || undefined;
-          await apiFetch(`/admin/customers/${id}`, {
-            method: "PATCH",
-            body: {
-              action,
-              durationDays: durationInput ? Number(durationInput) : undefined,
-              banMessage: message,
-              banReason
-            }
-          });
-        } else if (action === "reset_password") {
-          const result = await apiFetch(`/admin/users/${id}/password-reset`, {
-            method: "POST",
-            body: { forceOnly: false }
-          });
-          if (result.temporaryPassword) {
-            alert(`Temporary password: ${result.temporaryPassword}`);
-          }
-        } else {
-          await apiFetch(`/admin/customers/${id}`, { method: "PATCH", body: { action } });
-        }
-        window.toast("Customer updated", "success");
-        await loadCustomers();
-        await loadCustomerDetails(id);
-      } catch (error) {
-        window.toast(error.message, "error");
+    window.switchCustomerTab = (tabId) => {
+      document.querySelectorAll('.customer-tab-content').forEach(el => el.classList.add('hidden'));
+      document.querySelectorAll('.customer-tab-btn').forEach(el => {
+        el.classList.remove('border-primary', 'text-primary');
+        el.classList.add('border-transparent', 'text-muted');
+      });
+      document.getElementById(`customer-tab-${tabId}`).classList.remove('hidden');
+      const activeBtn = document.getElementById(`customer-tab-btn-${tabId}`);
+      if (activeBtn) {
+        activeBtn.classList.remove('border-transparent', 'text-muted');
+        activeBtn.classList.add('border-primary', 'text-primary');
       }
     };
 
-    window.customerLedgerAction = async (id, type) => {
-      try {
-        const amountInput = prompt(type === "ADJUSTMENT" ? "Adjustment amount (negative or positive):" : "Amount:");
-        if (!amountInput) return;
-        const note = prompt("Note:") || undefined;
-        if ((type === "CHARGE" || type === "ADJUSTMENT") && !note) {
-          window.toast("Note is required for this entry type.", "error");
-          return;
-        }
-        await apiFetch(`/admin/customers/${id}/ledger`, {
-          method: "POST",
-          body: {
-            type,
-            amount: Number(amountInput),
-            note
-          }
-        });
-        window.toast("Ledger updated", "success");
-        await loadCustomers();
-        await loadCustomerDetails(id);
-      } catch (error) {
-        window.toast(error.message, "error");
+    window.openCustomerActionModal = (id, actionType) => {
+      state.currentActionId = id;
+      state.currentActionType = actionType;
+
+      const modal = document.getElementById('customer-action-modal');
+      const title = document.getElementById('customer-action-title');
+      const desc = document.getElementById('customer-action-desc');
+      const extraFields = document.getElementById('customer-action-extra-fields');
+      const noteInput = document.getElementById('customer-action-note');
+      const submitBtn = document.getElementById('customer-action-submit');
+
+      noteInput.value = '';
+      extraFields.innerHTML = '';
+
+      if (actionType === 'suspend') {
+        title.textContent = "Suspend Customer";
+        desc.textContent = "Are you sure you want to suspend this customer? They will not be able to log in or book services.";
+        noteInput.placeholder = "Reason for suspension (Optional)";
+        submitBtn.className = "px-4 py-2 rounded-lg bg-amber-500 text-white font-semibold";
+      } else if (actionType === 'ban') {
+        title.textContent = "Ban Customer";
+        desc.textContent = "Banning a customer prevents them from using the platform entirely.";
+
+        extraFields.innerHTML = `
+          <input id="ban-duration-input" type="number" placeholder="Duration in days (leave empty for permanent)" class="w-full px-3 py-2 rounded-lg border border-border bg-bg text-sm mb-3">
+          <input id="ban-message-input" type="text" placeholder="Message shown to user (Optional)" class="w-full px-3 py-2 rounded-lg border border-border bg-bg text-sm">
+        `;
+        noteInput.placeholder = "Internal ban reason (Optional)";
+        submitBtn.className = "px-4 py-2 rounded-lg bg-danger text-white font-semibold";
+      } else if (actionType === 'reset_password') {
+        title.textContent = "Reset Password";
+        desc.textContent = "This will generate a new temporary password for the customer.";
+        noteInput.placeholder = "Reason for reset (Optional)";
+        submitBtn.className = "px-4 py-2 rounded-lg bg-primary text-white font-semibold";
+      } else if (actionType === 'activate') {
+        title.textContent = "Activate Customer";
+        desc.textContent = "Reactivate this customer account?";
+        noteInput.placeholder = "Note (Optional)";
+        submitBtn.className = "px-4 py-2 rounded-lg bg-success text-white font-semibold";
+      } else if (actionType === 'CHARGE') {
+        title.textContent = "Add Debt";
+        desc.textContent = "Add an outstanding charge to this customer's ledger.";
+        extraFields.innerHTML = `<input id="ledger-amount-input" type="number" step="0.01" placeholder="Amount (JOD)" class="w-full px-3 py-2 rounded-lg border border-border bg-bg text-sm" required>`;
+        noteInput.placeholder = "Reason/Note (Required)";
+        submitBtn.className = "px-4 py-2 rounded-lg bg-danger text-white font-semibold";
+      } else if (actionType === 'PAYMENT') {
+        title.textContent = "Record Payment";
+        desc.textContent = "Record a payment received from this customer.";
+        extraFields.innerHTML = `<input id="ledger-amount-input" type="number" step="0.01" placeholder="Amount (JOD)" class="w-full px-3 py-2 rounded-lg border border-border bg-bg text-sm" required>`;
+        noteInput.placeholder = "Payment reference/note (Optional)";
+        submitBtn.className = "px-4 py-2 rounded-lg bg-success text-white font-semibold";
+      } else if (actionType === 'ADJUSTMENT') {
+        title.textContent = "Record Adjustment";
+        desc.textContent = "Make a manual adjustment to the ledger. Use negative values to reduce debt without logging a payment.";
+        extraFields.innerHTML = `<input id="ledger-amount-input" type="number" step="0.01" placeholder="Amount (JOD)" class="w-full px-3 py-2 rounded-lg border border-border bg-bg text-sm" required>`;
+        noteInput.placeholder = "Reason (Required)";
+        submitBtn.className = "px-4 py-2 rounded-lg bg-primary text-white font-semibold";
       }
+
+      submitBtn.textContent = 'Confirm';
+
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+    };
+
+    window.closeCustomerActionModal = () => {
+      const modal = document.getElementById('customer-action-modal');
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+      state.currentActionId = null;
+      state.currentActionType = null;
+    };
+
+    window.submitCustomerAction = async () => {
+      const id = state.currentActionId;
+      const action = state.currentActionType;
+      const note = document.getElementById('customer-action-note').value.trim();
+      const submitBtn = document.getElementById('customer-action-submit');
+
+      if (!id || !action) return;
+
+      submitBtn.disabled = true;
+      submitBtn.innerHTML = `<svg class="animate-spin h-5 w-5 mx-auto" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path></svg>`;
+
+      try {
+        if (['CHARGE', 'PAYMENT', 'ADJUSTMENT'].includes(action)) {
+          const amtInput = document.getElementById('ledger-amount-input');
+          if (!amtInput || !amtInput.value) {
+            window.toast("Amount is required.", "error");
+            throw new Error("Validation failed");
+          }
+
+          await apiFetch(`/admin/customers/${id}/ledger`, {
+            method: "POST",
+            body: {
+              type: action,
+              amount: Number(amtInput.value),
+              note
+            }
+          });
+          window.toast("Ledger updated", "success");
+        } else {
+          // Status Actions
+          if (action === "suspend") {
+            await apiFetch(`/admin/customers/${id}`, { method: "PATCH", body: { action, reason: note || undefined } });
+          } else if (action === "ban") {
+            const durationInput = document.getElementById('ban-duration-input')?.value;
+            const message = document.getElementById('ban-message-input')?.value;
+            await apiFetch(`/admin/customers/${id}`, {
+              method: "PATCH",
+              body: {
+                action,
+                durationDays: durationInput ? Number(durationInput) : undefined,
+                banMessage: message || undefined,
+                banReason: note || undefined
+              }
+            });
+          } else if (action === "reset_password") {
+            const result = await apiFetch(`/admin/users/${id}/password-reset`, {
+              method: "POST",
+              body: { forceOnly: false }
+            });
+            if (result.temporaryPassword) {
+              await AlertModal({
+                title: "Password Reset Generated",
+                message: `Temporary password: ${result.temporaryPassword}`,
+                intent: "success",
+                confirmText: "Close"
+              });
+              try { await navigator.clipboard.writeText(result.temporaryPassword); } catch (e) { }
+            }
+          } else {
+            await apiFetch(`/admin/customers/${id}`, { method: "PATCH", body: { action } });
+          }
+          window.toast("Customer updated", "success");
+        }
+
+        window.closeCustomerActionModal();
+        await loadCustomers();
+        if (!document.getElementById("customer-details-drawer").classList.contains("hidden")) {
+          await loadCustomerDetails(id);
+        }
+      } catch (error) {
+        if (error.message !== "Validation failed") window.toast(error.message, "error");
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Confirm';
+      }
+    };
+
+    window.customerAction = (id, action) => {
+      window.openCustomerActionModal(id, action);
+    };
+
+    window.customerLedgerAction = (id, type) => {
+      window.openCustomerActionModal(id, type);
     };
 
     document.getElementById("close-customer-drawer").addEventListener("click", () => {
-      document.getElementById("customer-details-drawer").classList.add("translate-x-full");
+      document.getElementById("customer-details-drawer").classList.add("hidden");
+      document.getElementById("customer-details-drawer").classList.remove("flex");
     });
 
     queryInput.addEventListener("input", (event) => {
@@ -345,7 +515,8 @@ export function AdminCustomers() {
     });
 
     createToggle.addEventListener("click", () => {
-      createContainer.classList.toggle("hidden");
+      createContainer.classList.remove("hidden");
+      createContainer.classList.add("flex");
     });
 
     createForm.addEventListener("submit", async (event) => {
@@ -373,7 +544,7 @@ export function AdminCustomers() {
           }
         });
         form.reset();
-        createContainer.classList.add("hidden");
+        window.closeCustomerCreateModal();
         window.toast("Customer created", "success");
         loadCustomers();
       } catch (error) {
@@ -387,6 +558,19 @@ export function AdminCustomers() {
     });
 
     loadCustomers();
+
+    if (window.location.hash === '#create-customer') {
+      createContainer.classList.remove('hidden');
+      createContainer.classList.add('flex');
+    }
+
+    window.closeCustomerCreateModal = () => {
+      createContainer.classList.add("hidden");
+      createContainer.classList.remove("flex");
+      createForm.reset();
+      duplicateWarning.classList.add("hidden");
+      state.duplicateBlocked = false;
+    };
   };
 
   return `
@@ -399,18 +583,26 @@ export function AdminCustomers() {
         <button id="toggle-customer-create" class="px-4 py-2 rounded-lg bg-primary text-white text-sm font-semibold hover:bg-primary-hover">Create Customer</button>
       </div>
 
-      <div id="customer-create-container" class="hidden bg-surface border border-border rounded-xl p-4">
-        <form id="customer-create-form" class="grid grid-cols-1 md:grid-cols-3 gap-3">
-          <input name="fullName" required placeholder="Full Name" class="px-3 py-2 rounded-lg border border-border bg-bg">
-          <input id="customer-create-phone" name="phone" required maxlength="10" pattern="07[0-9]{8}" placeholder="07XXXXXXXX" class="px-3 py-2 rounded-lg border border-border bg-bg">
-          <input name="password" placeholder="Password (optional)" class="px-3 py-2 rounded-lg border border-border bg-bg">
-          <input name="location" placeholder="Location" class="px-3 py-2 rounded-lg border border-border bg-bg">
-          <input name="initialDebt" type="number" step="0.01" placeholder="Initial Debt" class="px-3 py-2 rounded-lg border border-border bg-bg">
-          <input name="initialPayment" type="number" step="0.01" placeholder="Initial Payment" class="px-3 py-2 rounded-lg border border-border bg-bg">
-          <input name="initialDebtNote" placeholder="Initial Debt Note" class="md:col-span-2 px-3 py-2 rounded-lg border border-border bg-bg">
-          <div id="customer-duplicate-warning" class="hidden md:col-span-3 text-xs text-danger bg-danger/10 border border-danger/20 rounded-lg px-3 py-2"></div>
-          <button class="px-4 py-2 rounded-lg bg-primary text-white font-semibold">Save</button>
-        </form>
+      <!-- Create Customer Modal -->
+      <div id="customer-create-container" class="fixed inset-0 z-[100] hidden items-center justify-center bg-black/50 backdrop-blur-sm">
+        <div class="bg-surface border border-border rounded-xl p-6 w-full max-w-2xl shadow-2xl relative animate-in zoom-in-95">
+          <button onclick="window.closeCustomerCreateModal()" class="absolute top-4 right-4 w-8 h-8 rounded-full border border-border hover:bg-bg flex items-center justify-center text-muted hover:text-text transition-colors">×</button>
+          <h3 class="text-xl font-bold mb-4">Create Customer</h3>
+          <form id="customer-create-form" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <input name="fullName" required placeholder="Full Name" class="px-3 py-2 rounded-lg border border-border bg-bg">
+            <input id="customer-create-phone" name="phone" required maxlength="10" pattern="07[0-9]{8}" placeholder="07XXXXXXXX" class="px-3 py-2 rounded-lg border border-border bg-bg">
+            <input name="password" placeholder="Password (optional)" class="px-3 py-2 rounded-lg border border-border bg-bg">
+            <input name="location" placeholder="Location" class="px-3 py-2 rounded-lg border border-border bg-bg">
+            <input name="initialDebt" type="number" step="0.01" placeholder="Initial Debt" class="px-3 py-2 rounded-lg border border-border bg-bg">
+            <input name="initialPayment" type="number" step="0.01" placeholder="Initial Payment" class="px-3 py-2 rounded-lg border border-border bg-bg">
+            <input name="initialDebtNote" placeholder="Initial Debt Note" class="md:col-span-2 px-3 py-2 rounded-lg border border-border bg-bg">
+            <div id="customer-duplicate-warning" class="hidden md:col-span-2 text-xs text-danger bg-danger/10 border border-danger/20 rounded-lg px-3 py-2"></div>
+            <div class="md:col-span-2 flex justify-end gap-3 mt-2">
+               <button type="button" onclick="window.closeCustomerCreateModal()" class="px-4 py-2 font-semibold text-sm hover:bg-surface-hover rounded-lg transition-colors">Cancel</button>
+               <button class="px-6 py-2 rounded-lg bg-primary text-white font-semibold">Save</button>
+            </div>
+          </form>
+        </div>
       </div>
 
       <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
@@ -422,20 +614,24 @@ export function AdminCustomers() {
           <option value="banned">Banned</option>
         </select>
         <div class="grid grid-cols-2 gap-2">
-          <input id="customers-join-from" type="date" class="px-3 py-2 rounded-lg border border-border bg-surface">
-          <input id="customers-join-to" type="date" class="px-3 py-2 rounded-lg border border-border bg-surface">
+          ${DateInput({ id: 'customers-join-from', className: 'w-full px-3 py-2 rounded-lg border border-border bg-surface' })}
+          ${DateInput({ id: 'customers-join-to', className: 'w-full px-3 py-2 rounded-lg border border-border bg-surface' })}
         </div>
       </div>
 
       <div class="bg-surface border border-border rounded-xl overflow-hidden">
         <div class="overflow-auto">
-          <table class="w-full min-w-[900px] text-left">
+          <table class="w-full min-w-[1200px] text-left">
             <thead class="bg-bg border-b border-border">
               <tr>
                 <th class="px-4 py-3 text-xs uppercase text-muted">Customer</th>
                 <th class="px-4 py-3 text-xs uppercase text-muted">Phone</th>
                 <th class="px-4 py-3 text-xs uppercase text-muted">Joined</th>
                 <th class="px-4 py-3 text-xs uppercase text-muted">Status</th>
+                <th class="px-4 py-3 text-xs uppercase text-muted">Total Paid</th>
+                <th class="px-4 py-3 text-xs uppercase text-muted">Services Cost</th>
+                <th class="px-4 py-3 text-xs uppercase text-muted text-center">Jobs</th>
+                <th class="px-4 py-3 text-xs uppercase text-muted">Last Activity</th>
                 <th class="px-4 py-3 text-xs uppercase text-muted">Debt</th>
                 <th class="px-4 py-3 text-xs uppercase text-muted text-right">Actions</th>
               </tr>
@@ -447,13 +643,32 @@ export function AdminCustomers() {
 
       <div id="customers-pagination" class="flex items-center justify-between"></div>
 
-      <aside id="customer-details-drawer" class="fixed top-0 right-0 h-full w-full max-w-lg bg-surface border-l border-border z-[70] p-5 overflow-y-auto transform translate-x-full transition-transform duration-300">
-        <div class="flex items-center justify-between mb-4">
-          <h3 id="customer-drawer-title" class="text-lg font-bold">Customer</h3>
-          <button id="close-customer-drawer" class="w-8 h-8 rounded-full border border-border hover:border-primary">×</button>
+      <div id="customer-details-drawer" class="fixed inset-0 z-[70] hidden items-center justify-center bg-black/50 backdrop-blur-sm overflow-y-auto pt-10 pb-10">
+        <div class="bg-surface border border-border rounded-xl p-6 w-full max-w-2xl shadow-2xl relative animate-in zoom-in-95 my-auto">
+          <button id="close-customer-drawer" class="absolute top-4 right-4 w-8 h-8 rounded-full border border-border hover:bg-bg flex items-center justify-center text-muted hover:text-text transition-colors">×</button>
+          <h3 id="customer-drawer-title" class="text-xl font-bold mb-4">Customer</h3>
+          <div id="customer-details-content" class="relative z-0"></div>
         </div>
-        <div id="customer-details-content"></div>
-      </aside>
+      </div>
+
+      <!-- Customer Action Modal -->
+      <div id="customer-action-modal" class="fixed inset-0 z-[100] hidden items-center justify-center bg-black/50 backdrop-blur-sm">
+        <div class="bg-surface border border-border rounded-xl p-6 w-full max-w-md shadow-2xl relative animate-in zoom-in-95">
+           <button onclick="window.closeCustomerActionModal()" class="absolute top-4 right-4 w-8 h-8 rounded-full border border-border hover:bg-bg flex items-center justify-center text-muted hover:text-text transition-colors">×</button>
+           <h3 id="customer-action-title" class="text-xl font-bold mb-2">Confirm Action</h3>
+           <p id="customer-action-desc" class="text-sm text-muted mb-5 leading-relaxed">Are you sure you want to proceed?</p>
+           
+           <div class="space-y-3 mb-6">
+              <div id="customer-action-extra-fields"></div>
+              <textarea id="customer-action-note" rows="3" placeholder="Reason/Note" class="w-full px-3 py-2 rounded-lg border border-border bg-bg text-sm focus:outline-none focus:ring-1 focus:ring-primary"></textarea>
+           </div>
+           
+           <div class="flex items-center justify-end gap-3">
+              <button onclick="window.closeCustomerActionModal()" class="px-4 py-2 font-semibold text-sm hover:bg-surface-hover rounded-lg transition-colors">Cancel</button>
+              <button id="customer-action-submit" onclick="window.submitCustomerAction()" class="px-4 py-2 rounded-lg bg-primary text-white font-semibold flex items-center justify-center min-w-[100px] transition-colors">Confirm</button>
+           </div>
+        </div>
+      </div>
     </div>
   `;
 }

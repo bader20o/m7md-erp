@@ -22,6 +22,11 @@ export const completeBookingSchema = z.object({
   performedByEmployeeId: z.string().min(1).optional()
 });
 
+export const setBookingPriceSchema = z.object({
+  finalPrice: z.coerce.number().positive(),
+  internalNote: z.string().trim().min(3).max(1000).optional()
+});
+
 export const assignBookingEmployeeSchema = z.object({
   employeeId: z.string().min(1),
   serviceId: z.string().min(1).optional(),

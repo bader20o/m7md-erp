@@ -11,9 +11,11 @@ type DailyPoint = {
   date: string;
   income: number;
   expense: number;
+  profit: number;
   bookingIncome: number;
   walkInIncome: number;
   membershipIncome: number;
+  inventorySalesIncome: number;
 };
 
 function toDayKey(value: Date): string {
@@ -66,6 +68,7 @@ export async function GET(request: Request): Promise<Response> {
       await Promise.all([
         prisma.transaction.findMany({
           where: {
+            deletedAt: null,
             recordedAt: {
               gte: fromStart,
               lte: toEnd
@@ -174,6 +177,7 @@ export async function GET(request: Request): Promise<Response> {
         }),
         prisma.transaction.findMany({
           where: {
+            deletedAt: null,
             recordedAt: {
               gte: fromStart,
               lte: toEnd
@@ -200,23 +204,23 @@ export async function GET(request: Request): Promise<Response> {
     const [customers, employees] = await Promise.all([
       customerIds.length
         ? prisma.user.findMany({
-            where: { id: { in: customerIds } },
-            select: { id: true, fullName: true, phone: true }
-          })
+          where: { id: { in: customerIds } },
+          select: { id: true, fullName: true, phone: true }
+        })
         : Promise.resolve([]),
       employeeIds.length
         ? prisma.employee.findMany({
-            where: { id: { in: employeeIds } },
-            select: {
-              id: true,
-              user: {
-                select: {
-                  fullName: true,
-                  phone: true
-                }
+          where: { id: { in: employeeIds } },
+          select: {
+            id: true,
+            user: {
+              select: {
+                fullName: true,
+                phone: true
               }
             }
-          })
+          }
+        })
         : Promise.resolve([])
     ]);
 
@@ -231,9 +235,11 @@ export async function GET(request: Request): Promise<Response> {
           date,
           income: 0,
           expense: 0,
+          profit: 0,
           bookingIncome: 0,
           walkInIncome: 0,
-          membershipIncome: 0
+          membershipIncome: 0,
+          inventorySalesIncome: 0
         }
       ])
     );
@@ -241,7 +247,9 @@ export async function GET(request: Request): Promise<Response> {
     const incomeBySourceTotals: Record<IncomeSource, number> = {
       BOOKING: 0,
       WALK_IN: 0,
-      MEMBERSHIP: 0
+      MEMBERSHIP: 0,
+      INVOICE: 0,
+      INVENTORY_SALE: 0
     };
     const expenseByCategoryTotals: Record<ExpenseCategory, number> = {
       SUPPLIER: 0,
@@ -272,6 +280,8 @@ export async function GET(request: Request): Promise<Response> {
               point.walkInIncome += amount;
             } else if (row.incomeSource === IncomeSource.MEMBERSHIP) {
               point.membershipIncome += amount;
+            } else if (row.incomeSource === IncomeSource.INVENTORY_SALE) {
+              point.inventorySalesIncome += amount;
             }
           }
         }
@@ -303,13 +313,17 @@ export async function GET(request: Request): Promise<Response> {
       timeseries: {
         daily: dayKeys.map((date) => {
           const point = dailyMap.get(date)!;
+          const income = roundCurrency(point.income);
+          const expense = roundCurrency(point.expense);
           return {
             date: point.date,
-            income: roundCurrency(point.income),
-            expense: roundCurrency(point.expense),
+            income,
+            expense,
+            profit: roundCurrency(income - expense),
             bookingIncome: roundCurrency(point.bookingIncome),
             walkInIncome: roundCurrency(point.walkInIncome),
-            membershipIncome: roundCurrency(point.membershipIncome)
+            membershipIncome: roundCurrency(point.membershipIncome),
+            inventorySalesIncome: roundCurrency(point.inventorySalesIncome)
           };
         })
       },
@@ -322,7 +336,11 @@ export async function GET(request: Request): Promise<Response> {
         incomeBySource: [
           { source: IncomeSource.BOOKING, amount: roundCurrency(incomeBySourceTotals.BOOKING) },
           { source: IncomeSource.WALK_IN, amount: roundCurrency(incomeBySourceTotals.WALK_IN) },
-          { source: IncomeSource.MEMBERSHIP, amount: roundCurrency(incomeBySourceTotals.MEMBERSHIP) }
+          { source: IncomeSource.MEMBERSHIP, amount: roundCurrency(incomeBySourceTotals.MEMBERSHIP) },
+          {
+            source: IncomeSource.INVENTORY_SALE,
+            amount: roundCurrency(incomeBySourceTotals.INVENTORY_SALE)
+          }
         ]
       },
       top: {

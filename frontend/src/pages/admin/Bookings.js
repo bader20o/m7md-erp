@@ -8,6 +8,16 @@ export function AdminBookings() {
     const tbody = document.getElementById('admin-bookings-tbody');
     let allBookings = [];
 
+    const getStatusStyle = (s) => ({
+      PENDING: { classes: 'bg-amber-500/10 text-amber-500 border-amber-500/20', text: 'PENDING' },
+      APPROVED: { classes: 'bg-blue-500/10 text-blue-500 border-blue-500/20', text: 'CONFIRMED' },
+      COMPLETED: { classes: 'bg-green-500/10 text-green-500 border-green-500/20', text: 'COMPLETED' },
+      NO_SHOW: { classes: 'bg-red-500/10 text-red-500 border-red-500/20', text: 'NO SHOW' },
+      CANCELLED: { classes: 'bg-gray-500/10 text-gray-500 border-gray-500/20', text: 'CANCELLED' },
+      LATE_CANCELLED: { classes: 'bg-gray-500/10 text-gray-500 border-gray-500/20', text: 'CANCELLED' },
+      NOT_SERVED: { classes: 'bg-gray-900/10 text-gray-900 border-gray-900/20', text: 'NOT SERVED' }
+    })[s] || { classes: 'bg-bg text-text border-border', text: s };
+
     async function load() {
       tbody.innerHTML = TableRowSkeleton(6).repeat(8);
 
@@ -36,16 +46,6 @@ export function AdminBookings() {
         return;
       }
 
-      const getStatusColor = (s) => ({
-        PENDING: 'bg-orange-500/10 text-orange-500 border-orange-500/20',
-        APPROVED: 'bg-blue-500/10 text-blue-500 border-blue-500/20',
-        COMPLETED: 'bg-green-500/10 text-green-500 border-green-500/20',
-        CANCELLED: 'bg-red-500/10 text-red-500 border-red-500/20',
-        LATE_CANCELLED: 'bg-red-800/10 text-red-800 border-red-800/20',
-        NO_SHOW: 'bg-gray-500/10 text-gray-500 border-gray-500/20',
-        NOT_SERVED: 'bg-gray-900/10 text-gray-900 border-gray-900/20'
-      })[s] || 'bg-bg text-text border-border';
-
       tbody.innerHTML = filtered.map(b => `
         <tr class="group border-b border-border bg-surface hover:bg-bg transition-colors">
           <td class="px-6 py-4 whitespace-nowrap">
@@ -58,14 +58,13 @@ export function AdminBookings() {
           </td>
           <td class="px-6 py-4 whitespace-nowrap">
             <div class="text-sm font-semibold text-text truncate max-w-[150px]">${b.serviceNameSnapshotEn}</div>
-            <div class="text-[10px] text-muted">${b.serviceBasePriceSnapshot} JOD</div>
           </td>
           <td class="px-6 py-4 whitespace-nowrap">
             <div class="text-sm font-medium text-text">${new Date(b.appointmentAt).toLocaleDateString()}</div>
             <div class="text-xs text-text">${new Date(b.appointmentAt).toLocaleTimeString([], { timeStyle: 'short' })}</div>
           </td>
           <td class="px-6 py-4 whitespace-nowrap">
-            <span class="px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider border ${getStatusColor(b.status)}">${b.status}</span>
+            <span class="px-3 py-1 rounded-full text-xs font-medium border ${getStatusStyle(b.status).classes}">${getStatusStyle(b.status).text}</span>
           </td>
           <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium pr-6">
             <button class="text-primary hover:text-primary-hover bg-primary/10 hover:bg-primary/20 p-2 rounded-lg transition-colors" onclick="window.manageBooking('${b.id}')">
@@ -78,56 +77,86 @@ export function AdminBookings() {
 
     document.getElementById('search-bookings').addEventListener('input', renderTable);
 
-    window.manageBooking = (id) => {
-      const b = allBookings.find(x => x.id === id);
+    window.manageBooking = async (id) => {
+      let b = allBookings.find(x => x.id === id);
       const m = document.getElementById('manage-modal');
       const mo = document.getElementById('manage-overlay');
-
-      let actionsHtml = '';
-
-      if (b.status === 'PENDING') {
-        actionsHtml = `
-          <button onclick="window.bAction('${id}', 'approve')" class="flex-1 bg-primary text-white py-2 rounded font-bold hover:bg-primary-hover shadow-sm">Approve</button>
-          <button onclick="window.bAction('${id}', 'reject')" class="flex-1 bg-surface border border-danger text-danger py-2 rounded font-bold hover:bg-danger/10">Reject</button>
-        `;
-      } else if (b.status === 'APPROVED') {
-        actionsHtml = `
-          <button onclick="window.bComplete('${id}')" class="w-full bg-success text-white py-2 rounded font-bold hover:bg-green-600 shadow-sm mb-3">Complete Servicing</button>
-          <div class="grid grid-cols-2 gap-3">
-            <button onclick="window.bAction('${id}', 'no-show')" class="bg-surface border border-border text-text py-1.5 text-sm rounded font-medium hover:bg-bg">No Show</button>
-            <button onclick="window.bAction('${id}', 'cancel')" class="bg-surface border border-danger text-danger py-1.5 text-sm rounded font-medium hover:bg-danger/10">Cancel</button>
-          </div>
-        `;
-      } else {
-        actionsHtml = `<div class="text-center text-sm font-medium text-muted bg-bg py-3 border border-border rounded-lg">No actions available (Terminal Status)</div>`;
-      }
-
-      m.innerHTML = `
-        <div class="p-6">
-          <div class="flex justify-between items-center mb-6">
-            <h3 class="font-heading font-bold text-xl text-text">Manage Booking</h3>
-            <button onclick="window.closeManage()" class="text-muted hover:text-text"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>
-          </div>
-          
-          <div class="space-y-4 mb-8 text-sm">
-            <div class="flex justify-between border-b border-border pb-2"><span class="text-muted">ID</span> <span class="font-mono text-text">${b.id}</span></div>
-            <div class="flex justify-between border-b border-border pb-2"><span class="text-muted">Customer</span> <span class="font-bold text-text">${b.customer?.fullName} (${b.customer?.phone})</span></div>
-            <div class="flex justify-between border-b border-border pb-2"><span class="text-muted">Service</span> <span class="font-bold text-text">${b.serviceNameSnapshotEn}</span></div>
-            <div class="flex justify-between border-b border-border pb-2"><span class="text-muted">Schedule</span> <span class="font-bold text-text">${new Date(b.appointmentAt).toLocaleString()}</span></div>
-            <div class="flex justify-between"><span class="text-muted">Notes</span> <span class="text-right max-w-xs text-text">${b.notes || '-'}</span></div>
-          </div>
-          
-          <div class="flex flex-col gap-3">
-            ${actionsHtml}
-          </div>
-        </div>
-      `;
+      const selectedPrice = Number(b.finalPrice || 0);
 
       mo.classList.remove('hidden');
+      m.innerHTML = `<div class="p-12 flex justify-center"><div class="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin"></div></div>`;
       requestAnimationFrame(() => {
         mo.classList.remove('opacity-0');
         m.classList.remove('scale-95', 'opacity-0');
       });
+
+      try {
+        const detailRes = await apiFetch(`/admin/bookings/${id}`);
+        if (detailRes && detailRes.item) {
+          b = detailRes.item; // includes auditLogs
+        }
+      } catch (e) {
+        window.toast('Failed to load booking details', 'error');
+        window.closeManage();
+        return;
+      }
+      const actionsHtml = (() => {
+        if (b.status === 'PENDING') {
+          return `
+            <button onclick="window.patchStatus('${b.id}', 'APPROVED')" class="w-full py-2.5 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-bold transition-colors shadow-sm">Confirm Booking</button>
+            <button onclick="window.patchStatus('${b.id}', 'CANCELLED', true)" class="w-full py-2.5 bg-surface border border-border hover:bg-bg text-text rounded-lg font-bold transition-colors">Cancel Booking</button>
+          `;
+        }
+        if (b.status === 'APPROVED') {
+          return `
+            <button onclick="window.patchStatus('${b.id}', 'COMPLETED')" class="w-full py-2.5 bg-green-500 hover:bg-green-600 text-white rounded-lg font-bold transition-colors shadow-sm">Mark Completed</button>
+            <div class="flex gap-3">
+              <button onclick="window.patchStatus('${b.id}', 'NO_SHOW', true)" class="flex-1 py-2 bg-surface text-amber-500 border border-amber-500/20 hover:bg-amber-500/10 rounded-lg font-bold transition-colors">No Show</button>
+              <button onclick="window.patchStatus('${b.id}', 'LATE_CANCELLED', true)" class="flex-1 py-2 bg-surface text-red-500 border border-red-500/20 hover:bg-red-500/10 rounded-lg font-bold transition-colors">Late Cancel</button>
+            </div>
+            <button onclick="window.patchStatus('${b.id}', 'CANCELLED', true)" class="w-full py-2.5 bg-surface border border-border hover:bg-bg text-text rounded-lg font-bold transition-colors">Cancel Booking</button>
+          `;
+        }
+        return `<div class="text-center text-sm text-muted italic py-2">No actions available in ${b.status} status.</div>`;
+      })();
+
+      const auditLogsHtml = (b.auditLogs || []).length > 0 ? b.auditLogs.map(a => `
+        <div class="mb-3 last:mb-0 border-l-2 border-primary/20 pl-3">
+          <div class="text-xs font-bold text-text">${a.action}</div>
+          <div class="text-[10px] text-muted">${new Date(a.createdAt).toLocaleString()} ${a.actor?.fullName ? 'by ' + a.actor.fullName : ''}</div>
+          ${a.payload?.note ? `<div class="text-[11px] text-muted mt-0.5 italic">Note: ${a.payload.note}</div>` : ''}
+        </div>
+      `).join('') : '<div class="text-[11px] italic text-muted">No audit logs found.</div>';
+
+      m.innerHTML = `
+        <div class="p-6">
+          <div class="flex justify-between items-center mb-6">
+            <div class="flex items-center gap-3">
+              <h3 class="font-heading font-bold text-xl text-text">Manage Booking</h3>
+              <span class="px-3 py-1 text-xs font-medium rounded-full border ${getStatusStyle(b.status).classes}">${getStatusStyle(b.status).text}</span>
+            </div>
+            <button onclick="window.closeManage()" class="text-muted hover:text-text"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>
+          </div>
+          
+          <div class="space-y-4 mb-6 text-sm">
+            <div class="flex justify-between border-b border-white/5 pb-2"><span class="text-muted">Customer</span> <span class="font-bold text-text">${b.customer?.fullName || 'Unknown'} (${b.customer?.phone || '--'})</span></div>
+            <div class="flex justify-between border-b border-white/5 pb-2"><span class="text-muted">Service</span> <span class="font-bold text-text">${b.serviceNameSnapshotEn}</span></div>
+            <div class="flex justify-between border-b border-white/5 pb-2"><span class="text-muted">Schedule</span> <span class="font-bold text-text">${new Date(b.appointmentAt).toLocaleDateString()} ${new Date(b.appointmentAt).toLocaleTimeString([], { timeStyle: 'short' })}</span></div>
+            <div class="flex justify-between"><span class="text-muted">Notes</span> <span class="text-right max-w-xs text-text">${b.notes || '<span class="italic text-muted/50">None</span>'}</span></div>
+          </div>
+          
+          <div class="flex flex-col gap-3" id="manage-actions-container">
+            ${actionsHtml}
+          </div>
+
+          <div class="mt-6 pt-6 border-t border-border">
+            <h4 class="text-xs font-bold uppercase tracking-wider text-muted mb-3">Audit Log</h4>
+            <div class="max-h-[150px] overflow-y-auto pr-2 saas-scrollbar">
+              ${auditLogsHtml}
+            </div>
+          </div>
+        </div>
+      `;
     };
 
     window.closeManage = () => {
@@ -138,56 +167,36 @@ export function AdminBookings() {
       setTimeout(() => mo.classList.add('hidden'), 300);
     };
 
-    window.bAction = async (id, action) => {
-      let body = {};
-      if (['reject', 'cancel', 'late-cancel'].includes(action)) {
-        const reason = prompt(`Enter ${action} reason (optional):`);
-        if (reason === null) return; // User cancelled prompt
-        body = { [`${action === 'reject' ? 'rejectReason' : 'cancelReason'}`]: reason };
-      }
+    window.patchStatus = async (id, newStatus, requiresNote = false) => {
+      let body = { status: newStatus };
 
-      const confirmed = await ConfirmModal({
-        title: `Confirm ${action.toUpperCase()}`,
-        message: `Are you sure you want to perform '${action}' on this booking?`,
-        intent: ['reject', 'cancel', 'late-cancel', 'not-served', 'no-show'].includes(action) ? 'danger' : 'primary'
-      });
-
-      if (!confirmed) return;
-
-      try {
-        await apiFetch(`/admin/bookings/${id}/${action}`, { method: 'POST', body });
-        window.toast(`Booking ${action} successful`, 'success');
-        window.closeManage();
-        load();
-      } catch (e) {
-        window.toast(e.message, 'error');
-      }
-    };
-
-    window.bComplete = async (id) => {
-      const priceStr = prompt('Enter final price for this service (JOD):');
-      if (priceStr === null) return;
-      const finalPrice = parseFloat(priceStr);
-      if (isNaN(finalPrice) || finalPrice < 0) return window.toast('Invalid price', 'error');
-
-      const confirmed = await ConfirmModal({
-        title: `Complete Service`,
-        message: `Are you sure you want to complete this booking for ${finalPrice} JOD? This will create an accounting transaction.`,
-        intent: 'primary'
-      });
-
-      if (!confirmed) return;
-
-      try {
-        await apiFetch(`/admin/bookings/${id}/complete`, {
-          method: 'POST',
-          body: { finalPrice, internalNote: 'Completed via UI' }
+      if (requiresNote) {
+        const note = prompt(`Enter reason for marking as ${newStatus}:`);
+        if (note === null) return; // cancelled
+        if (note.trim().length < 2) return window.toast('Please provide a valid reason.', 'error');
+        body.note = note.trim();
+      } else {
+        const confirmed = await ConfirmModal({
+          title: `Confirm ${newStatus === 'APPROVED' ? 'CONFIRMED' : newStatus}`,
+          message: `Are you sure you want to transition this booking to ${newStatus === 'APPROVED' ? 'CONFIRMED' : newStatus}?`,
+          intent: 'primary'
         });
-        window.toast(`Booking completed globally!`, 'success');
+        if (!confirmed) return;
+      }
+
+      try {
+        const container = document.getElementById('manage-actions-container');
+        if (container) container.style.opacity = '0.5';
+
+        await apiFetch(`/admin/bookings/${id}`, { method: 'PATCH', body });
+
+        window.toast(`Booking successfully updated.`, 'success');
         window.closeManage();
         load();
       } catch (e) {
         window.toast(e.message, 'error');
+        const container = document.getElementById('manage-actions-container');
+        if (container) container.style.opacity = '1';
       }
     };
 
@@ -239,3 +248,7 @@ export function AdminBookings() {
     </div>
   `;
 }
+
+
+
+

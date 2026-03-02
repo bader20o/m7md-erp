@@ -33,7 +33,7 @@ export async function acquireBookingSlotLock(input: AcquireLockInput): Promise<{
         slotDate: slot.slotDate,
         slotTime: slot.slotTime,
         status: {
-          in: [BookingStatus.PENDING, BookingStatus.APPROVED]
+          in: [BookingStatus.PENDING, BookingStatus.PRICE_SET, BookingStatus.APPROVED]
         }
       },
       select: { id: true }

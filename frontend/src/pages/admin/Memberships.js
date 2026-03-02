@@ -2,6 +2,7 @@ import { apiFetch } from '../../lib/api.js';
 import { openImageCropper } from '../../components/ui/ImageCropper.js';
 import { CardSkeleton } from '../../components/ui/Skeleton.js';
 import { uploadLocalFile } from '../../lib/uploads.js';
+import { ColorInput } from '../../components/ui/ColorInput.js';
 
 export function AdminMemberships() {
   window.onMount = async () => {
@@ -79,11 +80,10 @@ export function AdminMemberships() {
           (plan) => `
             <article class="bg-surface border border-border rounded-2xl overflow-hidden shadow-sm flex flex-col">
               <div class="h-48 bg-bg border-b border-border overflow-hidden">
-                ${
-                  plan.imageUrl
-                    ? `<img src="${plan.imageUrl}" alt="${plan.nameEn}" class="w-full h-full object-cover">`
-                    : `<div class="w-full h-full flex items-center justify-center text-muted text-sm">No image</div>`
-                }
+                ${plan.imageUrl
+              ? `<img src="${plan.imageUrl}" alt="${plan.nameEn}" class="w-full h-full object-cover">`
+              : `<div class="w-full h-full flex items-center justify-center text-muted text-sm">No image</div>`
+            }
               </div>
               <div class="p-5 flex flex-col gap-3 flex-1">
                 <div class="flex items-start justify-between gap-3">
@@ -91,18 +91,16 @@ export function AdminMemberships() {
                     <h3 class="text-lg font-heading font-bold text-text">${plan.nameEn}</h3>
                     <div class="text-xs text-muted">${plan.nameAr}</div>
                   </div>
-                  <span class="px-2 py-1 rounded-md text-[10px] font-bold uppercase ${
-                    plan.isActive ? 'bg-success/15 text-success' : 'bg-danger/15 text-danger'
-                  }">${plan.isActive ? 'Active' : 'Inactive'}</span>
+                  <span class="px-2 py-1 rounded-md text-[10px] font-bold uppercase ${plan.isActive ? 'bg-success/15 text-success' : 'bg-danger/15 text-danger'
+            }">${plan.isActive ? 'Active' : 'Inactive'}</span>
                 </div>
                 <p class="text-sm text-muted leading-relaxed flex-1">${plan.descriptionEn || 'No description provided.'}</p>
                 <div class="text-2xl font-extrabold text-primary">${Number(plan.price).toFixed(2)} JOD</div>
                 <div class="text-xs text-muted">Duration: ${Math.max(1, Math.round(plan.durationDays / 30))} month(s)</div>
                 <div class="flex items-center gap-2 pt-2">
                   <button class="flex-1 px-3 py-2 rounded-lg border border-primary text-primary font-semibold hover:bg-primary hover:text-white transition-colors" onclick="window.openPlanEditor('${plan.id}')">Edit</button>
-                  <button class="px-3 py-2 rounded-lg border ${
-                    plan.isActive ? 'border-danger text-danger hover:bg-danger hover:text-white' : 'border-success text-success hover:bg-success hover:text-white'
-                  } font-semibold transition-colors" onclick="window.togglePlanStatus('${plan.id}', ${!plan.isActive})">
+                  <button class="px-3 py-2 rounded-lg border ${plan.isActive ? 'border-danger text-danger hover:bg-danger hover:text-white' : 'border-success text-success hover:bg-success hover:text-white'
+            } font-semibold transition-colors" onclick="window.togglePlanStatus('${plan.id}', ${!plan.isActive})">
                     ${plan.isActive ? 'Disable' : 'Enable'}
                   </button>
                 </div>
@@ -291,7 +289,7 @@ export function AdminMemberships() {
             </div>
             <div>
               <label class="block text-xs font-bold text-muted uppercase tracking-wider mb-1">Theme Color</label>
-              <input type="color" name="color" value="#3B82F6" class="w-full bg-bg border border-border rounded-lg h-[42px] px-1 py-1">
+              ${ColorInput({ name: 'color', value: '#3B82F6' })}
             </div>
             <div>
               <label class="block text-xs font-bold text-muted uppercase tracking-wider mb-1">Name (EN)</label>
@@ -347,7 +345,7 @@ export function AdminMemberships() {
           <form id="plan-edit-form" class="p-5 space-y-4">
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
               <input type="text" name="tier" required class="w-full bg-bg border border-border rounded-lg px-3 py-2 text-text" placeholder="Tier">
-              <input type="color" name="color" class="w-full bg-bg border border-border rounded-lg h-[42px] px-1 py-1">
+              ${ColorInput({ name: 'color', value: '#3B82F6' })}
               <input type="text" name="nameEn" required class="w-full bg-bg border border-border rounded-lg px-3 py-2 text-text" placeholder="Name EN">
               <input type="text" name="nameAr" required class="w-full bg-bg border border-border rounded-lg px-3 py-2 text-right text-text" placeholder="Name AR">
               <input type="number" step="0.01" name="price" required class="w-full bg-bg border border-border rounded-lg px-3 py-2 text-text" placeholder="Price">

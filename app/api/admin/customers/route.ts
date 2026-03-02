@@ -6,6 +6,7 @@ import { getSession, hashPassword } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { requireAnyPermission, requireRoles } from "@/lib/rbac";
 import { generateTemporaryPassword } from "@/lib/security";
+import { normalizePhone } from "@/lib/utils/phone";
 
 const listCustomersQuerySchema = z.object({
   q: z.string().optional(),
@@ -18,10 +19,17 @@ const listCustomersQuerySchema = z.object({
 
 const createCustomerSchema = z.object({
   fullName: z.string().min(2).max(120),
-  phone: z.string().trim().regex(/^07\d{8}$/, "Phone must start with 07 and contain 10 digits."),
+  phone: z
+    .string()
+    .trim()
+    .transform((val) => normalizePhone(val) || val)
+    .refine((val) => /^07\d{8}$/.test(val), "Phone must be a valid Jordan mobile number starting with 07 and contain 10 digits."),
   password: z.string().min(8).max(128).optional(),
   bio: z.string().max(280).optional(),
+  carCompany: z.string().max(120).optional(),
   carType: z.string().max(120).optional(),
+  carModel: z.string().max(100).optional(),
+  carYear: z.string().max(10).optional(),
   location: z.string().max(120).optional(),
   avatarUrl: z.string().max(1000).optional(),
   initialDebt: z.coerce.number().min(0).optional(),
@@ -36,18 +44,54 @@ function toUserStatusFilter(value: "active" | "suspended" | "banned" | undefined
   return UserStatus.BANNED;
 }
 
-function computeBalanceDue(
-  entries: Array<{ customerId: string; type: CustomerAccountEntryType; amount: unknown }>
-): Map<string, number> {
-  const map = new Map<string, number>();
+function computeLedgerStats(
+  entries: Array<{ customerId: string; type: CustomerAccountEntryType; _sum: { amount: unknown }; _max: { occurredAt: Date | null } }>
+) {
+  const map = new Map<string, { balanceDue: number; totalPaid: number; totalServicesCost: number; lastLedgerDate: Date | null }>();
   for (const entry of entries) {
-    const amount = Number(entry.amount);
-    const current = map.get(entry.customerId) ?? 0;
+    const amount = Number(entry._sum.amount ?? 0);
+    const current = map.get(entry.customerId) || { balanceDue: 0, totalPaid: 0, totalServicesCost: 0, lastLedgerDate: null };
+
     if (entry.type === CustomerAccountEntryType.PAYMENT) {
-      map.set(entry.customerId, current - amount);
-    } else {
-      map.set(entry.customerId, current + amount);
+      current.balanceDue -= amount;
+      current.totalPaid += amount;
+    } else if (entry.type === CustomerAccountEntryType.CHARGE) {
+      current.balanceDue += amount;
+      current.totalServicesCost += amount;
+    } else if (entry.type === CustomerAccountEntryType.ADJUSTMENT) {
+      current.balanceDue += amount;
     }
+
+    if (entry._max.occurredAt) {
+      if (!current.lastLedgerDate || entry._max.occurredAt > current.lastLedgerDate) {
+        current.lastLedgerDate = entry._max.occurredAt;
+      }
+    }
+
+    map.set(entry.customerId, current);
+  }
+  return map;
+}
+
+function computeBookingStats(
+  bookings: Array<{ customerId: string; status: string; _count: { _all: number }; _max: { createdAt: Date | null } }>
+) {
+  const map = new Map<string, { totalBookings: number; completedJobs: number; lastBookingDate: Date | null }>();
+  for (const b of bookings) {
+    const current = map.get(b.customerId) || { totalBookings: 0, completedJobs: 0, lastBookingDate: null };
+    current.totalBookings += b._count._all;
+
+    if (b.status === "COMPLETED") {
+      current.completedJobs += b._count._all;
+    }
+
+    if (b._max.createdAt) {
+      if (!current.lastBookingDate || b._max.createdAt > current.lastBookingDate) {
+        current.lastBookingDate = b._max.createdAt;
+      }
+    }
+
+    map.set(b.customerId, current);
   }
   return map;
 }
@@ -76,16 +120,16 @@ export async function GET(request: Request): Promise<Response> {
       status: toUserStatusFilter(query.status),
       OR: query.q
         ? [
-            { fullName: { contains: query.q, mode: "insensitive" as const } },
-            { phone: { contains: query.q } }
-          ]
+          { fullName: { contains: query.q } },
+          { phone: { contains: query.q } }
+        ]
         : undefined,
       createdAt:
         query.joinFrom || query.joinTo
           ? {
-              gte: query.joinFrom,
-              lte: query.joinTo
-            }
+            gte: query.joinFrom,
+            lte: query.joinTo
+          }
           : undefined
     };
 
@@ -111,25 +155,57 @@ export async function GET(request: Request): Promise<Response> {
     ]);
 
     const customerIds = users.map((item) => item.id);
+
+    // Aggregate Ledger
     const entries = customerIds.length
-      ? await prisma.customerAccountEntry.findMany({
-          where: { customerId: { in: customerIds } },
-          select: { customerId: true, type: true, amount: true }
-        })
+      ? await prisma.customerAccountEntry.groupBy({
+        by: ["customerId", "type"],
+        where: { customerId: { in: customerIds } },
+        _sum: { amount: true },
+        _max: { occurredAt: true }
+      })
       : [];
-    const balanceMap = computeBalanceDue(entries);
+    const ledgerStats = computeLedgerStats(entries);
+
+    // Aggregate Bookings
+    const bookings = customerIds.length
+      ? await prisma.booking.groupBy({
+        by: ["customerId", "status"],
+        where: { customerId: { in: customerIds } },
+        _count: { _all: true },
+        _max: { createdAt: true }
+      })
+      : [];
+    const bookingStats = computeBookingStats(bookings);
 
     return ok({
-      items: users.map((user) => ({
-        id: user.id,
-        avatar: user.avatarUrl,
-        fullName: user.fullName,
-        phone: user.phone,
-        joinedAt: user.createdAt,
-        status: user.status.toLowerCase(),
-        bannedUntil: user.bannedUntil,
-        balanceDue: Number((balanceMap.get(user.id) ?? 0).toFixed(2))
-      })),
+      items: users.map((user) => {
+        const lStat = ledgerStats.get(user.id) || { balanceDue: 0, totalPaid: 0, totalServicesCost: 0, lastLedgerDate: null };
+        const bStat = bookingStats.get(user.id) || { totalBookings: 0, completedJobs: 0, lastBookingDate: null };
+
+        let lastActivityDate = lStat.lastLedgerDate;
+        if (bStat.lastBookingDate) {
+          if (!lastActivityDate || bStat.lastBookingDate > lastActivityDate) {
+            lastActivityDate = bStat.lastBookingDate;
+          }
+        }
+
+        return {
+          id: user.id,
+          avatar: user.avatarUrl,
+          fullName: user.fullName,
+          phone: user.phone,
+          joinedAt: user.createdAt,
+          status: user.status.toLowerCase(),
+          bannedUntil: user.bannedUntil,
+          balanceDue: Number(lStat.balanceDue.toFixed(2)),
+          totalPaid: Number(lStat.totalPaid.toFixed(2)),
+          totalServicesCost: Number(lStat.totalServicesCost.toFixed(2)),
+          totalBookings: bStat.totalBookings,
+          completedJobs: bStat.completedJobs,
+          lastActivityDate
+        };
+      }),
       page: query.page,
       limit: query.limit,
       total
@@ -144,13 +220,15 @@ export async function POST(request: Request): Promise<Response> {
     const actor = requireRoles(await getSession(), [Role.ADMIN]);
     const body = await parseJsonBody(request, createCustomerSchema);
 
-    const normalizedPhone = body.phone.trim();
+    // Zod already normalized the phone via the transform.
+    const normalizedPhone = body.phone;
     const existing = await prisma.user.findUnique({
       where: { phone: normalizedPhone },
-      select: { id: true }
+      select: { id: true, fullName: true, phone: true }
     });
     if (existing) {
-      throw new ApiError(409, "PHONE_ALREADY_EXISTS", "Phone already exists.");
+      // Safe error that admin can see
+      throw new ApiError(409, "PHONE_ALREADY_EXISTS", `Phone already exists (${existing.fullName || existing.phone}).`);
     }
 
     const temporaryPassword = body.password ? null : generateTemporaryPassword();
@@ -164,7 +242,10 @@ export async function POST(request: Request): Promise<Response> {
           phone: normalizedPhone,
           passwordHash: await hashPassword(password),
           bio: body.bio,
+          carCompany: body.carCompany,
           carType: body.carType,
+          carModel: body.carModel,
+          carYear: body.carYear,
           location: body.location,
           avatarUrl: body.avatarUrl
         }

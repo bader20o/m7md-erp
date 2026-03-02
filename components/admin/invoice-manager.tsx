@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { DateInput } from "@/components/ui/date-input";
 
 type InvoiceItem = {
   id: string;
@@ -77,11 +78,10 @@ export function InvoiceManager({ invoices }: Props): React.ReactElement {
             placeholder="Invoice Number"
             required
           />
-          <input
+          <DateInput
             value={dueDate}
             onChange={(event) => setDueDate(event.target.value)}
             className="rounded-md border border-slate-300 px-3 py-2"
-            type="date"
           />
           <textarea
             value={note}

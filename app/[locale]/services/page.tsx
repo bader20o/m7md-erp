@@ -1,3 +1,4 @@
+import { ServicesCatalog } from "@/components/services/services-catalog";
 import { prisma } from "@/lib/prisma";
 
 type Props = { params: Promise<{ locale: string }> };
@@ -10,6 +11,7 @@ export default async function ServicesPage({ params }: Props): Promise<React.Rea
   try {
     services = await prisma.service.findMany({
       where: { isActive: true },
+      include: { _count: { select: { bookings: true } } },
       orderBy: { createdAt: "desc" }
     });
   } catch {
@@ -17,29 +19,28 @@ export default async function ServicesPage({ params }: Props): Promise<React.Rea
   }
 
   return (
-    <div className="space-y-4">
-      <h1 className="text-2xl font-semibold">{locale === "ar" ? "الخدمات" : "Services"}</h1>
+    <div className="space-y-8">
+      <section className="overflow-hidden rounded-[28px] border border-sky-100 bg-[linear-gradient(135deg,rgba(255,255,255,0.96),rgba(225,241,255,0.9))] p-6 shadow-[0_24px_80px_-36px_rgba(17,94,169,0.45)] md:p-8">
+        <p className="text-xs font-semibold uppercase tracking-[0.25em] text-sky-700">Workshop services</p>
+        <h1 className="mt-3 text-3xl font-semibold text-slate-950 md:text-4xl">
+          {locale === "ar" ? "الخدمات" : "Services"}
+        </h1>
+        <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-600 md:text-base">
+          {locale === "ar"
+            ? "اختر الخدمة المناسبة لمركبتك، وسيتم تأكيد السعر النهائي بعد مراجعة الإدارة."
+            : "Choose the service that fits your vehicle. Final pricing is reviewed and confirmed by admin after inspection."}
+        </p>
+      </section>
+
       {servicesLoadFailed ? (
         <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
           {locale === "ar"
             ? "تعذر تحميل الخدمات حالياً. تحقق من إعدادات قاعدة البيانات ثم أعد المحاولة."
             : "Could not load services right now. Check database settings and try again."}
         </div>
-      ) : null}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {services.map((service) => (
-          <article key={service.id} className="rounded-xl border border-slate-200 bg-white p-4">
-            <h3 className="font-semibold">{locale === "ar" ? service.nameAr : service.nameEn}</h3>
-            <p className="mt-1 text-sm text-slate-600">
-              {locale === "ar" ? service.descriptionAr : service.descriptionEn}
-            </p>
-            <p className="mt-3 text-sm font-medium text-brand-700">{service.durationMinutes} min</p>
-            <p className="mt-1 text-xs text-slate-500">
-              {locale === "ar" ? "السعر يحدد بعد الفحص" : "Price determined after inspection"}
-            </p>
-          </article>
-        ))}
-      </div>
+      ) : (
+        <ServicesCatalog locale={locale} services={services} />
+      )}
     </div>
   );
 }

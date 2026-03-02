@@ -1,5 +1,26 @@
 import { z } from "zod";
 
+export const employeeRoleProfileSchema = z.enum([
+  "ADMIN",
+  "MANAGER",
+  "RECEPTION",
+  "ACCOUNTANT",
+  "TECHNICIAN",
+  "EMPLOYEE"
+]);
+
+export const employmentTypeSchema = z.enum(["FULL_TIME", "PART_TIME", "CONTRACT"]);
+export const employmentStatusSchema = z.enum(["ACTIVE", "ON_LEAVE"]);
+export const employeeDepartmentSchema = z.enum([
+  "OPERATIONS",
+  "HR",
+  "FINANCE",
+  "FRONT_DESK",
+  "TECHNICAL_SERVICE",
+  "INVENTORY",
+  "CUSTOMER_SUPPORT"
+]);
+
 const permissionSchema = z.enum([
   "accounting",
   "warehouse",
@@ -36,6 +57,47 @@ export const updateEmployeeHrSchema = z.object({
   profilePhotoUrl: z.string().min(1).max(1000).optional(),
   defaultSalaryInfo: z.record(z.any()).optional(),
   workSchedule: z.record(z.any()).optional()
+});
+
+export const employeePermissionOverrideSchema = z.object({
+  canManageBookings: z.boolean(),
+  canAccessAccounting: z.boolean(),
+  canEditInventory: z.boolean(),
+  canManageEmployees: z.boolean(),
+  canViewReports: z.boolean(),
+  canIssueRefunds: z.boolean()
+});
+
+export const employeeProfileUpdateSchema = z.object({
+  fullName: z.string().min(2).max(120).optional(),
+  phone: z.string().trim().regex(/^07\d{8}$/, "Phone must start with 07 and contain 10 digits.").optional(),
+  jobTitle: z.string().min(2).max(120).optional(),
+  department: employeeDepartmentSchema.nullable().optional(),
+  employmentType: employmentTypeSchema.optional(),
+  startDate: z.coerce.date().nullable().optional(),
+  status: z.enum(["ACTIVE", "SUSPENDED", "BANNED", "ON_LEAVE"]).optional(),
+  emergencyContact: z.string().max(120).nullable().optional(),
+  address: z.string().max(500).nullable().optional(),
+  avatarUrl: z.string().max(1000).nullable().optional()
+});
+
+export const employeePermissionsUpdateSchema = z.object({
+  roleProfile: employeeRoleProfileSchema,
+  overrides: employeePermissionOverrideSchema
+});
+
+export const employeeHrAdminUpdateSchema = z.object({
+  salary: z.coerce.number().min(0).nullable().optional(),
+  paymentFrequency: z.string().max(80).nullable().optional(),
+  bonusHistory: z.array(z.record(z.any())).optional(),
+  deductions: z.array(z.record(z.any())).optional(),
+  leaveBalance: z
+    .object({
+      annual: z.coerce.number().min(0).default(0),
+      sick: z.coerce.number().min(0).default(0)
+    })
+    .optional(),
+  internalNotes: z.string().max(2000).nullable().optional()
 });
 
 export const attendanceScanSchema = z.object({

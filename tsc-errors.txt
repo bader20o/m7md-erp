@@ -1,0 +1,2 @@
+app/api/chat/messages/route.ts(276,7): error TS2322: Type 'true' is not assignable to type 'never'.
+scripts/dedupe-chat-threads.ts(68,13): error TS2322: Type 'true' is not assignable to type 'never'.

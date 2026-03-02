@@ -20,9 +20,12 @@ export const listPartsQuerySchema = z.object({
 export const createPartSchema = z.object({
   name: z.string().trim().min(2).max(160),
   sku: z.string().max(120).optional().transform(nullableString),
+  vehicleModel: z.string().trim().min(2).max(120),
+  vehicleType: z.enum(["EV", "HYBRID", "REGULAR"]),
+  category: z.string().trim().max(120).optional().transform(nullableString),
   unit: z.string().trim().min(1).max(40),
   costPrice: z.coerce.number().min(0).optional(),
-  sellPrice: z.coerce.number().min(0).optional(),
+  sellPrice: z.coerce.number().min(0),
   stockQty: z.coerce.number().int().min(0).default(0),
   lowStockThreshold: z.coerce.number().int().min(0).default(0),
   isActive: z.boolean().default(true)
@@ -32,6 +35,19 @@ export const updatePartSchema = z
   .object({
     name: z.string().trim().min(2).max(160).optional(),
     sku: z.string().max(120).optional().nullable().transform((value) => {
+      if (value === null) {
+        return null;
+      }
+      return nullableString(value);
+    }),
+    vehicleModel: z.string().trim().max(120).optional().nullable().transform((value) => {
+      if (value === null) {
+        return null;
+      }
+      return nullableString(value);
+    }),
+    vehicleType: z.enum(["EV", "HYBRID", "REGULAR"]).optional().nullable(),
+    category: z.string().trim().max(120).optional().nullable().transform((value) => {
       if (value === null) {
         return null;
       }

@@ -32,6 +32,7 @@ export async function GET(request: Request): Promise<Response> {
         where: {
           type: TransactionType.INCOME,
           incomeSource: IncomeSource.WALK_IN,
+          deletedAt: null,
           recordedAt: rangeFilter
         },
         _sum: { amount: true }
@@ -40,6 +41,7 @@ export async function GET(request: Request): Promise<Response> {
         where: {
           type: TransactionType.INCOME,
           incomeSource: IncomeSource.MEMBERSHIP,
+          deletedAt: null,
           recordedAt: rangeFilter
         },
         _sum: { amount: true }
@@ -47,6 +49,7 @@ export async function GET(request: Request): Promise<Response> {
       prisma.transaction.aggregate({
         where: {
           type: TransactionType.EXPENSE,
+          deletedAt: null,
           recordedAt: rangeFilter
         },
         _sum: { amount: true }

@@ -1,0 +1,2883 @@
+{
+  "customers": [
+    {
+      "id": "C001",
+      "fullName": "Ahmad Al-Khatib",
+      "phone": "0785123401",
+      "email": "ahmad.khatib1@gmail.com",
+      "city": "Amman",
+      "createdAt": "2025-12-01T10:15:00Z"
+    },
+    {
+      "id": "C002",
+      "fullName": "Lina Haddad",
+      "phone": "0796234502",
+      "email": "lina.haddad2@gmail.com",
+      "city": "Zarqa",
+      "createdAt": "2025-12-02T10:15:00Z"
+    },
+    {
+      "id": "C003",
+      "fullName": "Omar Abu Saleh",
+      "phone": "0777345603",
+      "email": "omar.abusaleh3@gmail.com",
+      "city": "Irbid",
+      "createdAt": "2025-12-03T10:15:00Z"
+    },
+    {
+      "id": "C004",
+      "fullName": "Rana Naser",
+      "phone": "0788456704",
+      "email": "rana.naser4@gmail.com",
+      "city": "Aqaba",
+      "createdAt": "2025-12-04T10:15:00Z"
+    },
+    {
+      "id": "C005",
+      "fullName": "Yousef Dmour",
+      "phone": "0799567805",
+      "email": "yousef.dmour5@gmail.com",
+      "city": "Salt",
+      "createdAt": "2025-12-05T10:15:00Z"
+    },
+    {
+      "id": "C006",
+      "fullName": "Dana Al-Majali",
+      "phone": "0771678906",
+      "email": "dana.majali6@gmail.com",
+      "city": "Madaba",
+      "createdAt": "2025-12-06T10:15:00Z"
+    },
+    {
+      "id": "C007",
+      "fullName": "Khaled Bani Hani",
+      "phone": "0782789017",
+      "email": "khaled.bh7@gmail.com",
+      "city": "Jerash",
+      "createdAt": "2025-12-07T10:15:00Z"
+    },
+    {
+      "id": "C008",
+      "fullName": "Farah Shuqair",
+      "phone": "0793890128",
+      "email": "farah.shuqair8@gmail.com",
+      "city": "Karak",
+      "createdAt": "2025-12-08T10:15:00Z"
+    },
+    {
+      "id": "C009",
+      "fullName": "Mohammad Al-Zoubi",
+      "phone": "0774901239",
+      "email": "m.zoubi9@gmail.com",
+      "city": "Mafraq",
+      "createdAt": "2025-12-09T10:15:00Z"
+    },
+    {
+      "id": "C010",
+      "fullName": "Nour Khreis",
+      "phone": "0785012350",
+      "email": "nour.khreis10@gmail.com",
+      "city": "Ajloun",
+      "createdAt": "2025-12-10T10:15:00Z"
+    },
+    {
+      "id": "C011",
+      "fullName": "Sami Qudah",
+      "phone": "0796123461",
+      "email": "sami.qudah11@gmail.com",
+      "city": "Amman",
+      "createdAt": "2025-12-11T10:15:00Z"
+    },
+    {
+      "id": "C012",
+      "fullName": "Hala Rawashdeh",
+      "phone": "0777234572",
+      "email": "hala.raw12@gmail.com",
+      "city": "Irbid",
+      "createdAt": "2025-12-12T10:15:00Z"
+    },
+    {
+      "id": "C013",
+      "fullName": "Tareq Ayyoub",
+      "phone": "0788345683",
+      "email": "tareq.ayyoub13@gmail.com",
+      "city": "Zarqa",
+      "createdAt": "2025-12-13T10:15:00Z"
+    },
+    {
+      "id": "C014",
+      "fullName": "Maha Obeidat",
+      "phone": "0799456794",
+      "email": "maha.obeidat14@gmail.com",
+      "city": "Ramtha",
+      "createdAt": "2025-12-14T10:15:00Z"
+    },
+    {
+      "id": "C015",
+      "fullName": "Fadi Jaradat",
+      "phone": "0771567805",
+      "email": "fadi.jaradat15@gmail.com",
+      "city": "Amman",
+      "createdAt": "2025-12-15T10:15:00Z"
+    },
+    {
+      "id": "C016",
+      "fullName": "Aya Al-Rawashdeh",
+      "phone": "0782678916",
+      "email": "aya.raw16@gmail.com",
+      "city": "Madaba",
+      "createdAt": "2025-12-16T10:15:00Z"
+    },
+    {
+      "id": "C017",
+      "fullName": "Laith Abu Rumman",
+      "phone": "0793789027",
+      "email": "laith.aburumman17@gmail.com",
+      "city": "Salt",
+      "createdAt": "2025-12-17T10:15:00Z"
+    },
+    {
+      "id": "C018",
+      "fullName": "Ruba Smadi",
+      "phone": "0774890138",
+      "email": "ruba.smadi18@gmail.com",
+      "city": "Jerash",
+      "createdAt": "2025-12-18T10:15:00Z"
+    },
+    {
+      "id": "C019",
+      "fullName": "Zaid Malkawi",
+      "phone": "0785901249",
+      "email": "zaid.malkawi19@gmail.com",
+      "city": "Irbid",
+      "createdAt": "2025-12-19T10:15:00Z"
+    },
+    {
+      "id": "C020",
+      "fullName": "Sahar Muasher",
+      "phone": "0796012350",
+      "email": "sahar.muasher20@gmail.com",
+      "city": "Amman",
+      "createdAt": "2025-12-20T10:15:00Z"
+    },
+    {
+      "id": "C021",
+      "fullName": "Anas Khleifat",
+      "phone": "0777123461",
+      "email": "anas.khleifat21@gmail.com",
+      "city": "Aqaba",
+      "createdAt": "2025-12-21T10:15:00Z"
+    },
+    {
+      "id": "C022",
+      "fullName": "Reem Al-Fayez",
+      "phone": "0788234572",
+      "email": "reem.fayez22@gmail.com",
+      "city": "Mafraq",
+      "createdAt": "2025-12-22T10:15:00Z"
+    },
+    {
+      "id": "C023",
+      "fullName": "Bashar Odeh",
+      "phone": "0799345683",
+      "email": "bashar.odeh23@gmail.com",
+      "city": "Karak",
+      "createdAt": "2025-12-23T10:15:00Z"
+    },
+    {
+      "id": "C024",
+      "fullName": "Dima Naffa",
+      "phone": "0771456794",
+      "email": "dima.naffa24@gmail.com",
+      "city": "Amman",
+      "createdAt": "2025-12-24T10:15:00Z"
+    },
+    {
+      "id": "C025",
+      "fullName": "Walid Nsour",
+      "phone": "0782567805",
+      "email": "walid.nsour25@gmail.com",
+      "city": "Ajloun",
+      "createdAt": "2025-12-25T10:15:00Z"
+    },
+    {
+      "id": "C026",
+      "fullName": "Shatha Tawalbeh",
+      "phone": "0793678916",
+      "email": "shatha.t26@gmail.com",
+      "city": "Irbid",
+      "createdAt": "2025-12-26T10:15:00Z"
+    },
+    {
+      "id": "C027",
+      "fullName": "Hussein Al-Qudah",
+      "phone": "0774789027",
+      "email": "hussein.qudah27@gmail.com",
+      "city": "Salt",
+      "createdAt": "2025-12-27T10:15:00Z"
+    },
+    {
+      "id": "C028",
+      "fullName": "Nisreen Yassin",
+      "phone": "0785890138",
+      "email": "nisreen.y28@gmail.com",
+      "city": "Zarqa",
+      "createdAt": "2025-12-28T10:15:00Z"
+    },
+    {
+      "id": "C029",
+      "fullName": "Raed Harahsheh",
+      "phone": "0796901249",
+      "email": "raed.h29@gmail.com",
+      "city": "Madaba",
+      "createdAt": "2025-12-29T10:15:00Z"
+    },
+    {
+      "id": "C030",
+      "fullName": "Mona Al-Kayed",
+      "phone": "0777012350",
+      "email": "mona.kayed30@gmail.com",
+      "city": "Amman",
+      "createdAt": "2025-12-30T10:15:00Z"
+    }
+  ],
+  "vehicles": [
+    {
+      "id": "V001",
+      "customerId": "C001",
+      "carType": "EV",
+      "brand": "Tesla",
+      "model": "Model 3",
+      "year": 2019,
+      "plateNumber": "AM-1000"
+    },
+    {
+      "id": "V002",
+      "customerId": "C002",
+      "carType": "EV",
+      "brand": "BYD",
+      "model": "Atto 3",
+      "year": 2020,
+      "plateNumber": "ZR-1007"
+    },
+    {
+      "id": "V003",
+      "customerId": "C002",
+      "carType": "EV",
+      "brand": "Nissan",
+      "model": "Leaf",
+      "year": 2021,
+      "plateNumber": "ZR-1010"
+    },
+    {
+      "id": "V004",
+      "customerId": "C003",
+      "carType": "EV",
+      "brand": "Hyundai",
+      "model": "Ioniq 5",
+      "year": 2021,
+      "plateNumber": "IR-1014"
+    },
+    {
+      "id": "V005",
+      "customerId": "C003",
+      "carType": "EV",
+      "brand": "Kia",
+      "model": "EV6",
+      "year": 2022,
+      "plateNumber": "IR-1017"
+    },
+    {
+      "id": "V006",
+      "customerId": "C003",
+      "carType": "EV",
+      "brand": "MG",
+      "model": "ZS EV",
+      "year": 2023,
+      "plateNumber": "IR-1020"
+    },
+    {
+      "id": "V007",
+      "customerId": "C004",
+      "carType": "EV",
+      "brand": "MG",
+      "model": "ZS EV",
+      "year": 2022,
+      "plateNumber": "AQ-1021"
+    },
+    {
+      "id": "V008",
+      "customerId": "C005",
+      "carType": "HYBRID",
+      "brand": "Toyota",
+      "model": "Prius",
+      "year": 2023,
+      "plateNumber": "SL-1028"
+    },
+    {
+      "id": "V009",
+      "customerId": "C005",
+      "carType": "HYBRID",
+      "brand": "Toyota",
+      "model": "Corolla Cross Hybrid",
+      "year": 2024,
+      "plateNumber": "SL-1031"
+    },
+    {
+      "id": "V010",
+      "customerId": "C006",
+      "carType": "HYBRID",
+      "brand": "Hyundai",
+      "model": "Sonata Hybrid",
+      "year": 2024,
+      "plateNumber": "MD-1035"
+    },
+    {
+      "id": "V011",
+      "customerId": "C006",
+      "carType": "HYBRID",
+      "brand": "Kia",
+      "model": "Niro Hybrid",
+      "year": 2025,
+      "plateNumber": "MD-1038"
+    },
+    {
+      "id": "V012",
+      "customerId": "C006",
+      "carType": "HYBRID",
+      "brand": "Lexus",
+      "model": "UX 250h",
+      "year": 2019,
+      "plateNumber": "MD-1041"
+    },
+    {
+      "id": "V013",
+      "customerId": "C007",
+      "carType": "HYBRID",
+      "brand": "Lexus",
+      "model": "UX 250h",
+      "year": 2025,
+      "plateNumber": "JR-1042"
+    },
+    {
+      "id": "V014",
+      "customerId": "C008",
+      "carType": "HYBRID",
+      "brand": "Toyota",
+      "model": "Camry Hybrid",
+      "year": 2019,
+      "plateNumber": "KR-1049"
+    },
+    {
+      "id": "V015",
+      "customerId": "C008",
+      "carType": "HYBRID",
+      "brand": "Ford",
+      "model": "Escape Hybrid",
+      "year": 2020,
+      "plateNumber": "KR-1052"
+    },
+    {
+      "id": "V016",
+      "customerId": "C009",
+      "carType": "REGULAR",
+      "brand": "Toyota",
+      "model": "Corolla",
+      "year": 2020,
+      "plateNumber": "MF-1056"
+    },
+    {
+      "id": "V017",
+      "customerId": "C009",
+      "carType": "REGULAR",
+      "brand": "Hyundai",
+      "model": "Elantra",
+      "year": 2021,
+      "plateNumber": "MF-1059"
+    },
+    {
+      "id": "V018",
+      "customerId": "C009",
+      "carType": "REGULAR",
+      "brand": "Kia",
+      "model": "Sportage",
+      "year": 2022,
+      "plateNumber": "MF-1062"
+    },
+    {
+      "id": "V019",
+      "customerId": "C010",
+      "carType": "REGULAR",
+      "brand": "Kia",
+      "model": "Sportage",
+      "year": 2021,
+      "plateNumber": "AJ-1063"
+    },
+    {
+      "id": "V020",
+      "customerId": "C011",
+      "carType": "REGULAR",
+      "brand": "Mitsubishi",
+      "model": "Lancer",
+      "year": 2022,
+      "plateNumber": "AM-1070"
+    },
+    {
+      "id": "V021",
+      "customerId": "C011",
+      "carType": "REGULAR",
+      "brand": "Honda",
+      "model": "Civic",
+      "year": 2023,
+      "plateNumber": "AM-1073"
+    },
+    {
+      "id": "V022",
+      "customerId": "C012",
+      "carType": "REGULAR",
+      "brand": "Mazda",
+      "model": "CX-5",
+      "year": 2023,
+      "plateNumber": "IR-1077"
+    },
+    {
+      "id": "V023",
+      "customerId": "C012",
+      "carType": "REGULAR",
+      "brand": "Suzuki",
+      "model": "Dzire",
+      "year": 2024,
+      "plateNumber": "IR-1080"
+    },
+    {
+      "id": "V024",
+      "customerId": "C012",
+      "carType": "EV",
+      "brand": "Tesla",
+      "model": "Model 3",
+      "year": 2025,
+      "plateNumber": "IR-1083"
+    },
+    {
+      "id": "V025",
+      "customerId": "C013",
+      "carType": "EV",
+      "brand": "Tesla",
+      "model": "Model 3",
+      "year": 2024,
+      "plateNumber": "ZR-1084"
+    },
+    {
+      "id": "V026",
+      "customerId": "C014",
+      "carType": "EV",
+      "brand": "BYD",
+      "model": "Atto 3",
+      "year": 2025,
+      "plateNumber": "RM-1091"
+    },
+    {
+      "id": "V027",
+      "customerId": "C014",
+      "carType": "EV",
+      "brand": "Nissan",
+      "model": "Leaf",
+      "year": 2019,
+      "plateNumber": "RM-1094"
+    },
+    {
+      "id": "V028",
+      "customerId": "C015",
+      "carType": "EV",
+      "brand": "Hyundai",
+      "model": "Ioniq 5",
+      "year": 2019,
+      "plateNumber": "AM-1098"
+    },
+    {
+      "id": "V029",
+      "customerId": "C015",
+      "carType": "EV",
+      "brand": "Kia",
+      "model": "EV6",
+      "year": 2020,
+      "plateNumber": "AM-1101"
+    },
+    {
+      "id": "V030",
+      "customerId": "C015",
+      "carType": "EV",
+      "brand": "MG",
+      "model": "ZS EV",
+      "year": 2021,
+      "plateNumber": "AM-1104"
+    },
+    {
+      "id": "V031",
+      "customerId": "C016",
+      "carType": "EV",
+      "brand": "MG",
+      "model": "ZS EV",
+      "year": 2020,
+      "plateNumber": "MD-1105"
+    },
+    {
+      "id": "V032",
+      "customerId": "C017",
+      "carType": "HYBRID",
+      "brand": "Toyota",
+      "model": "Prius",
+      "year": 2021,
+      "plateNumber": "SL-1112"
+    },
+    {
+      "id": "V033",
+      "customerId": "C017",
+      "carType": "HYBRID",
+      "brand": "Toyota",
+      "model": "Corolla Cross Hybrid",
+      "year": 2022,
+      "plateNumber": "SL-1115"
+    },
+    {
+      "id": "V034",
+      "customerId": "C018",
+      "carType": "HYBRID",
+      "brand": "Hyundai",
+      "model": "Sonata Hybrid",
+      "year": 2022,
+      "plateNumber": "JR-1119"
+    },
+    {
+      "id": "V035",
+      "customerId": "C018",
+      "carType": "HYBRID",
+      "brand": "Kia",
+      "model": "Niro Hybrid",
+      "year": 2023,
+      "plateNumber": "JR-1122"
+    },
+    {
+      "id": "V036",
+      "customerId": "C018",
+      "carType": "HYBRID",
+      "brand": "Lexus",
+      "model": "UX 250h",
+      "year": 2024,
+      "plateNumber": "JR-1125"
+    },
+    {
+      "id": "V037",
+      "customerId": "C019",
+      "carType": "HYBRID",
+      "brand": "Lexus",
+      "model": "UX 250h",
+      "year": 2023,
+      "plateNumber": "IR-1126"
+    },
+    {
+      "id": "V038",
+      "customerId": "C020",
+      "carType": "HYBRID",
+      "brand": "Toyota",
+      "model": "Camry Hybrid",
+      "year": 2024,
+      "plateNumber": "AM-1133"
+    },
+    {
+      "id": "V039",
+      "customerId": "C020",
+      "carType": "HYBRID",
+      "brand": "Ford",
+      "model": "Escape Hybrid",
+      "year": 2025,
+      "plateNumber": "AM-1136"
+    },
+    {
+      "id": "V040",
+      "customerId": "C021",
+      "carType": "REGULAR",
+      "brand": "Toyota",
+      "model": "Corolla",
+      "year": 2025,
+      "plateNumber": "AQ-1140"
+    },
+    {
+      "id": "V041",
+      "customerId": "C021",
+      "carType": "REGULAR",
+      "brand": "Hyundai",
+      "model": "Elantra",
+      "year": 2019,
+      "plateNumber": "AQ-1143"
+    },
+    {
+      "id": "V042",
+      "customerId": "C021",
+      "carType": "REGULAR",
+      "brand": "Kia",
+      "model": "Sportage",
+      "year": 2020,
+      "plateNumber": "AQ-1146"
+    },
+    {
+      "id": "V043",
+      "customerId": "C022",
+      "carType": "REGULAR",
+      "brand": "Kia",
+      "model": "Sportage",
+      "year": 2019,
+      "plateNumber": "MF-1147"
+    },
+    {
+      "id": "V044",
+      "customerId": "C023",
+      "carType": "REGULAR",
+      "brand": "Mitsubishi",
+      "model": "Lancer",
+      "year": 2020,
+      "plateNumber": "KR-1154"
+    },
+    {
+      "id": "V045",
+      "customerId": "C023",
+      "carType": "REGULAR",
+      "brand": "Honda",
+      "model": "Civic",
+      "year": 2021,
+      "plateNumber": "KR-1157"
+    },
+    {
+      "id": "V046",
+      "customerId": "C024",
+      "carType": "REGULAR",
+      "brand": "Mazda",
+      "model": "CX-5",
+      "year": 2021,
+      "plateNumber": "AM-1161"
+    },
+    {
+      "id": "V047",
+      "customerId": "C024",
+      "carType": "REGULAR",
+      "brand": "Suzuki",
+      "model": "Dzire",
+      "year": 2022,
+      "plateNumber": "AM-1164"
+    },
+    {
+      "id": "V048",
+      "customerId": "C024",
+      "carType": "EV",
+      "brand": "Tesla",
+      "model": "Model 3",
+      "year": 2023,
+      "plateNumber": "AM-1167"
+    },
+    {
+      "id": "V049",
+      "customerId": "C025",
+      "carType": "EV",
+      "brand": "Tesla",
+      "model": "Model 3",
+      "year": 2022,
+      "plateNumber": "AJ-1168"
+    },
+    {
+      "id": "V050",
+      "customerId": "C026",
+      "carType": "EV",
+      "brand": "BYD",
+      "model": "Atto 3",
+      "year": 2023,
+      "plateNumber": "IR-1175"
+    },
+    {
+      "id": "V051",
+      "customerId": "C026",
+      "carType": "EV",
+      "brand": "Nissan",
+      "model": "Leaf",
+      "year": 2024,
+      "plateNumber": "IR-1178"
+    },
+    {
+      "id": "V052",
+      "customerId": "C027",
+      "carType": "EV",
+      "brand": "Hyundai",
+      "model": "Ioniq 5",
+      "year": 2024,
+      "plateNumber": "SL-1182"
+    },
+    {
+      "id": "V053",
+      "customerId": "C027",
+      "carType": "EV",
+      "brand": "Kia",
+      "model": "EV6",
+      "year": 2025,
+      "plateNumber": "SL-1185"
+    },
+    {
+      "id": "V054",
+      "customerId": "C027",
+      "carType": "EV",
+      "brand": "MG",
+      "model": "ZS EV",
+      "year": 2019,
+      "plateNumber": "SL-1188"
+    },
+    {
+      "id": "V055",
+      "customerId": "C028",
+      "carType": "EV",
+      "brand": "MG",
+      "model": "ZS EV",
+      "year": 2025,
+      "plateNumber": "ZR-1189"
+    },
+    {
+      "id": "V056",
+      "customerId": "C029",
+      "carType": "HYBRID",
+      "brand": "Toyota",
+      "model": "Prius",
+      "year": 2019,
+      "plateNumber": "MD-1196"
+    },
+    {
+      "id": "V057",
+      "customerId": "C029",
+      "carType": "HYBRID",
+      "brand": "Toyota",
+      "model": "Corolla Cross Hybrid",
+      "year": 2020,
+      "plateNumber": "MD-1199"
+    },
+    {
+      "id": "V058",
+      "customerId": "C030",
+      "carType": "HYBRID",
+      "brand": "Hyundai",
+      "model": "Sonata Hybrid",
+      "year": 2020,
+      "plateNumber": "AM-1203"
+    },
+    {
+      "id": "V059",
+      "customerId": "C030",
+      "carType": "HYBRID",
+      "brand": "Kia",
+      "model": "Niro Hybrid",
+      "year": 2021,
+      "plateNumber": "AM-1206"
+    },
+    {
+      "id": "V060",
+      "customerId": "C030",
+      "carType": "HYBRID",
+      "brand": "Lexus",
+      "model": "UX 250h",
+      "year": 2022,
+      "plateNumber": "AM-1209"
+    }
+  ],
+  "services": [
+    {
+      "id": "S001",
+      "name": "Battery Health Diagnostic",
+      "category": "EV",
+      "basePrice": 45.0,
+      "durationMin": 45
+    },
+    {
+      "id": "S002",
+      "name": "High-Voltage System Inspection",
+      "category": "EV",
+      "basePrice": 85.0,
+      "durationMin": 75
+    },
+    {
+      "id": "S003",
+      "name": "EV Cooling System Service",
+      "category": "EV",
+      "basePrice": 70.0,
+      "durationMin": 60
+    },
+    {
+      "id": "S004",
+      "name": "Charging Port Cleaning",
+      "category": "EV",
+      "basePrice": 25.0,
+      "durationMin": 25
+    },
+    {
+      "id": "S005",
+      "name": "Hybrid Battery Fan Cleaning",
+      "category": "HYBRID",
+      "basePrice": 40.0,
+      "durationMin": 35
+    },
+    {
+      "id": "S006",
+      "name": "Hybrid System Scan",
+      "category": "HYBRID",
+      "basePrice": 55.0,
+      "durationMin": 40
+    },
+    {
+      "id": "S007",
+      "name": "Regenerative Brake Service",
+      "category": "HYBRID",
+      "basePrice": 90.0,
+      "durationMin": 80
+    },
+    {
+      "id": "S008",
+      "name": "Hybrid Inverter Coolant Change",
+      "category": "HYBRID",
+      "basePrice": 95.0,
+      "durationMin": 70
+    },
+    {
+      "id": "S009",
+      "name": "Computerized Wheel Alignment",
+      "category": "GENERAL",
+      "basePrice": 30.0,
+      "durationMin": 30
+    },
+    {
+      "id": "S010",
+      "name": "Brake Pad Replacement Labor",
+      "category": "GENERAL",
+      "basePrice": 35.0,
+      "durationMin": 50
+    },
+    {
+      "id": "S011",
+      "name": "AC Performance Check",
+      "category": "GENERAL",
+      "basePrice": 20.0,
+      "durationMin": 20
+    },
+    {
+      "id": "S012",
+      "name": "Cabin Filter Replacement Labor",
+      "category": "GENERAL",
+      "basePrice": 15.0,
+      "durationMin": 15
+    },
+    {
+      "id": "S013",
+      "name": "Suspension Inspection",
+      "category": "GENERAL",
+      "basePrice": 28.0,
+      "durationMin": 30
+    },
+    {
+      "id": "S014",
+      "name": "12V Battery Replacement Labor",
+      "category": "GENERAL",
+      "basePrice": 18.0,
+      "durationMin": 20
+    },
+    {
+      "id": "S015",
+      "name": "Pre-Purchase Inspection",
+      "category": "GENERAL",
+      "basePrice": 60.0,
+      "durationMin": 60
+    }
+  ],
+  "inventoryItems": [
+    {
+      "id": "I001",
+      "itemName": "HV Battery Coolant",
+      "carType": "EV",
+      "cost": 18.0,
+      "defaultSellingPrice": 28.0,
+      "minimumQuantity": 6,
+      "currentQuantity": 34,
+      "supplierName": "VoltCare Supplies"
+    },
+    {
+      "id": "I002",
+      "itemName": "Charging Port Socket",
+      "carType": "EV",
+      "cost": 55.0,
+      "defaultSellingPrice": 82.0,
+      "minimumQuantity": 3,
+      "currentQuantity": 12,
+      "supplierName": "E-Motion Parts"
+    },
+    {
+      "id": "I003",
+      "itemName": "Battery Pack Seal Kit",
+      "carType": "EV",
+      "cost": 32.0,
+      "defaultSellingPrice": 49.0,
+      "minimumQuantity": 4,
+      "currentQuantity": 15,
+      "supplierName": "VoltCare Supplies"
+    },
+    {
+      "id": "I004",
+      "itemName": "DC-DC Converter Relay",
+      "carType": "EV",
+      "cost": 74.0,
+      "defaultSellingPrice": 108.0,
+      "minimumQuantity": 2,
+      "currentQuantity": 7,
+      "supplierName": "Green Circuit Trading"
+    },
+    {
+      "id": "I005",
+      "itemName": "EV Cabin Heater Pump",
+      "carType": "EV",
+      "cost": 96.0,
+      "defaultSellingPrice": 135.0,
+      "minimumQuantity": 2,
+      "currentQuantity": 6,
+      "supplierName": "Green Circuit Trading"
+    },
+    {
+      "id": "I006",
+      "itemName": "Type 2 Charging Cable",
+      "carType": "EV",
+      "cost": 88.0,
+      "defaultSellingPrice": 128.0,
+      "minimumQuantity": 2,
+      "currentQuantity": 8,
+      "supplierName": "ChargeHub Jordan"
+    },
+    {
+      "id": "I007",
+      "itemName": "Battery Cooling Fan",
+      "carType": "EV",
+      "cost": 62.0,
+      "defaultSellingPrice": 94.0,
+      "minimumQuantity": 3,
+      "currentQuantity": 10,
+      "supplierName": "VoltCare Supplies"
+    },
+    {
+      "id": "I008",
+      "itemName": "Electric Drive Bearing Kit",
+      "carType": "EV",
+      "cost": 110.0,
+      "defaultSellingPrice": 158.0,
+      "minimumQuantity": 2,
+      "currentQuantity": 5,
+      "supplierName": "Precision Drive Co"
+    },
+    {
+      "id": "I009",
+      "itemName": "Hybrid Battery Fan Filter",
+      "carType": "HYBRID",
+      "cost": 9.0,
+      "defaultSellingPrice": 16.0,
+      "minimumQuantity": 8,
+      "currentQuantity": 28,
+      "supplierName": "EcoDrive Parts"
+    },
+    {
+      "id": "I010",
+      "itemName": "Hybrid Inverter Coolant",
+      "carType": "HYBRID",
+      "cost": 14.0,
+      "defaultSellingPrice": 24.0,
+      "minimumQuantity": 6,
+      "currentQuantity": 21,
+      "supplierName": "EcoDrive Parts"
+    },
+    {
+      "id": "I011",
+      "itemName": "Hybrid Water Pump",
+      "carType": "HYBRID",
+      "cost": 48.0,
+      "defaultSellingPrice": 72.0,
+      "minimumQuantity": 3,
+      "currentQuantity": 10,
+      "supplierName": "Amman Auto Source"
+    },
+    {
+      "id": "I012",
+      "itemName": "Hybrid Brake Booster Sensor",
+      "carType": "HYBRID",
+      "cost": 66.0,
+      "defaultSellingPrice": 98.0,
+      "minimumQuantity": 2,
+      "currentQuantity": 7,
+      "supplierName": "Amman Auto Source"
+    },
+    {
+      "id": "I013",
+      "itemName": "Power Split Device Oil",
+      "carType": "HYBRID",
+      "cost": 22.0,
+      "defaultSellingPrice": 34.0,
+      "minimumQuantity": 5,
+      "currentQuantity": 15,
+      "supplierName": "EcoDrive Parts"
+    },
+    {
+      "id": "I014",
+      "itemName": "Hybrid Service Plug",
+      "carType": "HYBRID",
+      "cost": 38.0,
+      "defaultSellingPrice": 57.0,
+      "minimumQuantity": 2,
+      "currentQuantity": 7,
+      "supplierName": "E-Motion Parts"
+    },
+    {
+      "id": "I015",
+      "itemName": "Inverter Cooling Hose",
+      "carType": "HYBRID",
+      "cost": 19.0,
+      "defaultSellingPrice": 31.0,
+      "minimumQuantity": 4,
+      "currentQuantity": 12,
+      "supplierName": "Amman Auto Source"
+    },
+    {
+      "id": "I016",
+      "itemName": "Brake Pad Set",
+      "carType": "REGULAR",
+      "cost": 21.0,
+      "defaultSellingPrice": 36.0,
+      "minimumQuantity": 8,
+      "currentQuantity": 43,
+      "supplierName": "Jordan Spare House"
+    },
+    {
+      "id": "I017",
+      "itemName": "Cabin Air Filter",
+      "carType": "REGULAR",
+      "cost": 6.0,
+      "defaultSellingPrice": 12.0,
+      "minimumQuantity": 10,
+      "currentQuantity": 58,
+      "supplierName": "Jordan Spare House"
+    },
+    {
+      "id": "I018",
+      "itemName": "Engine Oil Filter",
+      "carType": "REGULAR",
+      "cost": 4.5,
+      "defaultSellingPrice": 9.0,
+      "minimumQuantity": 12,
+      "currentQuantity": 63,
+      "supplierName": "Jordan Spare House"
+    },
+    {
+      "id": "I019",
+      "itemName": "12V AGM Battery",
+      "carType": "REGULAR",
+      "cost": 58.0,
+      "defaultSellingPrice": 84.0,
+      "minimumQuantity": 4,
+      "currentQuantity": 11,
+      "supplierName": "Battery World JO"
+    },
+    {
+      "id": "I020",
+      "itemName": "Shock Absorber Front",
+      "carType": "REGULAR",
+      "cost": 44.0,
+      "defaultSellingPrice": 69.0,
+      "minimumQuantity": 4,
+      "currentQuantity": 12,
+      "supplierName": "Highway Components"
+    },
+    {
+      "id": "I021",
+      "itemName": "AC Compressor Belt",
+      "carType": "REGULAR",
+      "cost": 11.0,
+      "defaultSellingPrice": 19.0,
+      "minimumQuantity": 6,
+      "currentQuantity": 17,
+      "supplierName": "Highway Components"
+    },
+    {
+      "id": "I022",
+      "itemName": "Wheel Bearing Hub",
+      "carType": "REGULAR",
+      "cost": 29.0,
+      "defaultSellingPrice": 46.0,
+      "minimumQuantity": 4,
+      "currentQuantity": 14,
+      "supplierName": "Jordan Spare House"
+    },
+    {
+      "id": "I023",
+      "itemName": "Wiper Blade Pair",
+      "carType": "REGULAR",
+      "cost": 7.0,
+      "defaultSellingPrice": 14.0,
+      "minimumQuantity": 10,
+      "currentQuantity": 33,
+      "supplierName": "QuickFix Trading"
+    },
+    {
+      "id": "I024",
+      "itemName": "Brake Fluid DOT4",
+      "carType": "REGULAR",
+      "cost": 5.0,
+      "defaultSellingPrice": 10.0,
+      "minimumQuantity": 10,
+      "currentQuantity": 33,
+      "supplierName": "QuickFix Trading"
+    },
+    {
+      "id": "I025",
+      "itemName": "Tire Pressure Sensor",
+      "carType": "REGULAR",
+      "cost": 17.0,
+      "defaultSellingPrice": 29.0,
+      "minimumQuantity": 6,
+      "currentQuantity": 15,
+      "supplierName": "QuickFix Trading"
+    }
+  ],
+  "bookings": [
+    {
+      "bookingId": "B001",
+      "customerId": "C003",
+      "vehicleId": "V005",
+      "serviceId": "S002",
+      "bookingDate": "2025-12-03T10:30:00Z",
+      "status": "PENDING",
+      "finalPrice": 85.0
+    },
+    {
+      "bookingId": "B002",
+      "customerId": "C006",
+      "vehicleId": "V012",
+      "serviceId": "S004",
+      "bookingDate": "2025-12-05T11:00:00Z",
+      "status": "COMPLETED",
+      "finalPrice": 25.0
+    },
+    {
+      "bookingId": "B003",
+      "customerId": "C009",
+      "vehicleId": "V016",
+      "serviceId": "S006",
+      "bookingDate": "2025-12-07T12:30:00Z",
+      "status": "CONFIRMED",
+      "finalPrice": 59.0
+    },
+    {
+      "bookingId": "B004",
+      "customerId": "C012",
+      "vehicleId": "V023",
+      "serviceId": "S008",
+      "bookingDate": "2025-12-09T13:00:00Z",
+      "status": "COMPLETED",
+      "finalPrice": 102.0
+    },
+    {
+      "bookingId": "B005",
+      "customerId": "C015",
+      "vehicleId": "V030",
+      "serviceId": "S010",
+      "bookingDate": "2025-12-11T14:30:00Z",
+      "status": "COMPLETED",
+      "finalPrice": 45.0
+    },
+    {
+      "bookingId": "B006",
+      "customerId": "C018",
+      "vehicleId": "V034",
+      "serviceId": "S012",
+      "bookingDate": "2025-12-13T15:00:00Z",
+      "status": "CANCELLED",
+      "finalPrice": 10.0
+    },
+    {
+      "bookingId": "B007",
+      "customerId": "C021",
+      "vehicleId": "V041",
+      "serviceId": "S014",
+      "bookingDate": "2025-12-15T16:30:00Z",
+      "status": "COMPLETED",
+      "finalPrice": 18.0
+    },
+    {
+      "bookingId": "B008",
+      "customerId": "C024",
+      "vehicleId": "V048",
+      "serviceId": "S001",
+      "bookingDate": "2025-12-17T09:00:00Z",
+      "status": "COMPLETED",
+      "finalPrice": 45.0
+    },
+    {
+      "bookingId": "B009",
+      "customerId": "C027",
+      "vehicleId": "V052",
+      "serviceId": "S003",
+      "bookingDate": "2025-12-19T10:30:00Z",
+      "status": "CONFIRMED",
+      "finalPrice": 74.0
+    },
+    {
+      "bookingId": "B010",
+      "customerId": "C030",
+      "vehicleId": "V059",
+      "serviceId": "S005",
+      "bookingDate": "2025-12-21T11:00:00Z",
+      "status": "COMPLETED",
+      "finalPrice": 47.0
+    },
+    {
+      "bookingId": "B011",
+      "customerId": "C003",
+      "vehicleId": "V006",
+      "serviceId": "S007",
+      "bookingDate": "2025-12-23T12:30:00Z",
+      "status": "PENDING",
+      "finalPrice": 100.0
+    },
+    {
+      "bookingId": "B012",
+      "customerId": "C006",
+      "vehicleId": "V010",
+      "serviceId": "S009",
+      "bookingDate": "2025-12-25T13:00:00Z",
+      "status": "COMPLETED",
+      "finalPrice": 25.0
+    },
+    {
+      "bookingId": "B013",
+      "customerId": "C009",
+      "vehicleId": "V017",
+      "serviceId": "S011",
+      "bookingDate": "2025-12-27T14:30:00Z",
+      "status": "CANCELLED",
+      "finalPrice": 20.0
+    },
+    {
+      "bookingId": "B014",
+      "customerId": "C012",
+      "vehicleId": "V024",
+      "serviceId": "S013",
+      "bookingDate": "2025-12-29T15:00:00Z",
+      "status": "COMPLETED",
+      "finalPrice": 28.0
+    },
+    {
+      "bookingId": "B015",
+      "customerId": "C015",
+      "vehicleId": "V028",
+      "serviceId": "S015",
+      "bookingDate": "2025-12-31T16:30:00Z",
+      "status": "COMPLETED",
+      "finalPrice": 64.0
+    },
+    {
+      "bookingId": "B016",
+      "customerId": "C018",
+      "vehicleId": "V035",
+      "serviceId": "S002",
+      "bookingDate": "2026-01-02T09:00:00Z",
+      "status": "PENDING",
+      "finalPrice": 92.0
+    },
+    {
+      "bookingId": "B017",
+      "customerId": "C021",
+      "vehicleId": "V042",
+      "serviceId": "S004",
+      "bookingDate": "2026-01-04T10:30:00Z",
+      "status": "COMPLETED",
+      "finalPrice": 35.0
+    },
+    {
+      "bookingId": "B018",
+      "customerId": "C024",
+      "vehicleId": "V046",
+      "serviceId": "S006",
+      "bookingDate": "2026-01-06T11:00:00Z",
+      "status": "CONFIRMED",
+      "finalPrice": 50.0
+    },
+    {
+      "bookingId": "B019",
+      "customerId": "C027",
+      "vehicleId": "V053",
+      "serviceId": "S008",
+      "bookingDate": "2026-01-08T12:30:00Z",
+      "status": "COMPLETED",
+      "finalPrice": 95.0
+    },
+    {
+      "bookingId": "B020",
+      "customerId": "C030",
+      "vehicleId": "V060",
+      "serviceId": "S010",
+      "bookingDate": "2026-01-10T13:00:00Z",
+      "status": "COMPLETED",
+      "finalPrice": 35.0
+    },
+    {
+      "bookingId": "B021",
+      "customerId": "C003",
+      "vehicleId": "V004",
+      "serviceId": "S012",
+      "bookingDate": "2026-01-12T14:30:00Z",
+      "status": "CANCELLED",
+      "finalPrice": 19.0
+    },
+    {
+      "bookingId": "B022",
+      "customerId": "C006",
+      "vehicleId": "V011",
+      "serviceId": "S014",
+      "bookingDate": "2026-01-14T15:00:00Z",
+      "status": "COMPLETED",
+      "finalPrice": 25.0
+    },
+    {
+      "bookingId": "B023",
+      "customerId": "C009",
+      "vehicleId": "V018",
+      "serviceId": "S001",
+      "bookingDate": "2026-01-16T16:30:00Z",
+      "status": "PENDING",
+      "finalPrice": 55.0
+    },
+    {
+      "bookingId": "B024",
+      "customerId": "C012",
+      "vehicleId": "V022",
+      "serviceId": "S003",
+      "bookingDate": "2026-01-18T09:00:00Z",
+      "status": "COMPLETED",
+      "finalPrice": 65.0
+    },
+    {
+      "bookingId": "B025",
+      "customerId": "C015",
+      "vehicleId": "V029",
+      "serviceId": "S005",
+      "bookingDate": "2026-01-20T10:30:00Z",
+      "status": "PENDING",
+      "finalPrice": 40.0
+    },
+    {
+      "bookingId": "B026",
+      "customerId": "C018",
+      "vehicleId": "V036",
+      "serviceId": "S007",
+      "bookingDate": "2026-01-22T11:00:00Z",
+      "status": "COMPLETED",
+      "finalPrice": 90.0
+    },
+    {
+      "bookingId": "B027",
+      "customerId": "C021",
+      "vehicleId": "V040",
+      "serviceId": "S009",
+      "bookingDate": "2026-01-24T12:30:00Z",
+      "status": "CONFIRMED",
+      "finalPrice": 34.0
+    },
+    {
+      "bookingId": "B028",
+      "customerId": "C024",
+      "vehicleId": "V047",
+      "serviceId": "S011",
+      "bookingDate": "2026-01-26T13:00:00Z",
+      "status": "COMPLETED",
+      "finalPrice": 27.0
+    },
+    {
+      "bookingId": "B029",
+      "customerId": "C027",
+      "vehicleId": "V054",
+      "serviceId": "S013",
+      "bookingDate": "2026-01-28T14:30:00Z",
+      "status": "CANCELLED",
+      "finalPrice": 38.0
+    },
+    {
+      "bookingId": "B030",
+      "customerId": "C030",
+      "vehicleId": "V058",
+      "serviceId": "S015",
+      "bookingDate": "2026-01-30T15:00:00Z",
+      "status": "COMPLETED",
+      "finalPrice": 55.0
+    },
+    {
+      "bookingId": "B031",
+      "customerId": "C003",
+      "vehicleId": "V005",
+      "serviceId": "S002",
+      "bookingDate": "2026-02-01T16:30:00Z",
+      "status": "COMPLETED",
+      "finalPrice": 85.0
+    },
+    {
+      "bookingId": "B032",
+      "customerId": "C006",
+      "vehicleId": "V012",
+      "serviceId": "S004",
+      "bookingDate": "2026-02-03T09:00:00Z",
+      "status": "PENDING",
+      "finalPrice": 25.0
+    },
+    {
+      "bookingId": "B033",
+      "customerId": "C009",
+      "vehicleId": "V016",
+      "serviceId": "S006",
+      "bookingDate": "2026-02-05T10:30:00Z",
+      "status": "COMPLETED",
+      "finalPrice": 59.0
+    },
+    {
+      "bookingId": "B034",
+      "customerId": "C012",
+      "vehicleId": "V023",
+      "serviceId": "S008",
+      "bookingDate": "2026-02-07T11:00:00Z",
+      "status": "PENDING",
+      "finalPrice": 102.0
+    },
+    {
+      "bookingId": "B035",
+      "customerId": "C015",
+      "vehicleId": "V030",
+      "serviceId": "S010",
+      "bookingDate": "2026-02-09T12:30:00Z",
+      "status": "COMPLETED",
+      "finalPrice": 45.0
+    },
+    {
+      "bookingId": "B036",
+      "customerId": "C018",
+      "vehicleId": "V034",
+      "serviceId": "S012",
+      "bookingDate": "2026-02-11T13:00:00Z",
+      "status": "CANCELLED",
+      "finalPrice": 10.0
+    },
+    {
+      "bookingId": "B037",
+      "customerId": "C021",
+      "vehicleId": "V041",
+      "serviceId": "S014",
+      "bookingDate": "2026-02-13T14:30:00Z",
+      "status": "COMPLETED",
+      "finalPrice": 18.0
+    },
+    {
+      "bookingId": "B038",
+      "customerId": "C024",
+      "vehicleId": "V048",
+      "serviceId": "S001",
+      "bookingDate": "2026-02-15T15:00:00Z",
+      "status": "PENDING",
+      "finalPrice": 45.0
+    },
+    {
+      "bookingId": "B039",
+      "customerId": "C027",
+      "vehicleId": "V052",
+      "serviceId": "S003",
+      "bookingDate": "2026-02-17T16:30:00Z",
+      "status": "COMPLETED",
+      "finalPrice": 74.0
+    },
+    {
+      "bookingId": "B040",
+      "customerId": "C030",
+      "vehicleId": "V059",
+      "serviceId": "S005",
+      "bookingDate": "2026-02-19T09:00:00Z",
+      "status": "CANCELLED",
+      "finalPrice": 47.0
+    }
+  ],
+  "saleInvoices": [
+    {
+      "invoiceId": "SI001",
+      "invoiceNumber": "INV-2026-001",
+      "customerId": "C002",
+      "invoiceDate": "2025-12-07T13:15:00Z",
+      "items": [
+        {
+          "itemId": "I016",
+          "itemName": "Brake Pad Set",
+          "quantity": 2,
+          "sellingPrice": 35.0,
+          "lineTotal": 70.0
+        },
+        {
+          "itemId": "I024",
+          "itemName": "Brake Fluid DOT4",
+          "quantity": 3,
+          "sellingPrice": 9.0,
+          "lineTotal": 27.0
+        }
+      ],
+      "totalAmount": 97.0
+    },
+    {
+      "invoiceId": "SI002",
+      "invoiceNumber": "INV-2026-002",
+      "customerId": "C004",
+      "invoiceDate": "2025-12-10T14:15:00Z",
+      "items": [
+        {
+          "itemId": "I017",
+          "itemName": "Cabin Air Filter",
+          "quantity": 2,
+          "sellingPrice": 11.5,
+          "lineTotal": 23.0
+        },
+        {
+          "itemId": "I023",
+          "itemName": "Wiper Blade Pair",
+          "quantity": 2,
+          "sellingPrice": 13.5,
+          "lineTotal": 27.0
+        }
+      ],
+      "totalAmount": 50.0
+    },
+    {
+      "invoiceId": "SI003",
+      "invoiceNumber": "INV-2026-003",
+      "customerId": "C006",
+      "invoiceDate": "2025-12-13T15:15:00Z",
+      "items": [
+        {
+          "itemId": "I002",
+          "itemName": "Charging Port Socket",
+          "quantity": 1,
+          "sellingPrice": 85.0,
+          "lineTotal": 85.0
+        },
+        {
+          "itemId": "I006",
+          "itemName": "Type 2 Charging Cable",
+          "quantity": 1,
+          "sellingPrice": 132.0,
+          "lineTotal": 132.0
+        }
+      ],
+      "totalAmount": 217.0
+    },
+    {
+      "invoiceId": "SI004",
+      "invoiceNumber": "INV-2026-004",
+      "customerId": "C008",
+      "invoiceDate": "2025-12-16T16:15:00Z",
+      "items": [
+        {
+          "itemId": "I010",
+          "itemName": "Hybrid Inverter Coolant",
+          "quantity": 3,
+          "sellingPrice": 23.0,
+          "lineTotal": 69.0
+        },
+        {
+          "itemId": "I015",
+          "itemName": "Inverter Cooling Hose",
+          "quantity": 2,
+          "sellingPrice": 30.0,
+          "lineTotal": 60.0
+        }
+      ],
+      "totalAmount": 129.0
+    },
+    {
+      "invoiceId": "SI005",
+      "invoiceNumber": "INV-2026-005",
+      "customerId": "C010",
+      "invoiceDate": "2025-12-19T12:15:00Z",
+      "items": [
+        {
+          "itemId": "I019",
+          "itemName": "12V AGM Battery",
+          "quantity": 1,
+          "sellingPrice": 88.0,
+          "lineTotal": 88.0
+        },
+        {
+          "itemId": "I018",
+          "itemName": "Engine Oil Filter",
+          "quantity": 3,
+          "sellingPrice": 8.5,
+          "lineTotal": 25.5
+        }
+      ],
+      "totalAmount": 113.5
+    },
+    {
+      "invoiceId": "SI006",
+      "invoiceNumber": "INV-2026-006",
+      "customerId": "C012",
+      "invoiceDate": "2025-12-22T13:15:00Z",
+      "items": [
+        {
+          "itemId": "I011",
+          "itemName": "Hybrid Water Pump",
+          "quantity": 1,
+          "sellingPrice": 76.0,
+          "lineTotal": 76.0
+        },
+        {
+          "itemId": "I013",
+          "itemName": "Power Split Device Oil",
+          "quantity": 2,
+          "sellingPrice": 33.0,
+          "lineTotal": 66.0
+        }
+      ],
+      "totalAmount": 142.0
+    },
+    {
+      "invoiceId": "SI007",
+      "invoiceNumber": "INV-2026-007",
+      "customerId": "C014",
+      "invoiceDate": "2025-12-25T14:15:00Z",
+      "items": [
+        {
+          "itemId": "I020",
+          "itemName": "Shock Absorber Front",
+          "quantity": 2,
+          "sellingPrice": 67.0,
+          "lineTotal": 134.0
+        },
+        {
+          "itemId": "I025",
+          "itemName": "Tire Pressure Sensor",
+          "quantity": 4,
+          "sellingPrice": 28.0,
+          "lineTotal": 112.0
+        }
+      ],
+      "totalAmount": 246.0
+    },
+    {
+      "invoiceId": "SI008",
+      "invoiceNumber": "INV-2026-008",
+      "customerId": "C016",
+      "invoiceDate": "2025-12-28T15:15:00Z",
+      "items": [
+        {
+          "itemId": "I001",
+          "itemName": "HV Battery Coolant",
+          "quantity": 4,
+          "sellingPrice": 27.0,
+          "lineTotal": 108.0
+        },
+        {
+          "itemId": "I003",
+          "itemName": "Battery Pack Seal Kit",
+          "quantity": 1,
+          "sellingPrice": 48.0,
+          "lineTotal": 48.0
+        }
+      ],
+      "totalAmount": 156.0
+    },
+    {
+      "invoiceId": "SI009",
+      "invoiceNumber": "INV-2026-009",
+      "customerId": "C018",
+      "invoiceDate": "2025-12-31T16:15:00Z",
+      "items": [
+        {
+          "itemId": "I009",
+          "itemName": "Hybrid Battery Fan Filter",
+          "quantity": 3,
+          "sellingPrice": 15.0,
+          "lineTotal": 45.0
+        },
+        {
+          "itemId": "I014",
+          "itemName": "Hybrid Service Plug",
+          "quantity": 1,
+          "sellingPrice": 58.0,
+          "lineTotal": 58.0
+        }
+      ],
+      "totalAmount": 103.0
+    },
+    {
+      "invoiceId": "SI010",
+      "invoiceNumber": "INV-2026-010",
+      "customerId": "C020",
+      "invoiceDate": "2026-01-03T12:15:00Z",
+      "items": [
+        {
+          "itemId": "I021",
+          "itemName": "AC Compressor Belt",
+          "quantity": 3,
+          "sellingPrice": 18.5,
+          "lineTotal": 55.5
+        },
+        {
+          "itemId": "I024",
+          "itemName": "Brake Fluid DOT4",
+          "quantity": 4,
+          "sellingPrice": 9.5,
+          "lineTotal": 38.0
+        }
+      ],
+      "totalAmount": 93.5
+    },
+    {
+      "invoiceId": "SI011",
+      "invoiceNumber": "INV-2026-011",
+      "customerId": "C022",
+      "invoiceDate": "2026-01-06T13:15:00Z",
+      "items": [
+        {
+          "itemId": "I004",
+          "itemName": "DC-DC Converter Relay",
+          "quantity": 1,
+          "sellingPrice": 112.0,
+          "lineTotal": 112.0
+        },
+        {
+          "itemId": "I007",
+          "itemName": "Battery Cooling Fan",
+          "quantity": 1,
+          "sellingPrice": 96.0,
+          "lineTotal": 96.0
+        }
+      ],
+      "totalAmount": 208.0
+    },
+    {
+      "invoiceId": "SI012",
+      "invoiceNumber": "INV-2026-012",
+      "customerId": "C024",
+      "invoiceDate": "2026-01-09T14:15:00Z",
+      "items": [
+        {
+          "itemId": "I016",
+          "itemName": "Brake Pad Set",
+          "quantity": 3,
+          "sellingPrice": 37.0,
+          "lineTotal": 111.0
+        },
+        {
+          "itemId": "I017",
+          "itemName": "Cabin Air Filter",
+          "quantity": 2,
+          "sellingPrice": 12.0,
+          "lineTotal": 24.0
+        },
+        {
+          "itemId": "I023",
+          "itemName": "Wiper Blade Pair",
+          "quantity": 2,
+          "sellingPrice": 14.0,
+          "lineTotal": 28.0
+        }
+      ],
+      "totalAmount": 163.0
+    },
+    {
+      "invoiceId": "SI013",
+      "invoiceNumber": "INV-2026-013",
+      "customerId": "C026",
+      "invoiceDate": "2026-01-12T15:15:00Z",
+      "items": [
+        {
+          "itemId": "I010",
+          "itemName": "Hybrid Inverter Coolant",
+          "quantity": 2,
+          "sellingPrice": 25.0,
+          "lineTotal": 50.0
+        },
+        {
+          "itemId": "I012",
+          "itemName": "Hybrid Brake Booster Sensor",
+          "quantity": 1,
+          "sellingPrice": 101.0,
+          "lineTotal": 101.0
+        }
+      ],
+      "totalAmount": 151.0
+    },
+    {
+      "invoiceId": "SI014",
+      "invoiceNumber": "INV-2026-014",
+      "customerId": "C028",
+      "invoiceDate": "2026-01-15T16:15:00Z",
+      "items": [
+        {
+          "itemId": "I018",
+          "itemName": "Engine Oil Filter",
+          "quantity": 4,
+          "sellingPrice": 8.0,
+          "lineTotal": 32.0
+        },
+        {
+          "itemId": "I019",
+          "itemName": "12V AGM Battery",
+          "quantity": 1,
+          "sellingPrice": 86.0,
+          "lineTotal": 86.0
+        }
+      ],
+      "totalAmount": 118.0
+    },
+    {
+      "invoiceId": "SI015",
+      "invoiceNumber": "INV-2026-015",
+      "customerId": "C030",
+      "invoiceDate": "2026-01-18T12:15:00Z",
+      "items": [
+        {
+          "itemId": "I005",
+          "itemName": "EV Cabin Heater Pump",
+          "quantity": 1,
+          "sellingPrice": 138.0,
+          "lineTotal": 138.0
+        },
+        {
+          "itemId": "I001",
+          "itemName": "HV Battery Coolant",
+          "quantity": 2,
+          "sellingPrice": 29.0,
+          "lineTotal": 58.0
+        }
+      ],
+      "totalAmount": 196.0
+    },
+    {
+      "invoiceId": "SI016",
+      "invoiceNumber": "INV-2026-016",
+      "customerId": "C002",
+      "invoiceDate": "2026-01-21T13:15:00Z",
+      "items": [
+        {
+          "itemId": "I020",
+          "itemName": "Shock Absorber Front",
+          "quantity": 2,
+          "sellingPrice": 70.0,
+          "lineTotal": 140.0
+        },
+        {
+          "itemId": "I022",
+          "itemName": "Wheel Bearing Hub",
+          "quantity": 2,
+          "sellingPrice": 45.0,
+          "lineTotal": 90.0
+        }
+      ],
+      "totalAmount": 230.0
+    },
+    {
+      "invoiceId": "SI017",
+      "invoiceNumber": "INV-2026-017",
+      "customerId": "C004",
+      "invoiceDate": "2026-01-24T14:15:00Z",
+      "items": [
+        {
+          "itemId": "I008",
+          "itemName": "Electric Drive Bearing Kit",
+          "quantity": 1,
+          "sellingPrice": 162.0,
+          "lineTotal": 162.0
+        },
+        {
+          "itemId": "I002",
+          "itemName": "Charging Port Socket",
+          "quantity": 1,
+          "sellingPrice": 83.0,
+          "lineTotal": 83.0
+        }
+      ],
+      "totalAmount": 245.0
+    },
+    {
+      "invoiceId": "SI018",
+      "invoiceNumber": "INV-2026-018",
+      "customerId": "C006",
+      "invoiceDate": "2026-01-27T15:15:00Z",
+      "items": [
+        {
+          "itemId": "I013",
+          "itemName": "Power Split Device Oil",
+          "quantity": 3,
+          "sellingPrice": 35.0,
+          "lineTotal": 105.0
+        },
+        {
+          "itemId": "I015",
+          "itemName": "Inverter Cooling Hose",
+          "quantity": 2,
+          "sellingPrice": 32.0,
+          "lineTotal": 64.0
+        }
+      ],
+      "totalAmount": 169.0
+    },
+    {
+      "invoiceId": "SI019",
+      "invoiceNumber": "INV-2026-019",
+      "customerId": "C008",
+      "invoiceDate": "2026-01-30T16:15:00Z",
+      "items": [
+        {
+          "itemId": "I016",
+          "itemName": "Brake Pad Set",
+          "quantity": 2,
+          "sellingPrice": 36.0,
+          "lineTotal": 72.0
+        },
+        {
+          "itemId": "I024",
+          "itemName": "Brake Fluid DOT4",
+          "quantity": 5,
+          "sellingPrice": 10.0,
+          "lineTotal": 50.0
+        },
+        {
+          "itemId": "I025",
+          "itemName": "Tire Pressure Sensor",
+          "quantity": 2,
+          "sellingPrice": 27.0,
+          "lineTotal": 54.0
+        }
+      ],
+      "totalAmount": 176.0
+    },
+    {
+      "invoiceId": "SI020",
+      "invoiceNumber": "INV-2026-020",
+      "customerId": "C010",
+      "invoiceDate": "2026-02-02T12:15:00Z",
+      "items": [
+        {
+          "itemId": "I003",
+          "itemName": "Battery Pack Seal Kit",
+          "quantity": 2,
+          "sellingPrice": 50.0,
+          "lineTotal": 100.0
+        },
+        {
+          "itemId": "I006",
+          "itemName": "Type 2 Charging Cable",
+          "quantity": 1,
+          "sellingPrice": 129.0,
+          "lineTotal": 129.0
+        }
+      ],
+      "totalAmount": 229.0
+    },
+    {
+      "invoiceId": "SI021",
+      "invoiceNumber": "INV-2026-021",
+      "customerId": "C012",
+      "invoiceDate": "2026-02-05T13:15:00Z",
+      "items": [
+        {
+          "itemId": "I009",
+          "itemName": "Hybrid Battery Fan Filter",
+          "quantity": 4,
+          "sellingPrice": 16.0,
+          "lineTotal": 64.0
+        },
+        {
+          "itemId": "I010",
+          "itemName": "Hybrid Inverter Coolant",
+          "quantity": 2,
+          "sellingPrice": 24.5,
+          "lineTotal": 49.0
+        }
+      ],
+      "totalAmount": 113.0
+    },
+    {
+      "invoiceId": "SI022",
+      "invoiceNumber": "INV-2026-022",
+      "customerId": "C014",
+      "invoiceDate": "2026-02-08T14:15:00Z",
+      "items": [
+        {
+          "itemId": "I017",
+          "itemName": "Cabin Air Filter",
+          "quantity": 3,
+          "sellingPrice": 12.5,
+          "lineTotal": 37.5
+        },
+        {
+          "itemId": "I023",
+          "itemName": "Wiper Blade Pair",
+          "quantity": 3,
+          "sellingPrice": 14.5,
+          "lineTotal": 43.5
+        }
+      ],
+      "totalAmount": 81.0
+    },
+    {
+      "invoiceId": "SI023",
+      "invoiceNumber": "INV-2026-023",
+      "customerId": "C016",
+      "invoiceDate": "2026-02-11T15:15:00Z",
+      "items": [
+        {
+          "itemId": "I011",
+          "itemName": "Hybrid Water Pump",
+          "quantity": 1,
+          "sellingPrice": 74.0,
+          "lineTotal": 74.0
+        },
+        {
+          "itemId": "I014",
+          "itemName": "Hybrid Service Plug",
+          "quantity": 2,
+          "sellingPrice": 56.0,
+          "lineTotal": 112.0
+        }
+      ],
+      "totalAmount": 186.0
+    },
+    {
+      "invoiceId": "SI024",
+      "invoiceNumber": "INV-2026-024",
+      "customerId": "C018",
+      "invoiceDate": "2026-02-14T16:15:00Z",
+      "items": [
+        {
+          "itemId": "I021",
+          "itemName": "AC Compressor Belt",
+          "quantity": 2,
+          "sellingPrice": 19.0,
+          "lineTotal": 38.0
+        },
+        {
+          "itemId": "I022",
+          "itemName": "Wheel Bearing Hub",
+          "quantity": 1,
+          "sellingPrice": 47.0,
+          "lineTotal": 47.0
+        },
+        {
+          "itemId": "I024",
+          "itemName": "Brake Fluid DOT4",
+          "quantity": 3,
+          "sellingPrice": 9.0,
+          "lineTotal": 27.0
+        }
+      ],
+      "totalAmount": 112.0
+    },
+    {
+      "invoiceId": "SI025",
+      "invoiceNumber": "INV-2026-025",
+      "customerId": "C020",
+      "invoiceDate": "2026-02-17T12:15:00Z",
+      "items": [
+        {
+          "itemId": "I004",
+          "itemName": "DC-DC Converter Relay",
+          "quantity": 1,
+          "sellingPrice": 109.0,
+          "lineTotal": 109.0
+        },
+        {
+          "itemId": "I019",
+          "itemName": "12V AGM Battery",
+          "quantity": 1,
+          "sellingPrice": 87.0,
+          "lineTotal": 87.0
+        },
+        {
+          "itemId": "I025",
+          "itemName": "Tire Pressure Sensor",
+          "quantity": 3,
+          "sellingPrice": 28.5,
+          "lineTotal": 85.5
+        }
+      ],
+      "totalAmount": 281.5
+    }
+  ],
+  "transactions": [
+    {
+      "transactionId": "T001",
+      "type": "INCOME",
+      "source": "BOOKING",
+      "referenceId": "B002",
+      "description": "Completed service booking B002",
+      "amount": 25.0,
+      "occurredAt": "2025-12-05T11:00:00Z"
+    },
+    {
+      "transactionId": "T002",
+      "type": "INCOME",
+      "source": "BOOKING",
+      "referenceId": "B004",
+      "description": "Completed service booking B004",
+      "amount": 102.0,
+      "occurredAt": "2025-12-09T13:00:00Z"
+    },
+    {
+      "transactionId": "T003",
+      "type": "INCOME",
+      "source": "BOOKING",
+      "referenceId": "B005",
+      "description": "Completed service booking B005",
+      "amount": 45.0,
+      "occurredAt": "2025-12-11T14:30:00Z"
+    },
+    {
+      "transactionId": "T004",
+      "type": "INCOME",
+      "source": "BOOKING",
+      "referenceId": "B007",
+      "description": "Completed service booking B007",
+      "amount": 18.0,
+      "occurredAt": "2025-12-15T16:30:00Z"
+    },
+    {
+      "transactionId": "T005",
+      "type": "INCOME",
+      "source": "BOOKING",
+      "referenceId": "B008",
+      "description": "Completed service booking B008",
+      "amount": 45.0,
+      "occurredAt": "2025-12-17T09:00:00Z"
+    },
+    {
+      "transactionId": "T006",
+      "type": "INCOME",
+      "source": "BOOKING",
+      "referenceId": "B010",
+      "description": "Completed service booking B010",
+      "amount": 47.0,
+      "occurredAt": "2025-12-21T11:00:00Z"
+    },
+    {
+      "transactionId": "T007",
+      "type": "INCOME",
+      "source": "BOOKING",
+      "referenceId": "B012",
+      "description": "Completed service booking B012",
+      "amount": 25.0,
+      "occurredAt": "2025-12-25T13:00:00Z"
+    },
+    {
+      "transactionId": "T008",
+      "type": "INCOME",
+      "source": "BOOKING",
+      "referenceId": "B014",
+      "description": "Completed service booking B014",
+      "amount": 28.0,
+      "occurredAt": "2025-12-29T15:00:00Z"
+    },
+    {
+      "transactionId": "T009",
+      "type": "INCOME",
+      "source": "BOOKING",
+      "referenceId": "B015",
+      "description": "Completed service booking B015",
+      "amount": 64.0,
+      "occurredAt": "2025-12-31T16:30:00Z"
+    },
+    {
+      "transactionId": "T010",
+      "type": "INCOME",
+      "source": "BOOKING",
+      "referenceId": "B017",
+      "description": "Completed service booking B017",
+      "amount": 35.0,
+      "occurredAt": "2026-01-04T10:30:00Z"
+    },
+    {
+      "transactionId": "T011",
+      "type": "INCOME",
+      "source": "BOOKING",
+      "referenceId": "B019",
+      "description": "Completed service booking B019",
+      "amount": 95.0,
+      "occurredAt": "2026-01-08T12:30:00Z"
+    },
+    {
+      "transactionId": "T012",
+      "type": "INCOME",
+      "source": "BOOKING",
+      "referenceId": "B020",
+      "description": "Completed service booking B020",
+      "amount": 35.0,
+      "occurredAt": "2026-01-10T13:00:00Z"
+    },
+    {
+      "transactionId": "T013",
+      "type": "INCOME",
+      "source": "BOOKING",
+      "referenceId": "B022",
+      "description": "Completed service booking B022",
+      "amount": 25.0,
+      "occurredAt": "2026-01-14T15:00:00Z"
+    },
+    {
+      "transactionId": "T014",
+      "type": "INCOME",
+      "source": "BOOKING",
+      "referenceId": "B024",
+      "description": "Completed service booking B024",
+      "amount": 65.0,
+      "occurredAt": "2026-01-18T09:00:00Z"
+    },
+    {
+      "transactionId": "T015",
+      "type": "INCOME",
+      "source": "BOOKING",
+      "referenceId": "B026",
+      "description": "Completed service booking B026",
+      "amount": 90.0,
+      "occurredAt": "2026-01-22T11:00:00Z"
+    },
+    {
+      "transactionId": "T016",
+      "type": "INCOME",
+      "source": "BOOKING",
+      "referenceId": "B028",
+      "description": "Completed service booking B028",
+      "amount": 27.0,
+      "occurredAt": "2026-01-26T13:00:00Z"
+    },
+    {
+      "transactionId": "T017",
+      "type": "INCOME",
+      "source": "BOOKING",
+      "referenceId": "B030",
+      "description": "Completed service booking B030",
+      "amount": 55.0,
+      "occurredAt": "2026-01-30T15:00:00Z"
+    },
+    {
+      "transactionId": "T018",
+      "type": "INCOME",
+      "source": "BOOKING",
+      "referenceId": "B031",
+      "description": "Completed service booking B031",
+      "amount": 85.0,
+      "occurredAt": "2026-02-01T16:30:00Z"
+    },
+    {
+      "transactionId": "T019",
+      "type": "INCOME",
+      "source": "BOOKING",
+      "referenceId": "B033",
+      "description": "Completed service booking B033",
+      "amount": 59.0,
+      "occurredAt": "2026-02-05T10:30:00Z"
+    },
+    {
+      "transactionId": "T020",
+      "type": "INCOME",
+      "source": "BOOKING",
+      "referenceId": "B035",
+      "description": "Completed service booking B035",
+      "amount": 45.0,
+      "occurredAt": "2026-02-09T12:30:00Z"
+    },
+    {
+      "transactionId": "T021",
+      "type": "INCOME",
+      "source": "BOOKING",
+      "referenceId": "B037",
+      "description": "Completed service booking B037",
+      "amount": 18.0,
+      "occurredAt": "2026-02-13T14:30:00Z"
+    },
+    {
+      "transactionId": "T022",
+      "type": "INCOME",
+      "source": "BOOKING",
+      "referenceId": "B039",
+      "description": "Completed service booking B039",
+      "amount": 74.0,
+      "occurredAt": "2026-02-17T16:30:00Z"
+    },
+    {
+      "transactionId": "T023",
+      "type": "INCOME",
+      "source": "WALK_IN",
+      "referenceId": "SI001",
+      "description": "Retail parts sale INV-2026-001",
+      "amount": 97.0,
+      "occurredAt": "2025-12-07T13:15:00Z"
+    },
+    {
+      "transactionId": "T024",
+      "type": "INCOME",
+      "source": "WALK_IN",
+      "referenceId": "SI002",
+      "description": "Retail parts sale INV-2026-002",
+      "amount": 50.0,
+      "occurredAt": "2025-12-10T14:15:00Z"
+    },
+    {
+      "transactionId": "T025",
+      "type": "INCOME",
+      "source": "WALK_IN",
+      "referenceId": "SI003",
+      "description": "Retail parts sale INV-2026-003",
+      "amount": 217.0,
+      "occurredAt": "2025-12-13T15:15:00Z"
+    },
+    {
+      "transactionId": "T026",
+      "type": "INCOME",
+      "source": "WALK_IN",
+      "referenceId": "SI004",
+      "description": "Retail parts sale INV-2026-004",
+      "amount": 129.0,
+      "occurredAt": "2025-12-16T16:15:00Z"
+    },
+    {
+      "transactionId": "T027",
+      "type": "INCOME",
+      "source": "WALK_IN",
+      "referenceId": "SI005",
+      "description": "Retail parts sale INV-2026-005",
+      "amount": 113.5,
+      "occurredAt": "2025-12-19T12:15:00Z"
+    },
+    {
+      "transactionId": "T028",
+      "type": "INCOME",
+      "source": "WALK_IN",
+      "referenceId": "SI006",
+      "description": "Retail parts sale INV-2026-006",
+      "amount": 142.0,
+      "occurredAt": "2025-12-22T13:15:00Z"
+    },
+    {
+      "transactionId": "T029",
+      "type": "INCOME",
+      "source": "WALK_IN",
+      "referenceId": "SI007",
+      "description": "Retail parts sale INV-2026-007",
+      "amount": 246.0,
+      "occurredAt": "2025-12-25T14:15:00Z"
+    },
+    {
+      "transactionId": "T030",
+      "type": "INCOME",
+      "source": "WALK_IN",
+      "referenceId": "SI008",
+      "description": "Retail parts sale INV-2026-008",
+      "amount": 156.0,
+      "occurredAt": "2025-12-28T15:15:00Z"
+    },
+    {
+      "transactionId": "T031",
+      "type": "INCOME",
+      "source": "WALK_IN",
+      "referenceId": "SI009",
+      "description": "Retail parts sale INV-2026-009",
+      "amount": 103.0,
+      "occurredAt": "2025-12-31T16:15:00Z"
+    },
+    {
+      "transactionId": "T032",
+      "type": "INCOME",
+      "source": "WALK_IN",
+      "referenceId": "SI010",
+      "description": "Retail parts sale INV-2026-010",
+      "amount": 93.5,
+      "occurredAt": "2026-01-03T12:15:00Z"
+    },
+    {
+      "transactionId": "T033",
+      "type": "INCOME",
+      "source": "WALK_IN",
+      "referenceId": "SI011",
+      "description": "Retail parts sale INV-2026-011",
+      "amount": 208.0,
+      "occurredAt": "2026-01-06T13:15:00Z"
+    },
+    {
+      "transactionId": "T034",
+      "type": "INCOME",
+      "source": "WALK_IN",
+      "referenceId": "SI012",
+      "description": "Retail parts sale INV-2026-012",
+      "amount": 163.0,
+      "occurredAt": "2026-01-09T14:15:00Z"
+    },
+    {
+      "transactionId": "T035",
+      "type": "INCOME",
+      "source": "WALK_IN",
+      "referenceId": "SI013",
+      "description": "Retail parts sale INV-2026-013",
+      "amount": 151.0,
+      "occurredAt": "2026-01-12T15:15:00Z"
+    },
+    {
+      "transactionId": "T036",
+      "type": "INCOME",
+      "source": "WALK_IN",
+      "referenceId": "SI014",
+      "description": "Retail parts sale INV-2026-014",
+      "amount": 118.0,
+      "occurredAt": "2026-01-15T16:15:00Z"
+    },
+    {
+      "transactionId": "T037",
+      "type": "INCOME",
+      "source": "WALK_IN",
+      "referenceId": "SI015",
+      "description": "Retail parts sale INV-2026-015",
+      "amount": 196.0,
+      "occurredAt": "2026-01-18T12:15:00Z"
+    },
+    {
+      "transactionId": "T038",
+      "type": "INCOME",
+      "source": "WALK_IN",
+      "referenceId": "SI016",
+      "description": "Retail parts sale INV-2026-016",
+      "amount": 230.0,
+      "occurredAt": "2026-01-21T13:15:00Z"
+    },
+    {
+      "transactionId": "T039",
+      "type": "INCOME",
+      "source": "WALK_IN",
+      "referenceId": "SI017",
+      "description": "Retail parts sale INV-2026-017",
+      "amount": 245.0,
+      "occurredAt": "2026-01-24T14:15:00Z"
+    },
+    {
+      "transactionId": "T040",
+      "type": "INCOME",
+      "source": "WALK_IN",
+      "referenceId": "SI018",
+      "description": "Retail parts sale INV-2026-018",
+      "amount": 169.0,
+      "occurredAt": "2026-01-27T15:15:00Z"
+    },
+    {
+      "transactionId": "T041",
+      "type": "INCOME",
+      "source": "WALK_IN",
+      "referenceId": "SI019",
+      "description": "Retail parts sale INV-2026-019",
+      "amount": 176.0,
+      "occurredAt": "2026-01-30T16:15:00Z"
+    },
+    {
+      "transactionId": "T042",
+      "type": "INCOME",
+      "source": "WALK_IN",
+      "referenceId": "SI020",
+      "description": "Retail parts sale INV-2026-020",
+      "amount": 229.0,
+      "occurredAt": "2026-02-02T12:15:00Z"
+    },
+    {
+      "transactionId": "T043",
+      "type": "INCOME",
+      "source": "WALK_IN",
+      "referenceId": "SI021",
+      "description": "Retail parts sale INV-2026-021",
+      "amount": 113.0,
+      "occurredAt": "2026-02-05T13:15:00Z"
+    },
+    {
+      "transactionId": "T044",
+      "type": "INCOME",
+      "source": "WALK_IN",
+      "referenceId": "SI022",
+      "description": "Retail parts sale INV-2026-022",
+      "amount": 81.0,
+      "occurredAt": "2026-02-08T14:15:00Z"
+    },
+    {
+      "transactionId": "T045",
+      "type": "INCOME",
+      "source": "WALK_IN",
+      "referenceId": "SI023",
+      "description": "Retail parts sale INV-2026-023",
+      "amount": 186.0,
+      "occurredAt": "2026-02-11T15:15:00Z"
+    },
+    {
+      "transactionId": "T046",
+      "type": "INCOME",
+      "source": "WALK_IN",
+      "referenceId": "SI024",
+      "description": "Retail parts sale INV-2026-024",
+      "amount": 112.0,
+      "occurredAt": "2026-02-14T16:15:00Z"
+    },
+    {
+      "transactionId": "T047",
+      "type": "INCOME",
+      "source": "WALK_IN",
+      "referenceId": "SI025",
+      "description": "Retail parts sale INV-2026-025",
+      "amount": 281.5,
+      "occurredAt": "2026-02-17T12:15:00Z"
+    },
+    {
+      "transactionId": "T048",
+      "type": "EXPENSE",
+      "source": "INVENTORY_PURCHASE",
+      "referenceId": "EXP001",
+      "description": "VoltCare restock for EV cooling and seals",
+      "amount": 640.0,
+      "occurredAt": "2025-12-05T11:00:00Z"
+    },
+    {
+      "transactionId": "T049",
+      "type": "EXPENSE",
+      "source": "INVENTORY_PURCHASE",
+      "referenceId": "EXP002",
+      "description": "Jordan Spare House monthly stock replenishment",
+      "amount": 520.0,
+      "occurredAt": "2025-12-19T11:30:00Z"
+    },
+    {
+      "transactionId": "T050",
+      "type": "EXPENSE",
+      "source": "INVENTORY_PURCHASE",
+      "referenceId": "EXP003",
+      "description": "Hybrid consumables purchase from EcoDrive Parts",
+      "amount": 430.0,
+      "occurredAt": "2026-01-04T10:45:00Z"
+    },
+    {
+      "transactionId": "T051",
+      "type": "EXPENSE",
+      "source": "INVENTORY_PURCHASE",
+      "referenceId": "EXP004",
+      "description": "Battery World and ChargeHub mixed parts delivery",
+      "amount": 710.0,
+      "occurredAt": "2026-01-21T13:00:00Z"
+    },
+    {
+      "transactionId": "T052",
+      "type": "EXPENSE",
+      "source": "INVENTORY_PURCHASE",
+      "referenceId": "EXP005",
+      "description": "General workshop fast-moving parts restock",
+      "amount": 385.0,
+      "occurredAt": "2026-02-06T12:30:00Z"
+    },
+    {
+      "transactionId": "T053",
+      "type": "EXPENSE",
+      "source": "SALARY",
+      "referenceId": "E001-2025-12",
+      "description": "Nader Al-Rawabdeh salary for 2025-12",
+      "amount": 1450.0,
+      "occurredAt": "2025-12-02T17:00:00Z"
+    },
+    {
+      "transactionId": "T054",
+      "type": "EXPENSE",
+      "source": "SALARY",
+      "referenceId": "E002-2025-12",
+      "description": "Rami Abu Ghazaleh salary for 2025-12",
+      "amount": 1200.0,
+      "occurredAt": "2025-12-02T17:00:00Z"
+    },
+    {
+      "transactionId": "T055",
+      "type": "EXPENSE",
+      "source": "SALARY",
+      "referenceId": "E003-2025-12",
+      "description": "Sawsan Al-Hindi salary for 2025-12",
+      "amount": 650.0,
+      "occurredAt": "2025-12-02T17:00:00Z"
+    },
+    {
+      "transactionId": "T056",
+      "type": "EXPENSE",
+      "source": "SALARY",
+      "referenceId": "E004-2025-12",
+      "description": "Baraa Shannak salary for 2025-12",
+      "amount": 780.0,
+      "occurredAt": "2025-12-02T17:00:00Z"
+    },
+    {
+      "transactionId": "T057",
+      "type": "EXPENSE",
+      "source": "SALARY",
+      "referenceId": "E005-2025-12",
+      "description": "Motasem Al-Qaisi salary for 2025-12",
+      "amount": 820.0,
+      "occurredAt": "2025-12-02T17:00:00Z"
+    },
+    {
+      "transactionId": "T058",
+      "type": "EXPENSE",
+      "source": "SALARY",
+      "referenceId": "E006-2025-12",
+      "description": "Rana Odeibat salary for 2025-12",
+      "amount": 900.0,
+      "occurredAt": "2025-12-02T17:00:00Z"
+    },
+    {
+      "transactionId": "T059",
+      "type": "EXPENSE",
+      "source": "SALARY",
+      "referenceId": "E007-2025-12",
+      "description": "Qusai Zureikat salary for 2025-12",
+      "amount": 760.0,
+      "occurredAt": "2025-12-02T17:00:00Z"
+    },
+    {
+      "transactionId": "T060",
+      "type": "EXPENSE",
+      "source": "SALARY",
+      "referenceId": "E008-2025-12",
+      "description": "Haneen Al-Khalidi salary for 2025-12",
+      "amount": 620.0,
+      "occurredAt": "2025-12-02T17:00:00Z"
+    },
+    {
+      "transactionId": "T061",
+      "type": "EXPENSE",
+      "source": "SALARY",
+      "referenceId": "E001-2026-01",
+      "description": "Nader Al-Rawabdeh salary for 2026-01",
+      "amount": 1450.0,
+      "occurredAt": "2026-01-02T17:00:00Z"
+    },
+    {
+      "transactionId": "T062",
+      "type": "EXPENSE",
+      "source": "SALARY",
+      "referenceId": "E002-2026-01",
+      "description": "Rami Abu Ghazaleh salary for 2026-01",
+      "amount": 1200.0,
+      "occurredAt": "2026-01-02T17:00:00Z"
+    },
+    {
+      "transactionId": "T063",
+      "type": "EXPENSE",
+      "source": "SALARY",
+      "referenceId": "E003-2026-01",
+      "description": "Sawsan Al-Hindi salary for 2026-01",
+      "amount": 650.0,
+      "occurredAt": "2026-01-02T17:00:00Z"
+    },
+    {
+      "transactionId": "T064",
+      "type": "EXPENSE",
+      "source": "SALARY",
+      "referenceId": "E004-2026-01",
+      "description": "Baraa Shannak salary for 2026-01",
+      "amount": 780.0,
+      "occurredAt": "2026-01-02T17:00:00Z"
+    },
+    {
+      "transactionId": "T065",
+      "type": "EXPENSE",
+      "source": "SALARY",
+      "referenceId": "E005-2026-01",
+      "description": "Motasem Al-Qaisi salary for 2026-01",
+      "amount": 820.0,
+      "occurredAt": "2026-01-02T17:00:00Z"
+    },
+    {
+      "transactionId": "T066",
+      "type": "EXPENSE",
+      "source": "SALARY",
+      "referenceId": "E006-2026-01",
+      "description": "Rana Odeibat salary for 2026-01",
+      "amount": 900.0,
+      "occurredAt": "2026-01-02T17:00:00Z"
+    },
+    {
+      "transactionId": "T067",
+      "type": "EXPENSE",
+      "source": "SALARY",
+      "referenceId": "E007-2026-01",
+      "description": "Qusai Zureikat salary for 2026-01",
+      "amount": 760.0,
+      "occurredAt": "2026-01-02T17:00:00Z"
+    },
+    {
+      "transactionId": "T068",
+      "type": "EXPENSE",
+      "source": "SALARY",
+      "referenceId": "E008-2026-01",
+      "description": "Haneen Al-Khalidi salary for 2026-01",
+      "amount": 620.0,
+      "occurredAt": "2026-01-02T17:00:00Z"
+    },
+    {
+      "transactionId": "T069",
+      "type": "EXPENSE",
+      "source": "SALARY",
+      "referenceId": "E001-2026-02",
+      "description": "Nader Al-Rawabdeh salary for 2026-02",
+      "amount": 1450.0,
+      "occurredAt": "2026-02-02T17:00:00Z"
+    },
+    {
+      "transactionId": "T070",
+      "type": "EXPENSE",
+      "source": "SALARY",
+      "referenceId": "E002-2026-02",
+      "description": "Rami Abu Ghazaleh salary for 2026-02",
+      "amount": 1200.0,
+      "occurredAt": "2026-02-02T17:00:00Z"
+    },
+    {
+      "transactionId": "T071",
+      "type": "EXPENSE",
+      "source": "SALARY",
+      "referenceId": "E003-2026-02",
+      "description": "Sawsan Al-Hindi salary for 2026-02",
+      "amount": 650.0,
+      "occurredAt": "2026-02-02T17:00:00Z"
+    },
+    {
+      "transactionId": "T072",
+      "type": "EXPENSE",
+      "source": "SALARY",
+      "referenceId": "E004-2026-02",
+      "description": "Baraa Shannak salary for 2026-02",
+      "amount": 780.0,
+      "occurredAt": "2026-02-02T17:00:00Z"
+    },
+    {
+      "transactionId": "T073",
+      "type": "EXPENSE",
+      "source": "SALARY",
+      "referenceId": "E005-2026-02",
+      "description": "Motasem Al-Qaisi salary for 2026-02",
+      "amount": 820.0,
+      "occurredAt": "2026-02-02T17:00:00Z"
+    },
+    {
+      "transactionId": "T074",
+      "type": "EXPENSE",
+      "source": "SALARY",
+      "referenceId": "E006-2026-02",
+      "description": "Rana Odeibat salary for 2026-02",
+      "amount": 900.0,
+      "occurredAt": "2026-02-02T17:00:00Z"
+    },
+    {
+      "transactionId": "T075",
+      "type": "EXPENSE",
+      "source": "SALARY",
+      "referenceId": "E007-2026-02",
+      "description": "Qusai Zureikat salary for 2026-02",
+      "amount": 760.0,
+      "occurredAt": "2026-02-02T17:00:00Z"
+    },
+    {
+      "transactionId": "T076",
+      "type": "EXPENSE",
+      "source": "SALARY",
+      "referenceId": "E008-2026-02",
+      "description": "Haneen Al-Khalidi salary for 2026-02",
+      "amount": 620.0,
+      "occurredAt": "2026-02-02T17:00:00Z"
+    },
+    {
+      "transactionId": "T077",
+      "type": "EXPENSE",
+      "source": "UTILITIES",
+      "referenceId": "EXP-U01",
+      "description": "Electricity bill for workshop and chargers",
+      "amount": 265.0,
+      "occurredAt": "2025-12-30T15:00:00Z"
+    },
+    {
+      "transactionId": "T078",
+      "type": "EXPENSE",
+      "source": "UTILITIES",
+      "referenceId": "EXP-U02",
+      "description": "Water and facility services bill",
+      "amount": 94.0,
+      "occurredAt": "2026-01-28T15:00:00Z"
+    },
+    {
+      "transactionId": "T079",
+      "type": "EXPENSE",
+      "source": "UTILITIES",
+      "referenceId": "EXP-U03",
+      "description": "Internet, phone, and software subscriptions",
+      "amount": 142.0,
+      "occurredAt": "2026-02-24T15:00:00Z"
+    }
+  ],
+  "employees": [
+    {
+      "id": "E001",
+      "fullName": "Nader Al-Rawabdeh",
+      "role": "ADMIN",
+      "salary": 1450,
+      "hireDate": "2025-12-01T09:00:00Z"
+    },
+    {
+      "id": "E002",
+      "fullName": "Rami Abu Ghazaleh",
+      "role": "MANAGER",
+      "salary": 1200,
+      "hireDate": "2025-12-06T09:00:00Z"
+    },
+    {
+      "id": "E003",
+      "fullName": "Sawsan Al-Hindi",
+      "role": "RECEPTION",
+      "salary": 650,
+      "hireDate": "2025-12-13T09:00:00Z"
+    },
+    {
+      "id": "E004",
+      "fullName": "Baraa Shannak",
+      "role": "TECHNICIAN",
+      "salary": 780,
+      "hireDate": "2025-12-19T09:00:00Z"
+    },
+    {
+      "id": "E005",
+      "fullName": "Motasem Al-Qaisi",
+      "role": "TECHNICIAN",
+      "salary": 820,
+      "hireDate": "2025-12-25T09:00:00Z"
+    },
+    {
+      "id": "E006",
+      "fullName": "Rana Odeibat",
+      "role": "ACCOUNTANT",
+      "salary": 900,
+      "hireDate": "2026-01-01T09:00:00Z"
+    },
+    {
+      "id": "E007",
+      "fullName": "Qusai Zureikat",
+      "role": "TECHNICIAN",
+      "salary": 760,
+      "hireDate": "2026-01-06T09:00:00Z"
+    },
+    {
+      "id": "E008",
+      "fullName": "Haneen Al-Khalidi",
+      "role": "RECEPTION",
+      "salary": 620,
+      "hireDate": "2026-01-12T09:00:00Z"
+    }
+  ]
+}

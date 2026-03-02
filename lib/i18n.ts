@@ -29,11 +29,13 @@ const en = {
   menuMemberships: "Memberships",
   menuProfile: "Profile",
   menuChat: "Chat",
+  menuTasks: "My Tasks",
   menuBookings: "Bookings",
   menuReviews: "Reviews",
   menuMembershipOrders: "Membership Orders",
   menuUsers: "Users",
   menuAttendance: "Attendance",
+  menuAdminTasks: "Tasks",
   menuSalaries: "Salaries",
   menuServices: "Services",
   menuOffersSlider: "Offers / Slider",
@@ -183,6 +185,8 @@ const en = {
 } as const;
 
 const ar: Record<keyof typeof en, string> = {
+  menuTasks: "المهام",
+  menuAdminTasks: "المهام",
   centerName: "مركز محمد خويلة",
   platformTitle: "منصة مركز محمد خويلة لصيانة السيارات الهجينة والكهربائية",
   appName: "مركز محمد خويلة",

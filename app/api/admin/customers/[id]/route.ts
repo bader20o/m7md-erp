@@ -35,6 +35,9 @@ const updateCustomerSchema = z.discriminatedUnion("action", [
     fullName: z.string().min(2).max(120).optional(),
     bio: z.string().max(280).nullable().optional(),
     carType: z.string().max(120).nullable().optional(),
+    carCompany: z.string().max(120).nullable().optional(),
+    carModel: z.string().max(100).nullable().optional(),
+    carYear: z.string().max(10).nullable().optional(),
     location: z.string().max(120).nullable().optional(),
     avatarUrl: z.string().max(1000).nullable().optional()
   })
@@ -78,7 +81,10 @@ export async function GET(_: Request, context: Params): Promise<Response> {
         role: true,
         status: true,
         bio: true,
+        carCompany: true,
         carType: true,
+        carModel: true,
+        carYear: true,
         location: true,
         avatarUrl: true,
         createdAt: true,
@@ -104,6 +110,18 @@ export async function GET(_: Request, context: Params): Promise<Response> {
                 phone: true
               }
             }
+          }
+        },
+        customerBookings: {
+          orderBy: { createdAt: "desc" },
+          take: 50,
+          select: {
+            id: true,
+            status: true,
+            finalPrice: true,
+            createdAt: true,
+            appointmentAt: true,
+            serviceNameSnapshotEn: true
           }
         }
       }
@@ -223,7 +241,10 @@ export async function PATCH(request: Request, context: Params): Promise<Response
         data: {
           fullName: body.fullName,
           bio: body.bio,
+          carCompany: body.carCompany,
           carType: body.carType,
+          carModel: body.carModel,
+          carYear: body.carYear,
           location: body.location,
           avatarUrl: body.avatarUrl
         }

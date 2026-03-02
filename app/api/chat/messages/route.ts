@@ -1,60 +1,57 @@
-import { Role } from "@prisma/client";
+import { ConversationMessageType, ConversationType, Role } from "@prisma/client";
 import { z } from "zod";
 import { ApiError, fail, ok, parseJsonBody } from "@/lib/api";
 import { getSession } from "@/lib/auth";
+import {
+  assertCanAccessConversation,
+  ensureSupportConversationForCustomer,
+  normalizeUrl,
+  sanitizeMessageContent
+} from "@/lib/chat";
+import { publishChatEvent } from "@/lib/chat-events";
 import { prisma } from "@/lib/prisma";
 import { requireSession } from "@/lib/rbac";
 
 const listMessagesQuerySchema = z.object({
-  threadId: z.string().min(1),
-  take: z.coerce.number().int().min(1).max(100).default(50),
+  conversationId: z.string().min(1),
+  take: z.coerce.number().int().min(1).max(100).default(20),
   cursor: z.string().min(1).optional()
 });
 
 const sendMessageSchema = z.object({
-  threadId: z.string().min(1),
-  messageType: z.enum(["TEXT", "IMAGE", "VIDEO", "VOICE"]).default("TEXT"),
+  conversationId: z.string().min(1).optional(),
+  threadId: z.string().min(1).optional(),
+  type: z.enum(["TEXT", "IMAGE", "VIDEO", "LINK"]).default("TEXT"),
+  messageType: z.enum(["TEXT", "IMAGE", "VIDEO", "VOICE", "LINK"]).optional(),
+  content: z.string().max(2000).optional(),
   body: z.string().max(2000).optional(),
-  mediaUrl: z.string().max(1200).optional(),
-  mediaMimeType: z.string().max(120).optional(),
-  mediaDurationSec: z.coerce.number().int().min(0).max(60 * 60).optional()
-}).superRefine((data, context) => {
-  if (data.messageType === "TEXT" && !data.body?.trim()) {
-    context.addIssue({
-      code: z.ZodIssueCode.custom,
-      path: ["body"],
-      message: "Text message body is required."
-    });
-  }
-
-  if (data.messageType !== "TEXT" && !data.mediaUrl?.trim()) {
-    context.addIssue({
-      code: z.ZodIssueCode.custom,
-      path: ["mediaUrl"],
-      message: "mediaUrl is required for media messages."
-    });
-  }
+  fileUrl: z.string().max(1200).optional(),
+  mediaUrl: z.string().max(1200).optional()
 });
 
-const markSeenSchema = z.object({
-  messageIds: z.array(z.string().min(1)).min(1)
+const markReadSchema = z.object({
+  conversationId: z.string().min(1)
 });
 
-async function assertAdminContactThread(threadId: string, actorRole: Role): Promise<void> {
-  if (actorRole === Role.ADMIN) {
-    return;
-  }
-
-  const adminParticipantsCount = await prisma.chatParticipant.count({
-    where: {
-      threadId,
-      user: { role: Role.ADMIN }
-    }
+async function resolveBroadcastUserIds(
+  conversationId: string,
+  conversationType: ConversationType
+): Promise<string[]> {
+  const participantRows = await prisma.conversationParticipant.findMany({
+    where: { conversationId },
+    select: { userId: true }
   });
 
-  if (adminParticipantsCount === 0) {
-    throw new ApiError(403, "FORBIDDEN", "You can only access conversations with center admins.");
+  if (conversationType === ConversationType.CENTER) {
+    return participantRows.map((item) => item.userId);
   }
+
+  const adminRows = await prisma.user.findMany({
+    where: { role: Role.ADMIN, isActive: true },
+    select: { id: true }
+  });
+
+  return Array.from(new Set([...participantRows.map((item) => item.userId), ...adminRows.map((item) => item.id)]));
 }
 
 export async function GET(request: Request): Promise<Response> {
@@ -62,25 +59,12 @@ export async function GET(request: Request): Promise<Response> {
     const actor = requireSession(await getSession());
     const url = new URL(request.url);
     const query = await listMessagesQuerySchema.parseAsync({
-      threadId: url.searchParams.get("threadId") ?? undefined,
+      conversationId: url.searchParams.get("conversationId") ?? url.searchParams.get("threadId") ?? undefined,
       take: url.searchParams.get("take") ?? undefined,
       cursor: url.searchParams.get("cursor") ?? undefined
     });
-    const { threadId, take, cursor } = query;
 
-    const participant = await prisma.chatParticipant.findUnique({
-      where: {
-        threadId_userId: {
-          threadId,
-          userId: actor.sub
-        }
-      },
-      select: { id: true }
-    });
-    if (!participant) {
-      throw new ApiError(403, "FORBIDDEN", "Not a participant in this thread.");
-    }
-    await assertAdminContactThread(threadId, actor.role);
+    await assertCanAccessConversation(prisma, query.conversationId, actor);
 
     let cursorFilter:
       | {
@@ -94,14 +78,14 @@ export async function GET(request: Request): Promise<Response> {
         }
       | undefined;
 
-    if (cursor) {
-      const cursorMessage = await prisma.chatMessage.findUnique({
-        where: { id: cursor },
-        select: { id: true, threadId: true, createdAt: true }
+    if (query.cursor) {
+      const cursorMessage = await prisma.conversationMessage.findUnique({
+        where: { id: query.cursor },
+        select: { id: true, conversationId: true, createdAt: true }
       });
 
-      if (!cursorMessage || cursorMessage.threadId !== threadId) {
-        throw new ApiError(400, "INVALID_CURSOR", "cursor must be a valid message id from the selected thread.");
+      if (!cursorMessage || cursorMessage.conversationId !== query.conversationId) {
+        throw new ApiError(400, "INVALID_CURSOR", "cursor must be a valid message id from the selected conversation.");
       }
 
       cursorFilter = {
@@ -115,33 +99,25 @@ export async function GET(request: Request): Promise<Response> {
       };
     }
 
-    const rows = await prisma.chatMessage.findMany({
+    const rows = await prisma.conversationMessage.findMany({
       where: {
-        threadId,
+        conversationId: query.conversationId,
         ...cursorFilter
       },
       include: {
-        sender: { select: { id: true, fullName: true, phone: true, role: true } },
-        seenBy: {
-          where: { userId: actor.sub },
-          select: { id: true, userId: true, messageId: true, seenAt: true }
+        sender: {
+          select: { id: true, fullName: true, phone: true, role: true }
         }
       },
       orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-      take: take + 1
+      take: query.take + 1
     });
 
-    const hasMore = rows.length > take;
-    const slice = hasMore ? rows.slice(0, take) : rows;
+    const hasMore = rows.length > query.take;
+    const slice = hasMore ? rows.slice(0, query.take) : rows;
     const nextCursor = hasMore ? slice[slice.length - 1]?.id ?? null : null;
-    const messages = slice.reverse().map((message) => ({
-      ...message,
-      body: message.deletedAt ? "" : message.body,
-      mediaUrl: message.deletedAt ? null : message.mediaUrl,
-      mediaMimeType: message.deletedAt ? null : message.mediaMimeType
-    }));
 
-    return ok({ messages, nextCursor });
+    return ok({ messages: slice.reverse(), nextCursor });
   } catch (error) {
     return fail(error);
   }
@@ -152,74 +128,80 @@ export async function POST(request: Request): Promise<Response> {
     const actor = requireSession(await getSession());
     const body = await parseJsonBody(request, sendMessageSchema);
 
-    const participant = await prisma.chatParticipant.findUnique({
-      where: {
-        threadId_userId: {
-          threadId: body.threadId,
-          userId: actor.sub
-        }
-      }
-    });
-    if (!participant) {
-      throw new ApiError(403, "FORBIDDEN", "Not a participant in this thread.");
-    }
-    await assertAdminContactThread(body.threadId, actor.role);
-
     const item = await prisma.$transaction(async (tx) => {
-      const existingCustomerMessageCount =
-        actor.role === Role.CUSTOMER
-          ? await tx.chatMessage.count({
-              where: {
-                threadId: body.threadId,
-                senderId: actor.sub,
-                sender: { role: Role.CUSTOMER },
-                deletedAt: null
-              }
-            })
-          : 0;
+      const resolvedType = (body.messageType ?? body.type) as "TEXT" | "IMAGE" | "VIDEO" | "VOICE" | "LINK";
+      let conversationId = body.conversationId ?? body.threadId ?? null;
+      const contentInput = body.content ?? body.body ?? "";
+      const fileUrlInput = body.fileUrl ?? body.mediaUrl;
 
-      const message = await tx.chatMessage.create({
+      if (!conversationId) {
+        if (actor.role !== Role.CUSTOMER) {
+          throw new ApiError(400, "CONVERSATION_REQUIRED", "conversationId is required.");
+        }
+
+        const conversation = await ensureSupportConversationForCustomer(tx, actor.sub);
+        conversationId = conversation.id;
+      }
+
+      const conversation = await assertCanAccessConversation(tx, conversationId, actor);
+      const content = sanitizeMessageContent(contentInput);
+      const maybeUrl = normalizeUrl(content);
+
+      const type = resolvedType as ConversationMessageType;
+      if (type === ConversationMessageType.TEXT && !content) {
+        throw new ApiError(400, "MESSAGE_CONTENT_REQUIRED", "Text message content is required.");
+      }
+
+      if (type === ConversationMessageType.LINK && !maybeUrl) {
+        throw new ApiError(400, "INVALID_LINK", "A valid http/https link is required.");
+      }
+
+      if (
+        (type === ConversationMessageType.IMAGE ||
+          type === ConversationMessageType.VIDEO ||
+          type === ConversationMessageType.VOICE) &&
+        !fileUrlInput?.trim()
+      ) {
+        throw new ApiError(400, "FILE_REQUIRED", "fileUrl is required for media messages.");
+      }
+      if (
+        (type === ConversationMessageType.IMAGE ||
+          type === ConversationMessageType.VIDEO ||
+          type === ConversationMessageType.VOICE) &&
+        fileUrlInput &&
+        !fileUrlInput.startsWith("/uploads/")
+      ) {
+        throw new ApiError(400, "INVALID_FILE_URL", "Invalid uploaded file URL.");
+      }
+
+      const message = await tx.conversationMessage.create({
         data: {
-          threadId: body.threadId,
+          conversationId,
           senderId: actor.sub,
-          messageType: body.messageType,
-          body: body.body?.trim() || "",
-          mediaUrl: body.mediaUrl,
-          mediaMimeType: body.mediaMimeType,
-          mediaDurationSec: body.mediaDurationSec
+          content: type === ConversationMessageType.LINK ? maybeUrl ?? content : content,
+          type,
+          fileUrl: fileUrlInput?.trim() || null
+        },
+        include: {
+          sender: { select: { id: true, fullName: true, phone: true, role: true } }
         }
       });
 
-      if (actor.role === Role.CUSTOMER && existingCustomerMessageCount === 0) {
-        const firstAdminParticipant = await tx.chatParticipant.findFirst({
-          where: {
-            threadId: body.threadId,
-            user: { role: Role.ADMIN }
-          },
-          select: { userId: true }
-        });
-
-        if (firstAdminParticipant) {
-          await tx.chatMessage.create({
-            data: {
-              threadId: body.threadId,
-              senderId: firstAdminParticipant.userId,
-              messageType: "TEXT",
-              body: "أهلًا وسهلًا 👋 نحن هنا لمساعدتك، يرجى كتابة رسالتك."
-            }
-          });
-        }
-      }
-
-      await tx.chatThread.update({
-        where: { id: body.threadId },
+      await tx.conversation.update({
+        where: { id: conversationId },
         data: { updatedAt: new Date() }
       });
 
-      return message;
+      return { message, conversation };
     });
 
-    return ok({ item }, 201);
+    const toUserIds = await resolveBroadcastUserIds(item.message.conversationId, item.conversation.type);
+    publishChatEvent("message:new", toUserIds, {
+      conversationId: item.message.conversationId,
+      message: item.message
+    });
+
+    return ok({ item: item.message }, 201);
   } catch (error) {
     return fail(error);
   }
@@ -228,72 +210,33 @@ export async function POST(request: Request): Promise<Response> {
 export async function PATCH(request: Request): Promise<Response> {
   try {
     const actor = requireSession(await getSession());
-    const body = await parseJsonBody(request, markSeenSchema);
+    const body = await parseJsonBody(request, markReadSchema);
 
-    const messages = await prisma.chatMessage.findMany({
-      where: { id: { in: body.messageIds } },
-      select: { id: true, threadId: true }
-    });
+    const conversation = await assertCanAccessConversation(prisma, body.conversationId, actor);
 
-    if (!messages.length) {
-      return ok({ inserted: 0 });
-    }
-
-    const threadIds = Array.from(new Set(messages.map((message) => message.threadId)));
-    const participantRows = await prisma.chatParticipant.findMany({
+    await prisma.conversationParticipant.upsert({
       where: {
-        userId: actor.sub,
-        threadId: { in: threadIds },
-        ...(actor.role === Role.ADMIN
-          ? {}
-          : {
-              thread: {
-                participants: {
-                  some: {
-                    user: { role: Role.ADMIN }
-                  }
-                }
-              }
-            })
+        conversationId_userId: {
+          conversationId: body.conversationId,
+          userId: actor.sub
+        }
       },
-      select: { threadId: true }
-    });
-    const allowedThreadIds = new Set(participantRows.map((item) => item.threadId));
-
-    const allowedMessageIds = messages
-      .filter((message) => allowedThreadIds.has(message.threadId))
-      .map((message) => message.id);
-
-    if (!allowedMessageIds.length) {
-      return ok({ inserted: 0 });
-    }
-
-    const inserted = await prisma.chatMessageSeen.createMany({
-      data: allowedMessageIds.map((messageId) => ({
-        messageId,
-        userId: actor.sub
-      })),
-      skipDuplicates: true
-    });
-
-    const allowedMessageIdSet = new Set(allowedMessageIds);
-    const seenThreadIds = Array.from(
-      new Set(
-        messages
-          .filter((message) => allowedMessageIdSet.has(message.id))
-          .map((message) => message.threadId)
-      )
-    );
-
-    await prisma.chatParticipant.updateMany({
-      where: {
+      update: { lastReadAt: new Date() },
+      create: {
+        conversationId: body.conversationId,
         userId: actor.sub,
-        threadId: { in: seenThreadIds }
-      },
-      data: { lastSeenAt: new Date() }
+        lastReadAt: new Date()
+      }
     });
 
-    return ok({ inserted: inserted.count });
+    const toUserIds = await resolveBroadcastUserIds(body.conversationId, conversation.type);
+    publishChatEvent("conversation:read", toUserIds, {
+      conversationId: body.conversationId,
+      userId: actor.sub,
+      readAt: new Date().toISOString()
+    });
+
+    return ok({ read: true });
   } catch (error) {
     return fail(error);
   }

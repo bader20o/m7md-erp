@@ -5,10 +5,9 @@ import { store } from '../../lib/store.js';
 
 function rankTopServices(items) {
   return [...items].sort((a, b) => {
-    const aPrice = Number(a.basePrice || 0);
-    const bPrice = Number(b.basePrice || 0);
-    if (bPrice !== aPrice) return bPrice - aPrice;
-    return Number(a.durationMinutes || 0) - Number(b.durationMinutes || 0);
+    const durationDiff = Number(a.durationMinutes || 0) - Number(b.durationMinutes || 0);
+    if (durationDiff !== 0) return durationDiff;
+    return (a.nameEn || "").localeCompare(b.nameEn || "");
   });
 }
 
@@ -73,10 +72,6 @@ export function Services() {
         .map((service) => {
           const title = lang === 'ar' ? service.nameAr : service.nameEn;
           const desc = lang === 'ar' ? service.descriptionAr || '' : service.descriptionEn || '';
-          const hasPrice = service.basePrice !== null && service.basePrice !== undefined;
-          const priceText = hasPrice
-            ? `${Number(service.basePrice).toFixed(2)} JOD`
-            : '\u063A\u064A\u0631 \u0645\u062D\u062F\u062F';
 
           return `
             <article class="bg-surface border border-border rounded-2xl overflow-hidden flex flex-col card-hover h-full">
@@ -101,7 +96,7 @@ export function Services() {
                   <div class="text-sm text-text">
                     <span class="font-semibold">${t('services.duration', { min: service.durationMinutes })}</span>
                   </div>
-                  <div class="text-base font-extrabold ${hasPrice ? 'text-primary' : 'text-muted'}">${priceText}</div>
+                  <div class="text-xs font-semibold text-muted">Price set after admin approval</div>
                 </div>
                 <button onclick="navigate(event, '/login')" class="w-full py-2.5 bg-primary/10 text-primary hover:bg-primary hover:text-white rounded-xl font-semibold transition-colors">
                   ${t('services.book')}

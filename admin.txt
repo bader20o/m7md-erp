@@ -1,0 +1,30 @@
+admin:
+0780000000
+ChangeMe123!
+
+Customer:
+079880001
+Customer123!
+
+Employee:
+0781000102 
+Employee123!
+
+
+to run the app:
+1. npm run dev
+2. go to http://localhost:3000
+
+
+to stop the app:
+1. press ctrl+c
+
+to upload the app to the internet:
+1. npm run build
+2. npm run start
+3. go to http://localhost:3000
+
+to save the files to github:
+1. git add .
+2. git commit -m "message"
+3. git push 

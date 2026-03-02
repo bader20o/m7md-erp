@@ -40,77 +40,76 @@ export async function GET(request: Request): Promise<Response> {
     const [phoneMatch, nationalIdMatch, possibleNameMatches] = await Promise.all([
       phone
         ? prisma.user.findUnique({
-            where: { phone },
-            select: { id: true, fullName: true, phone: true, role: true, createdAt: true }
-          })
+          where: { phone },
+          select: { id: true, fullName: true, phone: true, role: true, createdAt: true }
+        })
         : Promise.resolve(null),
       nationalId
         ? prisma.employee.findUnique({
-            where: { nationalIdHash: createLookupHash(nationalId) },
-            select: {
-              id: true,
-              user: {
-                select: { id: true, fullName: true, phone: true, role: true, createdAt: true }
-              }
+          where: { nationalIdHash: createLookupHash(nationalId) },
+          select: {
+            id: true,
+            user: {
+              select: { id: true, fullName: true, phone: true, role: true, createdAt: true }
             }
-          })
+          }
+        })
         : Promise.resolve(null),
       fullName
         ? prisma.user.findMany({
-            where: {
-              fullName: {
-                contains: normalizeName(fullName)[0] || fullName,
-                mode: "insensitive"
-              }
-            },
-            select: {
-              id: true,
-              fullName: true,
-              phone: true,
-              role: true,
-              createdAt: true
-            },
-            take: 15
-          })
+          where: {
+            fullName: {
+              contains: normalizeName(fullName)[0] || fullName
+            }
+          },
+          select: {
+            id: true,
+            fullName: true,
+            phone: true,
+            role: true,
+            createdAt: true
+          },
+          take: 15
+        })
         : Promise.resolve([])
     ]);
 
     const nameWarnings = fullName
       ? possibleNameMatches
-          .map((item) => ({
-            ...item,
-            similarity: similarityScore(fullName, item.fullName || "")
-          }))
-          .filter((item) => item.similarity >= 0.5)
-          .sort((a, b) => b.similarity - a.similarity)
-          .slice(0, 5)
+        .map((item) => ({
+          ...item,
+          similarity: similarityScore(fullName, item.fullName || "")
+        }))
+        .filter((item) => item.similarity >= 0.5)
+        .sort((a, b) => b.similarity - a.similarity)
+        .slice(0, 5)
       : [];
 
     return ok({
       phone: phoneMatch
         ? {
-            exists: true,
-            profile: {
-              id: phoneMatch.id,
-              fullName: phoneMatch.fullName,
-              phone: phoneMatch.phone,
-              role: phoneMatch.role,
-              profilePath: phoneMatch.role === Role.CUSTOMER ? `/admin/customers` : `/admin/employees`
-            }
+          exists: true,
+          profile: {
+            id: phoneMatch.id,
+            fullName: phoneMatch.fullName,
+            phone: phoneMatch.phone,
+            role: phoneMatch.role,
+            profilePath: phoneMatch.role === Role.CUSTOMER ? `/admin/customers` : `/admin/employees`
           }
+        }
         : { exists: false },
       nationalId: nationalIdMatch
         ? {
-            exists: true,
-            profile: {
-              id: nationalIdMatch.id,
-              userId: nationalIdMatch.user.id,
-              fullName: nationalIdMatch.user.fullName,
-              phone: nationalIdMatch.user.phone,
-              role: nationalIdMatch.user.role,
-              profilePath: "/admin/employees"
-            }
+          exists: true,
+          profile: {
+            id: nationalIdMatch.id,
+            userId: nationalIdMatch.user.id,
+            fullName: nationalIdMatch.user.fullName,
+            phone: nationalIdMatch.user.phone,
+            role: nationalIdMatch.user.role,
+            profilePath: "/admin/employees"
           }
+        }
         : { exists: false },
       nameWarnings: nameWarnings.map((item) => ({
         id: item.id,

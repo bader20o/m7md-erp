@@ -24,6 +24,7 @@ import {
 } from "recharts";
 import { useEffect, useMemo, useState } from "react";
 import type { Dictionary } from "@/lib/i18n";
+import { DateInput } from "@/components/ui/date-input";
 
 type AnalyticsPayload = {
   kpis: {
@@ -44,14 +45,19 @@ type AnalyticsPayload = {
       date: string;
       income: number;
       expense: number;
+      profit: number;
       bookingIncome: number;
       walkInIncome: number;
       membershipIncome: number;
+      inventorySalesIncome: number;
     }>;
   };
   breakdowns: {
     expenseByCategory: Array<{ category: "SUPPLIER" | "GENERAL" | "SALARY"; amount: number }>;
-    incomeBySource: Array<{ source: "BOOKING" | "WALK_IN" | "MEMBERSHIP"; amount: number }>;
+    incomeBySource: Array<{
+      source: "BOOKING" | "WALK_IN" | "MEMBERSHIP" | "INVENTORY_SALE";
+      amount: number;
+    }>;
   };
   top: {
     services: Array<{
@@ -90,15 +96,15 @@ type AnalyticsPayload = {
 
 type ApiPayload =
   | {
-      success: true;
-      data: AnalyticsPayload;
-    }
+    success: true;
+    data: AnalyticsPayload;
+  }
   | {
-      success: false;
-      error?: {
-        message?: string;
-      };
+    success: false;
+    error?: {
+      message?: string;
     };
+  };
 
 type PresetKey = "today" | "last7" | "thisMonth" | "lastMonth" | "custom";
 
@@ -109,6 +115,7 @@ type Props = {
 };
 
 const PIE_COLORS = ["#0f766e", "#64748b", "#dc2626"];
+const SPARSE_LINE_DOT = { r: 2.5, strokeWidth: 1.5, fill: "#ffffff" };
 
 function toDateInputValue(value: Date): string {
   return format(value, "yyyy-MM-dd");
@@ -175,9 +182,9 @@ function ChartFrame({ children }: { children: React.ReactElement }): React.React
   }, []);
 
   return (
-    <div className="mt-3 h-72 min-h-[18rem] w-full min-w-0">
+    <div className="mt-3 h-72 min-h-[18rem] w-full min-w-0 overflow-hidden">
       {ready ? (
-        <ResponsiveContainer width="100%" height="100%" minWidth={280} minHeight={260}>
+        <ResponsiveContainer width="99%" height="100%" minWidth={280} minHeight={260}>
           {children}
         </ResponsiveContainer>
       ) : (
@@ -211,7 +218,7 @@ export function AnalyticsDashboard({ locale, dir, dict }: Props): React.ReactEle
     () =>
       new Intl.NumberFormat(locale, {
         style: "currency",
-        currency: "USD",
+        currency: "JOD",
         maximumFractionDigits: 2
       }),
     [locale]
@@ -229,6 +236,7 @@ export function AnalyticsDashboard({ locale, dir, dict }: Props): React.ReactEle
     if (value === "BOOKING") return dict.analyticsSourceBooking;
     if (value === "WALK_IN") return dict.analyticsSourceWalkIn;
     if (value === "MEMBERSHIP") return dict.analyticsSourceMembership;
+    if (value === "INVENTORY_SALE") return "Inventory Sale";
     if (value === "SUPPLIER") return dict.analyticsCategorySupplier;
     if (value === "GENERAL") return dict.analyticsCategoryGeneral;
     if (value === "SALARY") return dict.analyticsCategorySalary;
@@ -298,25 +306,25 @@ export function AnalyticsDashboard({ locale, dir, dict }: Props): React.ReactEle
 
   const kpiItems = payload
     ? [
-        { label: dict.analyticsTotalIncome, value: formatCurrency(payload.kpis.totalIncome), tone: "text-emerald-700" },
-        { label: dict.analyticsBookingIncome, value: formatCurrency(payload.kpis.bookingIncome), tone: "text-brand-800" },
-        { label: dict.analyticsWalkInIncome, value: formatCurrency(payload.kpis.walkInIncome), tone: "text-brand-800" },
-        { label: dict.analyticsMembershipIncome, value: formatCurrency(payload.kpis.membershipIncome), tone: "text-brand-800" },
-        { label: dict.analyticsTotalExpenses, value: formatCurrency(payload.kpis.totalExpenses), tone: "text-red-700" },
-        { label: dict.analyticsNetProfit, value: formatCurrency(payload.kpis.netProfit), tone: payload.kpis.netProfit >= 0 ? "text-emerald-700" : "text-red-700" },
-        { label: dict.analyticsCompletedBookingsCount, value: payload.kpis.completedBookingsCount.toLocaleString(locale), tone: "text-slate-900" },
-        { label: dict.analyticsPendingBookingsCount, value: payload.kpis.pendingBookingsCount.toLocaleString(locale), tone: "text-slate-900" },
-        { label: dict.analyticsNoShowCount, value: payload.kpis.noShowCount.toLocaleString(locale), tone: "text-slate-900" },
-        { label: dict.analyticsCancellationCount, value: payload.kpis.cancellationCount.toLocaleString(locale), tone: "text-slate-900" },
-        { label: dict.analyticsAverageTicket, value: formatCurrency(payload.kpis.averageTicket), tone: "text-slate-900" }
-      ]
+      { label: dict.analyticsTotalIncome, value: formatCurrency(payload.kpis.totalIncome), tone: "text-emerald-700" },
+      { label: dict.analyticsBookingIncome, value: formatCurrency(payload.kpis.bookingIncome), tone: "text-brand-800" },
+      { label: dict.analyticsWalkInIncome, value: formatCurrency(payload.kpis.walkInIncome), tone: "text-brand-800" },
+      { label: dict.analyticsMembershipIncome, value: formatCurrency(payload.kpis.membershipIncome), tone: "text-brand-800" },
+      { label: dict.analyticsTotalExpenses, value: formatCurrency(payload.kpis.totalExpenses), tone: "text-red-700" },
+      { label: dict.analyticsNetProfit, value: formatCurrency(payload.kpis.netProfit), tone: payload.kpis.netProfit >= 0 ? "text-emerald-700" : "text-red-700" },
+      { label: dict.analyticsCompletedBookingsCount, value: payload.kpis.completedBookingsCount.toLocaleString(locale), tone: "text-slate-900" },
+      { label: dict.analyticsPendingBookingsCount, value: payload.kpis.pendingBookingsCount.toLocaleString(locale), tone: "text-slate-900" },
+      { label: dict.analyticsNoShowCount, value: payload.kpis.noShowCount.toLocaleString(locale), tone: "text-slate-900" },
+      { label: dict.analyticsCancellationCount, value: payload.kpis.cancellationCount.toLocaleString(locale), tone: "text-slate-900" },
+      { label: dict.analyticsAverageTicket, value: formatCurrency(payload.kpis.averageTicket), tone: "text-slate-900" }
+    ]
     : [];
 
   const pieData = payload
     ? payload.breakdowns.expenseByCategory.map((item) => ({
-        ...item,
-        name: formatSourceOrCategory(item.category)
-      }))
+      ...item,
+      name: formatSourceOrCategory(item.category)
+    }))
     : [];
 
   const legendLabelByDataKey: Record<string, string> = {
@@ -383,8 +391,7 @@ export function AnalyticsDashboard({ locale, dir, dict }: Props): React.ReactEle
             <div className="grid gap-2 sm:grid-cols-2">
               <label className="grid gap-1 text-sm">
                 <span className="text-slate-600">{dict.analyticsFromLabel}</span>
-                <input
-                  type="date"
+                <DateInput
                   value={from}
                   onChange={(event) => setFrom(event.target.value)}
                   className="rounded-md border border-slate-300 px-3 py-2 text-sm"
@@ -392,8 +399,7 @@ export function AnalyticsDashboard({ locale, dir, dict }: Props): React.ReactEle
               </label>
               <label className="grid gap-1 text-sm">
                 <span className="text-slate-600">{dict.analyticsToLabel}</span>
-                <input
-                  type="date"
+                <DateInput
                   value={to}
                   onChange={(event) => setTo(event.target.value)}
                   className="rounded-md border border-slate-300 px-3 py-2 text-sm"
@@ -454,10 +460,16 @@ export function AnalyticsDashboard({ locale, dir, dict }: Props): React.ReactEle
             <article className="rounded-xl border border-slate-200 bg-white p-4">
               <h2 className="text-lg font-semibold">{dict.analyticsIncomeVsExpensesTitle}</h2>
               <ChartFrame>
-                <LineChart data={payload.timeseries.daily}>
+                <LineChart data={payload.timeseries.daily} margin={{ left: -20, right: 10, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="date" tickFormatter={(value) => formatDayTick(value, locale)} minTickGap={20} />
-                  <YAxis />
+                  <XAxis
+                    dataKey="date"
+                    tickFormatter={(value) => formatDayTick(value, locale)}
+                    interval={0}
+                    minTickGap={18}
+                    tick={{ fontSize: 12 }}
+                  />
+                  <YAxis domain={[0, "auto"]} tick={{ fontSize: 12 }} width={80} />
                   <Tooltip
                     contentStyle={{ direction: dir, textAlign: dir === "rtl" ? "right" : "left" }}
                     formatter={(value: number | string | undefined, name: string | undefined) => [
@@ -467,8 +479,24 @@ export function AnalyticsDashboard({ locale, dir, dict }: Props): React.ReactEle
                     labelFormatter={(value) => formatDayTick(value, locale)}
                   />
                   <Legend formatter={(value) => legendLabelByDataKey[value] ?? value} />
-                  <Line type="monotone" dataKey="income" stroke="#0f766e" strokeWidth={2} dot={false} />
-                  <Line type="monotone" dataKey="expense" stroke="#dc2626" strokeWidth={2} dot={false} />
+                  <Line
+                    type="monotone"
+                    dataKey="income"
+                    stroke="#0f766e"
+                    strokeWidth={2}
+                    connectNulls
+                    dot={{ ...SPARSE_LINE_DOT, stroke: "#0f766e" }}
+                    activeDot={{ r: 4, strokeWidth: 1.5, fill: "#ffffff" }}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="expense"
+                    stroke="#dc2626"
+                    strokeWidth={2}
+                    connectNulls
+                    dot={{ ...SPARSE_LINE_DOT, stroke: "#dc2626" }}
+                    activeDot={{ r: 4, strokeWidth: 1.5, fill: "#ffffff" }}
+                  />
                 </LineChart>
               </ChartFrame>
             </article>
@@ -476,10 +504,15 @@ export function AnalyticsDashboard({ locale, dir, dict }: Props): React.ReactEle
             <article className="rounded-xl border border-slate-200 bg-white p-4">
               <h2 className="text-lg font-semibold">{dict.analyticsIncomeBreakdownTitle}</h2>
               <ChartFrame>
-                <BarChart data={payload.timeseries.daily}>
+                <BarChart data={payload.timeseries.daily} margin={{ left: -20, right: 10, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="date" tickFormatter={(value) => formatDayTick(value, locale)} minTickGap={20} />
-                  <YAxis />
+                  <XAxis
+                    dataKey="date"
+                    tickFormatter={(value) => formatDayTick(value, locale)}
+                    minTickGap={30}
+                    tick={{ fontSize: 12 }}
+                  />
+                  <YAxis tick={{ fontSize: 12 }} width={80} />
                   <Tooltip
                     contentStyle={{ direction: dir, textAlign: dir === "rtl" ? "right" : "left" }}
                     formatter={(value: number | string | undefined, name: string | undefined) => [

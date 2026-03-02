@@ -34,6 +34,7 @@ export async function GET(request: Request): Promise<Response> {
 
     const items = await prisma.transaction.findMany({
       where: {
+        deletedAt: null,
         occurredAt: {
           gte: fromStart,
           lte: toEnd
@@ -94,4 +95,3 @@ export async function GET(request: Request): Promise<Response> {
     return fail(error);
   }
 }
-

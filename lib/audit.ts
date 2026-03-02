@@ -13,6 +13,13 @@ export async function logAudit(input: AuditInput): Promise<void> {
   const requestHeaders = await headers();
   const forwarded = requestHeaders.get("x-forwarded-for");
   const ipAddress = forwarded?.split(",")[0]?.trim() ?? null;
+  const userAgent = requestHeaders.get("user-agent");
+  const payload =
+    input.payload && typeof input.payload === "object"
+      ? { ...(input.payload as Record<string, unknown>), userAgent }
+      : userAgent
+        ? { userAgent }
+        : undefined;
 
   await prisma.auditLog.create({
     data: {
@@ -20,9 +27,8 @@ export async function logAudit(input: AuditInput): Promise<void> {
       entity: input.entity,
       entityId: input.entityId,
       actorId: input.actorId,
-      payload: input.payload as object | undefined,
+      payload: payload as object | undefined,
       ipAddress
     }
   });
 }
-

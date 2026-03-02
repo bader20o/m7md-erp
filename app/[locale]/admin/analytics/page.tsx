@@ -26,10 +26,10 @@ export default async function AdminAnalyticsRoutePage({ params }: Props): Promis
 
   return (
     <AdminAnalyticsPage
+      adminUserId={session.sub}
       locale={locale}
       dir={getDirection(locale)}
       dict={getDictionary(locale)}
     />
   );
 }
-

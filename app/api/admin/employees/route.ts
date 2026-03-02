@@ -1,6 +1,7 @@
-import { Role, UserStatus } from "@prisma/client";
+import { EmploymentStatus, Prisma, Role, UserStatus } from "@prisma/client";
 import { z } from "zod";
 import { ApiError, fail, ok, parseJsonBody } from "@/lib/api";
+import { getEmployeeStatusLabel } from "@/lib/employee-profile";
 import { logAudit } from "@/lib/audit";
 import { getSession, hashPassword } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
@@ -10,17 +11,18 @@ import { createEmployeeSchema } from "@/lib/validators/employee";
 
 const listEmployeesQuerySchema = z.object({
   q: z.string().optional(),
-  status: z.enum(["active", "suspended", "banned"]).optional(),
+  status: z.enum(["active", "suspended", "banned", "on_leave"]).optional(),
   joinFrom: z.coerce.date().optional(),
   joinTo: z.coerce.date().optional(),
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(100).default(20)
 });
 
-function toUserStatusFilter(value: "active" | "suspended" | "banned" | undefined): UserStatus | undefined {
+function toUserStatusFilter(value: "active" | "suspended" | "banned" | "on_leave" | undefined): UserStatus | undefined {
   if (!value) return undefined;
   if (value === "active") return UserStatus.ACTIVE;
   if (value === "suspended") return UserStatus.SUSPENDED;
+  if (value === "on_leave") return UserStatus.ACTIVE;
   return UserStatus.BANNED;
 }
 
@@ -48,7 +50,7 @@ export async function GET(request: Request): Promise<Response> {
       limit: url.searchParams.get("limit") ?? "20"
     });
 
-    const where = {
+    const where: Prisma.EmployeeWhereInput = {
       user: {
         role: Role.EMPLOYEE,
         status: toUserStatusFilter(query.status),
@@ -65,7 +67,8 @@ export async function GET(request: Request): Promise<Response> {
                 lte: query.joinTo
               }
             : undefined
-      }
+      },
+      employmentStatus: query.status === "on_leave" ? EmploymentStatus.ON_LEAVE : undefined
     };
 
     const skip = (query.page - 1) * query.limit;
@@ -104,9 +107,10 @@ export async function GET(request: Request): Promise<Response> {
         fullName: employee.user.fullName,
         phone: employee.user.phone,
         joinedAt: employee.user.createdAt,
-        status: employee.user.status.toLowerCase(),
+        status: getEmployeeStatusLabel(employee.user.status, employee.employmentStatus).toLowerCase(),
         bannedUntil: employee.user.bannedUntil,
-        permissions: employee.permissionGrants.map((entry) => entry.permission.toLowerCase())
+        permissions: employee.permissionGrants.map((entry) => entry.permission.toLowerCase()),
+        roleProfile: employee.roleProfile
       })),
       page: query.page,
       limit: query.limit,
@@ -235,4 +239,3 @@ export async function POST(request: Request): Promise<Response> {
     return fail(error);
   }
 }
-

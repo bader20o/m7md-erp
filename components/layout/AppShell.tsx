@@ -48,6 +48,7 @@ type ShellUser = {
   fullName: string | null;
   phone: string;
   role: Role;
+  avatarUrl?: string | null;
 };
 
 type AppShellProps = {
@@ -92,23 +93,7 @@ const groupLabelKeys: Record<MenuGroupKey, keyof Dictionary> = {
   system: "menuGroupSystem"
 };
 
-function getInitials(fullName: string | null, phone: string): string {
-  if (fullName) {
-    const words = fullName
-      .split(" ")
-      .map((word) => word.trim())
-      .filter(Boolean);
-    if (words.length >= 2) {
-      return `${words[0][0] ?? ""}${words[1][0] ?? ""}`.toUpperCase();
-    }
-    if (words.length === 1) {
-      return (words[0][0] ?? "U").toUpperCase();
-    }
-  }
-
-  const digits = phone.replace(/\D/g, "");
-  return digits.slice(-2).padStart(2, "0");
-}
+import { getInitials } from "@/lib/utils/string";
 
 function itemLabel(dict: Dictionary, item: MenuItemConfig): string {
   return dict[item.labelKey as keyof Dictionary] ?? item.labelKey;
@@ -123,6 +108,24 @@ export function AppShell({ locale, dir, dict, user, children }: AppShellProps): 
   const [isDrawerOpen, setDrawerOpen] = useState(false);
   const [isProfileMenuOpen, setProfileMenuOpen] = useState(false);
   const [chatUnreadCount, setChatUnreadCount] = useState(0);
+
+  const [liveAvatarUrl, setLiveAvatarUrl] = useState<string | null>(user?.avatarUrl || null);
+  const [liveFullName, setLiveFullName] = useState<string | null>(user?.fullName || null);
+
+  useEffect(() => {
+    if (user?.avatarUrl !== undefined) setLiveAvatarUrl(user?.avatarUrl || null);
+    if (user?.fullName !== undefined) setLiveFullName(user?.fullName || null);
+  }, [user]);
+
+  useEffect(() => {
+    const handleProfileUpdate = (e: CustomEvent) => {
+      if (e.detail.avatarUrl !== undefined) setLiveAvatarUrl(e.detail.avatarUrl);
+      if (e.detail.fullName !== undefined) setLiveFullName(e.detail.fullName);
+    };
+
+    window.addEventListener("profile-updated", handleProfileUpdate as EventListener);
+    return () => window.removeEventListener("profile-updated", handleProfileUpdate as EventListener);
+  }, []);
 
   const isPublicRoute =
     pathname.startsWith(`/${locale}/login`) || pathname.startsWith(`/${locale}/register`);
@@ -183,8 +186,8 @@ export function AppShell({ locale, dir, dict, user, children }: AppShellProps): 
     return <div className="mx-auto w-full max-w-[1400px] px-4 py-6">{children}</div>;
   }
 
-  const profileLabel = user.fullName || user.phone;
-  const initials = getInitials(user.fullName, user.phone);
+  const profileLabel = liveFullName || user.phone;
+  const initials = getInitials(liveFullName, user.phone);
   const visibleItems = getVisibleMenuItems(user.role);
   const mainItems = visibleItems.filter((item) => item.group === "main");
   const adminItemsByGroup = ADMIN_GROUP_ORDER.map((group) => ({
@@ -211,8 +214,12 @@ export function AppShell({ locale, dir, dict, user, children }: AppShellProps): 
             aria-controls="profile-menu"
             className="flex w-full items-center gap-3 rounded-lg border border-slate-200 px-3 py-2 text-left hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-700"
           >
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-brand-100 text-sm font-semibold text-brand-800">
-              {initials}
+            <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-brand-100 text-sm font-semibold text-brand-800">
+              {liveAvatarUrl ? (
+                <img src={liveAvatarUrl} alt="Avatar" className="h-full w-full object-cover" />
+              ) : (
+                initials
+              )}
             </div>
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-semibold text-slate-900">{profileLabel}</p>
@@ -257,9 +264,8 @@ export function AppShell({ locale, dir, dict, user, children }: AppShellProps): 
                   <Link
                     key={item.key}
                     href={href}
-                    className={`flex items-center gap-2 rounded-md px-3 py-2 text-sm transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-700 ${
-                      active ? "bg-brand-100 text-brand-900" : "text-slate-700 hover:bg-slate-100"
-                    }`}
+                    className={`flex items-center gap-2 rounded-md px-3 py-2 text-sm transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-700 ${active ? "bg-brand-100 text-brand-900" : "text-slate-700 hover:bg-slate-100"
+                      }`}
                   >
                     <Icon size={16} aria-hidden={true} />
                     <span className="flex-1">{itemLabel(dict, item)}</span>
@@ -277,37 +283,36 @@ export function AppShell({ locale, dir, dict, user, children }: AppShellProps): 
 
         {showAdminGroups
           ? adminItemsByGroup.map(({ group, items }) => (
-              <section key={group} className="mb-4">
-                <h2 className="mb-2 px-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                  {dict[groupLabelKeys[group]]}
-                </h2>
-                <nav className="grid gap-1">
-                  {items.map((item) => {
-                    const href = withLocale(locale, item.href);
-                    const active = isRouteActive(pathname, href);
-                    const Icon = item.icon ? iconMap[item.icon] : UserRound;
+            <section key={group} className="mb-4">
+              <h2 className="mb-2 px-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                {dict[groupLabelKeys[group]]}
+              </h2>
+              <nav className="grid gap-1">
+                {items.map((item) => {
+                  const href = withLocale(locale, item.href);
+                  const active = isRouteActive(pathname, href);
+                  const Icon = item.icon ? iconMap[item.icon] : UserRound;
 
-                    return (
-                      <Link
-                        key={item.key}
-                        href={href}
-                        className={`flex items-center gap-2 rounded-md px-3 py-2 text-sm transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-700 ${
-                          active ? "bg-brand-100 text-brand-900" : "text-slate-700 hover:bg-slate-100"
+                  return (
+                    <Link
+                      key={item.key}
+                      href={href}
+                      className={`flex items-center gap-2 rounded-md px-3 py-2 text-sm transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-700 ${active ? "bg-brand-100 text-brand-900" : "text-slate-700 hover:bg-slate-100"
                         }`}
-                      >
-                        <Icon size={16} aria-hidden={true} />
-                        <span className="flex-1">{itemLabel(dict, item)}</span>
-                        {item.key === "chat" && chatUnreadCount > 0 ? (
-                          <span className="rounded-full bg-brand-700 px-2 py-0.5 text-[10px] font-semibold text-white">
-                            {chatUnreadCount}
-                          </span>
-                        ) : null}
-                      </Link>
-                    );
-                  })}
-                </nav>
-              </section>
-            ))
+                    >
+                      <Icon size={16} aria-hidden={true} />
+                      <span className="flex-1">{itemLabel(dict, item)}</span>
+                      {item.key === "chat" && chatUnreadCount > 0 ? (
+                        <span className="rounded-full bg-brand-700 px-2 py-0.5 text-[10px] font-semibold text-white">
+                          {chatUnreadCount}
+                        </span>
+                      ) : null}
+                    </Link>
+                  );
+                })}
+              </nav>
+            </section>
+          ))
           : null}
       </div>
 

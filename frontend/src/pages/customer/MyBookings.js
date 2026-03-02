@@ -3,7 +3,7 @@ import { TableRowSkeleton } from '../../components/ui/Skeleton.js';
 import { store } from '../../lib/store.js';
 import { t } from '../../lib/i18n.js';
 
-const NOT_SET_PRICE_LABEL = '\u063A\u064A\u0631 \u0645\u062D\u062F\u062F';
+const NOT_SET_PRICE_LABEL = 'Shown after admin approval';
 
 export function MyBookings() {
 
@@ -57,12 +57,9 @@ export function MyBookings() {
                 const d = new Date(b.appointmentAt);
                 const color = statusColors[b.status] || 'bg-muted/10 text-muted';
                 const hasFinalPrice = b.finalPrice !== null && b.finalPrice !== undefined;
-                const hasBasePrice = b.serviceBasePriceSnapshot !== null && b.serviceBasePriceSnapshot !== undefined;
                 const displayPrice = hasFinalPrice
                     ? `${b.finalPrice} JOD`
-                    : hasBasePrice
-                        ? `${b.serviceBasePriceSnapshot} JOD (Est)`
-                        : NOT_SET_PRICE_LABEL;
+                    : NOT_SET_PRICE_LABEL;
 
                 return `
           <tr class="border-b border-border hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer group" onclick="window.openBookingDrawer('${b.id}')">
@@ -99,12 +96,9 @@ export function MyBookings() {
             document.getElementById('drawer-datetime').textContent = `${d.toLocaleDateString()} at ${d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
             document.getElementById('drawer-status').textContent = b.status;
             const hasFinalPrice = b.finalPrice !== null && b.finalPrice !== undefined;
-            const hasBasePrice = b.serviceBasePriceSnapshot !== null && b.serviceBasePriceSnapshot !== undefined;
             document.getElementById('drawer-price').textContent = hasFinalPrice
                 ? `${b.finalPrice} JOD`
-                : hasBasePrice
-                    ? `${b.serviceBasePriceSnapshot} JOD (Estimated)`
-                    : NOT_SET_PRICE_LABEL;
+                : NOT_SET_PRICE_LABEL;
             document.getElementById('drawer-notes').textContent = b.notes || 'None';
 
             const cancelBtn = document.getElementById('drawer-cancel-btn');

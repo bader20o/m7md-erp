@@ -1,7 +1,7 @@
 import bcrypt from "bcryptjs";
 import { SignJWT, jwtVerify } from "jose";
 import { cookies } from "next/headers";
-import { Role, UserStatus } from "@prisma/client";
+import { Prisma, Role, UserStatus } from "@prisma/client";
 import { env } from "@/lib/env";
 import { prisma } from "@/lib/prisma";
 
@@ -13,7 +13,16 @@ export type SessionPayload = {
   sub: string;
   role: Role;
   phone: string;
+  sessionVersion: number;
 };
+
+export type SessionLookupResult =
+  | { ok: true; session: SessionPayload }
+  | {
+      ok: false;
+      code: "NO_SESSION" | "INVALID_SESSION" | "USER_NOT_FOUND";
+      message: string;
+    };
 
 export async function hashPassword(value: string): Promise<string> {
   return bcrypt.hash(value, 10);
@@ -47,18 +56,46 @@ export async function clearSessionCookie(): Promise<void> {
   cookieStore.set(COOKIE_NAME, "", { httpOnly: true, path: "/", maxAge: 0 });
 }
 
-export async function getSession(): Promise<SessionPayload | null> {
+function isJwtSessionError(error: unknown): boolean {
+  return (
+    error instanceof Error &&
+    [
+      "JWTExpired",
+      "JWTInvalid",
+      "JWTClaimValidationFailed",
+      "JWSInvalid",
+      "JWSSignatureVerificationFailed"
+    ].includes(error.name)
+  );
+}
+
+function isPrismaConnectionError(error: unknown): boolean {
+  return (
+    error instanceof Prisma.PrismaClientInitializationError ||
+    (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P1001")
+  );
+}
+
+export async function getSessionResult(): Promise<SessionLookupResult> {
   const cookieStore = await cookies();
   const token = cookieStore.get(COOKIE_NAME)?.value;
   if (!token) {
-    return null;
+    return {
+      ok: false,
+      code: "NO_SESSION",
+      message: "No active session."
+    };
   }
 
   try {
     const verified = await jwtVerify(token, secret);
     const payload = verified.payload as SessionPayload;
-    if (!payload?.sub || !payload?.role) {
-      return null;
+    if (!payload?.sub || !payload?.role || typeof payload.sessionVersion !== "number") {
+      return {
+        ok: false,
+        code: "INVALID_SESSION",
+        message: "Invalid or expired session token."
+      };
     }
 
     const user = await prisma.user.findUnique({
@@ -69,12 +106,47 @@ export async function getSession(): Promise<SessionPayload | null> {
         role: true,
         status: true,
         bannedUntil: true,
-        isActive: true
+        isActive: true,
+        sessionVersion: true
       }
     });
 
     if (!user) {
-      return null;
+      return {
+        ok: false,
+        code: "USER_NOT_FOUND",
+        message: "Session user no longer exists."
+      };
+    }
+
+    if (payload.sessionVersion !== user.sessionVersion) {
+      return {
+        ok: false,
+        code: "INVALID_SESSION",
+        message: "Invalid or expired session token."
+      };
+    }
+
+    if (user.status === UserStatus.SUSPENDED) {
+      if (user.bannedUntil && user.bannedUntil.getTime() <= Date.now()) {
+        await prisma.user.update({
+          where: { id: user.id },
+          data: {
+            status: UserStatus.ACTIVE,
+            isActive: true,
+            bannedUntil: null,
+            suspendedAt: null,
+            suspensionReason: null,
+            suspendedByAdminId: null
+          }
+        });
+      } else {
+        return {
+          ok: false,
+          code: "INVALID_SESSION",
+          message: "Invalid or expired session token."
+        };
+      }
     }
 
     if (user.status === UserStatus.BANNED) {
@@ -91,20 +163,49 @@ export async function getSession(): Promise<SessionPayload | null> {
           }
         });
       } else {
-        return null;
+        return {
+          ok: false,
+          code: "INVALID_SESSION",
+          message: "Invalid or expired session token."
+        };
       }
     }
 
     if (user.status === UserStatus.SUSPENDED || !user.isActive) {
-      return null;
+      return {
+        ok: false,
+        code: "INVALID_SESSION",
+        message: "Invalid or expired session token."
+      };
     }
 
     return {
-      sub: user.id,
-      role: user.role,
-      phone: user.phone
+      ok: true,
+      session: {
+        sub: user.id,
+        role: user.role,
+        phone: user.phone,
+        sessionVersion: user.sessionVersion
+      }
     };
-  } catch {
-    return null;
+  } catch (error) {
+    if (isJwtSessionError(error)) {
+      return {
+        ok: false,
+        code: "INVALID_SESSION",
+        message: "Invalid or expired session token."
+      };
+    }
+
+    if (isPrismaConnectionError(error)) {
+      throw error;
+    }
+
+    throw error;
   }
+}
+
+export async function getSession(): Promise<SessionPayload | null> {
+  const result = await getSessionResult();
+  return result.ok ? result.session : null;
 }

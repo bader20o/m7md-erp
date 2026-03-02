@@ -45,7 +45,9 @@ export function Profile() {
       document.getElementById("profile-name").value = user.fullName || "";
       document.getElementById("profile-phone").value = user.phone || "";
       document.getElementById("profile-bio").value = user.bio || "";
+      document.getElementById("profile-car-company").value = user.carCompany || "";
       document.getElementById("profile-car-type").value = user.carType || "";
+      document.getElementById("profile-car-year").value = user.carYear || "";
       document.getElementById("profile-location").value = user.location || "";
       document.getElementById("profile-avatar-url").value = user.avatarUrl || "";
       avatarPreview.innerHTML = avatarPreviewMarkup(user.fullName, user.avatarUrl);
@@ -80,7 +82,8 @@ export function Profile() {
           title: "Crop avatar",
           aspectRatio: 1,
           outputType: "image/jpeg",
-          outputSize: 640
+          outputSize: 640,
+          cropShape: "round"
         });
         if (!croppedBlob) {
           if (avatarHint) avatarHint.textContent = "Upload cancelled.";
@@ -130,7 +133,9 @@ export function Profile() {
 
       if (isCustomer) {
         payload.bio = document.getElementById("profile-bio").value || null;
+        payload.carCompany = document.getElementById("profile-car-company").value || null;
         payload.carType = document.getElementById("profile-car-type").value || null;
+        payload.carYear = document.getElementById("profile-car-year").value || null;
         payload.location = document.getElementById("profile-location").value || null;
       }
 
@@ -180,13 +185,12 @@ export function Profile() {
     <div class="max-w-4xl mx-auto w-full flex flex-col gap-6">
       <div>
         <h1 class="text-3xl font-heading font-bold text-text">Profile</h1>
-        <p class="text-muted mt-1">${
-          isCustomer
-            ? "Update your customer profile and account settings."
-            : isEmployee
-            ? "View HR information and manage your account security."
-            : "Manage administrator profile and platform preferences."
-        }</p>
+        <p class="text-muted mt-1">${isCustomer
+      ? "Update your customer profile and account settings."
+      : isEmployee
+        ? "View HR information and manage your account security."
+        : "Manage administrator profile and platform preferences."
+    }</p>
       </div>
 
       <div class="bg-surface border border-border rounded-2xl p-6 space-y-6">
@@ -218,8 +222,16 @@ export function Profile() {
             <textarea id="profile-bio" rows="3" class="w-full px-4 py-2.5 bg-bg border border-border rounded-xl"></textarea>
           </div>
           <div class="${isCustomer ? "" : "hidden"}">
-            <label class="block text-sm font-medium mb-1">Car Type</label>
+            <label class="block text-sm font-medium mb-1">Car Company (e.g. Toyota)</label>
+            <input id="profile-car-company" type="text" class="w-full px-4 py-2.5 bg-bg border border-border rounded-xl">
+          </div>
+          <div class="${isCustomer ? "" : "hidden"}">
+            <label class="block text-sm font-medium mb-1">Car Type (e.g. Camry)</label>
             <input id="profile-car-type" type="text" class="w-full px-4 py-2.5 bg-bg border border-border rounded-xl">
+          </div>
+          <div class="${isCustomer ? "" : "hidden"} md:col-span-2">
+            <label class="block text-sm font-medium mb-1">Car Model/Year (e.g. 2018)</label>
+            <input id="profile-car-year" type="number" class="w-full px-4 py-2.5 bg-bg border border-border rounded-xl">
           </div>
           <div class="${isCustomer ? "" : "hidden"} md:col-span-2">
             <label class="block text-sm font-medium mb-1">Location</label>

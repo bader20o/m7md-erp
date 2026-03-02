@@ -83,10 +83,6 @@ export async function POST(request: Request, context: Params): Promise<Response>
       throw new ApiError(404, "CUSTOMER_NOT_FOUND", "Customer not found.");
     }
 
-    if ((body.type === "CHARGE" || body.type === "ADJUSTMENT") && !body.note?.trim()) {
-      throw new ApiError(400, "NOTE_REQUIRED", "Note is required for CHARGE and ADJUSTMENT.");
-    }
-
     if (body.type !== "ADJUSTMENT" && body.amount <= 0) {
       throw new ApiError(400, "INVALID_AMOUNT", "Amount must be greater than 0.");
     }
@@ -132,4 +128,3 @@ export async function POST(request: Request, context: Params): Promise<Response>
     return fail(error);
   }
 }
-

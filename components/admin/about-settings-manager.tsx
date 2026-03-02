@@ -231,7 +231,7 @@ export function AboutSettingsManager({ about, settings }: Props): React.ReactEle
             value={settingsState.defaultCurrency}
             onChange={(event) => setSettingsState((prev) => ({ ...prev, defaultCurrency: event.target.value }))}
             className="rounded-md border border-slate-300 px-3 py-2"
-            placeholder="Currency (USD)"
+            placeholder="Currency (JOD)"
             maxLength={3}
             required
           />
@@ -254,4 +254,3 @@ export function AboutSettingsManager({ about, settings }: Props): React.ReactEle
     </div>
   );
 }
-
