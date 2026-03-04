@@ -108,8 +108,22 @@ export function AdminBookings() {
           `;
         }
         if (b.status === 'APPROVED') {
+          const priceType = b.service?.priceType || b.priceTypeSnapshot || 'FIXED';
+          const servicePrice = b.finalPrice || b.service?.basePrice || b.serviceBasePriceSnapshot || '';
           return `
-            <button onclick="window.patchStatus('${b.id}', 'COMPLETED')" class="w-full py-2.5 bg-green-500 hover:bg-green-600 text-white rounded-lg font-bold transition-colors shadow-sm">Mark Completed</button>
+            <div id="complete-form-area" class="space-y-3">
+              ${priceType === 'AFTER_INSPECTION' ? `
+                <div class="rounded-lg bg-amber-500/10 border border-amber-500/20 p-3">
+                  <p class="text-xs font-bold text-amber-500">Inspection Pricing</p>
+                  <p class="text-[11px] text-muted mt-1">Final price must be set before completing this booking.</p>
+                </div>
+                <input id="complete-price" type="number" step="0.01" min="0.01" value="" placeholder="Enter final price (JOD) *" class="w-full bg-bg border border-border text-sm rounded-lg px-3 py-2 text-text focus:outline-none focus:border-primary transition-colors" />
+              ` : `
+                <input id="complete-price" type="number" step="0.01" min="0.01" value="${servicePrice}" class="w-full bg-bg border border-border text-sm rounded-lg px-3 py-2 text-text focus:outline-none focus:border-primary transition-colors" placeholder="Final price (JOD)" />
+              `}
+              <textarea id="complete-note" placeholder="Admin note (optional)" class="w-full bg-bg border border-border text-sm rounded-lg px-3 py-2 text-text focus:outline-none focus:border-primary transition-colors" rows="2"></textarea>
+              <button onclick="window.completeBooking('${b.id}')" class="w-full py-2.5 bg-green-500 hover:bg-green-600 text-white rounded-lg font-bold transition-colors shadow-sm">Mark Completed</button>
+            </div>
             <div class="flex gap-3">
               <button onclick="window.patchStatus('${b.id}', 'NO_SHOW', true)" class="flex-1 py-2 bg-surface text-amber-500 border border-amber-500/20 hover:bg-amber-500/10 rounded-lg font-bold transition-colors">No Show</button>
               <button onclick="window.patchStatus('${b.id}', 'LATE_CANCELLED', true)" class="flex-1 py-2 bg-surface text-red-500 border border-red-500/20 hover:bg-red-500/10 rounded-lg font-bold transition-colors">Late Cancel</button>
@@ -165,6 +179,37 @@ export function AdminBookings() {
       mo.classList.add('opacity-0');
       m.classList.add('scale-95', 'opacity-0');
       setTimeout(() => mo.classList.add('hidden'), 300);
+    };
+
+    // Complete a booking via dedicated /complete endpoint
+    window.completeBooking = async (id) => {
+      const priceEl = document.getElementById('complete-price');
+      const noteEl = document.getElementById('complete-note');
+      const price = Number(priceEl?.value);
+      const note = noteEl?.value?.trim() || undefined;
+
+      if (!price || price <= 0) {
+        window.toast('Please enter a valid final price.', 'error');
+        return;
+      }
+
+      try {
+        const container = document.getElementById('manage-actions-container');
+        if (container) container.style.opacity = '0.5';
+
+        await apiFetch(`/admin/bookings/${id}/complete`, {
+          method: 'POST',
+          body: { finalPrice: price, internalNote: note }
+        });
+
+        window.toast('Booking completed successfully.', 'success');
+        window.closeManage();
+        load();
+      } catch (e) {
+        window.toast(e.message, 'error');
+        const container = document.getElementById('manage-actions-container');
+        if (container) container.style.opacity = '1';
+      }
     };
 
     window.patchStatus = async (id, newStatus, requiresNote = false) => {

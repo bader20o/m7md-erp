@@ -18,6 +18,20 @@ export async function GET(): Promise<Response> {
   try {
     const services = await prisma.service.findMany({
       where: { isActive: true },
+      select: {
+        id: true,
+        nameEn: true,
+        nameAr: true,
+        descriptionEn: true,
+        descriptionAr: true,
+        imageUrl: true,
+        category: true,
+        basePrice: true,
+        priceType: true,
+        supportedCarTypes: true,
+        durationMinutes: true,
+        isActive: true
+      },
       orderBy: { createdAt: "desc" }
     });
     return ok({ items: services });

@@ -9,6 +9,11 @@ const repoRoot = path.resolve(__dirname, "..");
 const spaSourceDir = path.join(repoRoot, "frontend");
 const spaOutputDir = path.join(repoRoot, "public", "spa");
 const entriesToCopy = ["index.html", "src"];
+const vendorSource = path.join(repoRoot, "node_modules", "embla-carousel", "embla-carousel.umd.js");
+const zxingVendorSource = path.join(repoRoot, "node_modules", "@zxing", "browser", "umd", "zxing-browser.min.js");
+const vendorOutputDir = path.join(spaOutputDir, "vendor");
+const vendorOutputFile = path.join(vendorOutputDir, "embla-carousel.js");
+const zxingVendorOutputFile = path.join(vendorOutputDir, "zxing-browser.js");
 
 async function ensureExists(targetPath) {
   try {
@@ -29,6 +34,12 @@ async function syncSpa() {
     await ensureExists(fromPath);
     await cp(fromPath, toPath, { force: true, recursive: true });
   }
+
+  await ensureExists(vendorSource);
+  await ensureExists(zxingVendorSource);
+  await mkdir(vendorOutputDir, { recursive: true });
+  await cp(vendorSource, vendorOutputFile, { force: true });
+  await cp(zxingVendorSource, zxingVendorOutputFile, { force: true });
 
   console.log(`Synced SPA files: frontend -> ${path.relative(repoRoot, spaOutputDir)}`);
 }

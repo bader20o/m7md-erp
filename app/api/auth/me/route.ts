@@ -1,8 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { fail, ok } from "@/lib/api";
-import { getSessionResult } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
+import { findSessionUserProfileById, getSessionResult } from "@/lib/auth";
 import { getPermissionsForUser } from "@/lib/rbac";
 
 function unauthorized(code: string, message: string): Response {
@@ -40,32 +39,7 @@ export async function GET(): Promise<Response> {
       return unauthorized(sessionResult.code, sessionResult.message);
     }
 
-    const user = await prisma.user.findUnique({
-      where: { id: sessionResult.session.sub },
-      select: {
-        id: true,
-        phone: true,
-        role: true,
-        status: true,
-        avatarUrl: true,
-        bio: true,
-        carCompany: true,
-        carType: true,
-        carModel: true,
-        carYear: true,
-        location: true,
-        fullName: true,
-        locale: true,
-        theme: true,
-        isActive: true,
-        forcePasswordReset: true,
-        mustChangePassword: true,
-        bannedUntil: true,
-        banReason: true,
-        banMessage: true,
-        createdAt: true
-      }
-    });
+    const user = await findSessionUserProfileById(sessionResult.session.sub);
 
     if (!user) {
       return unauthorized("USER_NOT_FOUND", "Session user no longer exists.");

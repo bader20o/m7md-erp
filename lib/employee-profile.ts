@@ -1,4 +1,14 @@
-import { BookingStatus, EmploymentStatus, EmployeeRoleProfile, Prisma, Role, UserStatus } from "@prisma/client";
+import {
+  AttendanceEventStatus,
+  AttendanceType,
+  BookingStatus,
+  EmploymentStatus,
+  EmployeeRoleProfile,
+  Prisma,
+  Role,
+  UserStatus
+} from "@prisma/client";
+import { getAttendanceDayKey, getAttendanceEventMessage } from "@/lib/attendance";
 import { prisma } from "@/lib/prisma";
 
 export const EMPLOYEE_ROLE_OPTIONS = [
@@ -433,75 +443,81 @@ export async function buildEmployeeActivity(userId: string, employeeId: string, 
 }
 
 export async function buildEmployeeAttendance(employeeId: string, range?: PerformanceRange) {
-  const checkInFilter = range ? { gte: range.from, lte: range.to } : undefined;
-  const [latestCheckIn, latestCheckOut, records] = await Promise.all([
-    prisma.attendance.findFirst({
-      where: { employeeId },
+  const dayKeyFilter = range
+    ? {
+        gte: getAttendanceDayKey(range.from),
+        lte: getAttendanceDayKey(range.to)
+      }
+    : undefined;
+  const [latestCheckIn, latestCheckOut, records, events] = await Promise.all([
+    prisma.attendanceDay.findFirst({
+      where: { employeeId, checkInAt: { not: null } },
       orderBy: { checkInAt: "desc" },
       select: { checkInAt: true }
     }),
-    prisma.attendance.findFirst({
+    prisma.attendanceDay.findFirst({
       where: { employeeId, checkOutAt: { not: null } },
       orderBy: { checkOutAt: "desc" },
       select: { checkOutAt: true }
     }),
-    prisma.attendance.findMany({
-      where: { employeeId, ...(checkInFilter ? { checkInAt: checkInFilter } : {}) },
-      orderBy: { checkInAt: "desc" },
+    prisma.attendanceDay.findMany({
+      where: { employeeId, ...(dayKeyFilter ? { dayKey: dayKeyFilter } : {}) },
+      orderBy: { dayKey: "desc" },
       take: 60,
       select: {
         id: true,
+        dayKey: true,
         checkInAt: true,
         checkOutAt: true,
-        qrPayload: true
+        workedMinutes: true
+      }
+    }),
+    prisma.attendanceEvent.findMany({
+      where: { employeeId, ...(dayKeyFilter ? { dayKey: dayKeyFilter } : {}) },
+      orderBy: [{ occurredAt: "desc" }, { createdAt: "desc" }],
+      take: 80,
+      select: {
+        id: true,
+        dayKey: true,
+        type: true,
+        status: true,
+        rejectReason: true,
+        occurredAt: true,
+        ipAddress: true
       }
     })
   ]);
 
-  const attendanceLog = records.flatMap((record) => {
-    const baseDate = record.checkInAt.toISOString().slice(0, 10);
-    const source = record.qrPayload ? "QR Scan" : "Manual";
-    const entries = [
-      {
-        id: `${record.id}:in`,
-        date: baseDate,
-        action: "Check-in",
-        time: record.checkInAt.toISOString(),
-        source,
-        ipAddress: null as string | null
-      }
-    ];
-
-    if (record.checkOutAt) {
-      entries.push({
-        id: `${record.id}:out`,
-        date: record.checkOutAt.toISOString().slice(0, 10),
-        action: "Check-out",
-        time: record.checkOutAt.toISOString(),
-        source,
-        ipAddress: null as string | null
-      });
-    }
-
-    return entries;
-  });
+  const attendanceLog = events.map((event) => ({
+    id: event.id,
+    date: event.dayKey,
+    action: event.type === AttendanceType.CHECK_IN ? "Check-in" : "Check-out",
+    time: event.occurredAt.toISOString(),
+    source: "QR Scan",
+    ipAddress: event.ipAddress,
+    result: event.status === AttendanceEventStatus.ACCEPTED ? "Accepted" : "Rejected",
+    message: getAttendanceEventMessage(event.type, event.status, event.rejectReason)
+  }));
 
   const summaryBase = range?.to ?? new Date();
   const summaryMonth = summaryBase.getUTCMonth();
   const summaryYear = summaryBase.getUTCFullYear();
   const monthlyRecords = records.filter(
-    (record) => record.checkInAt.getUTCMonth() === summaryMonth && record.checkInAt.getUTCFullYear() === summaryYear
+    (record) =>
+      record.checkInAt &&
+      record.checkInAt.getUTCMonth() === summaryMonth &&
+      record.checkInAt.getUTCFullYear() === summaryYear
   );
-  const presentDays = new Set(monthlyRecords.map((record) => record.checkInAt.toISOString().slice(0, 10))).size;
+  const presentDays = new Set(monthlyRecords.map((record) => record.dayKey)).size;
   const completedShifts = monthlyRecords.filter((record) => record.checkOutAt).length;
   const totalWorkedMs = monthlyRecords.reduce((sum, record) => {
-    if (!record.checkOutAt) return sum;
+    if (!record.checkInAt || !record.checkOutAt) return sum;
     return sum + (record.checkOutAt.getTime() - record.checkInAt.getTime());
   }, 0);
 
   return {
     snapshot: {
-      lastCheckInAt: latestCheckIn?.checkInAt.toISOString() ?? null,
+      lastCheckInAt: latestCheckIn?.checkInAt?.toISOString() ?? null,
       lastCheckOutAt: latestCheckOut?.checkOutAt?.toISOString() ?? null
     },
     log: attendanceLog,

@@ -195,6 +195,8 @@ export async function createSaleInvoice(
     }
 
     const totalAmount = computeInvoiceTotal(lines);
+    const totalQuantity = lines.reduce((sum, l) => sum + l.quantity, 0);
+    const avgSaleUnitPrice = totalQuantity > 0 ? Number((totalAmount / totalQuantity).toFixed(2)) : 0;
     const { totalCost, avgUnitCost } = computeInventoryCostTotals(lines, partMap);
     const profitAmount = Number((totalAmount - totalCost).toFixed(2));
 
@@ -281,10 +283,10 @@ export async function createSaleInvoice(
                 type: TransactionType.INCOME,
                 incomeSource: IncomeSource.INVOICE,
                 itemName: `Invoice ${invoice.number}`,
-                unitPrice: totalAmount,
-                quantity: 1,
+                unitPrice: avgSaleUnitPrice,
+                quantity: totalQuantity,
                 amount: totalAmount,
-                sellPriceAtTimeOfSale: totalAmount,
+                sellPriceAtTimeOfSale: avgSaleUnitPrice,
                 costAtTimeOfSale: avgUnitCost,
                 costTotal: totalCost,
                 profitAmount,
@@ -497,6 +499,8 @@ export async function updateSaleInvoice(
     }
 
     const totalAmount = computeInvoiceTotal(lines);
+    const totalQuantity = lines.reduce((sum, l) => sum + l.quantity, 0);
+    const avgSaleUnitPrice = totalQuantity > 0 ? Number((totalAmount / totalQuantity).toFixed(2)) : 0;
     const { totalCost, avgUnitCost } = computeInventoryCostTotals(lines, partMap);
     const profitAmount = Number((totalAmount - totalCost).toFixed(2));
 
@@ -616,10 +620,10 @@ export async function updateSaleInvoice(
                 type: TransactionType.INCOME,
                 incomeSource: IncomeSource.INVOICE,
                 itemName: `Invoice ${existing.number}`,
-                unitPrice: totalAmount,
-                quantity: 1,
+                unitPrice: avgSaleUnitPrice,
+                quantity: totalQuantity,
                 amount: totalAmount,
-                sellPriceAtTimeOfSale: totalAmount,
+                sellPriceAtTimeOfSale: avgSaleUnitPrice,
                 costAtTimeOfSale: avgUnitCost,
                 costTotal: totalCost,
                 profitAmount,

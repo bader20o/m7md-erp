@@ -162,6 +162,7 @@ async function main(): Promise<void> {
         descriptionAr: "???? ?????? ???????? ???????.",
         price: 299,
         durationDays: 180,
+        durationMonths: 6,
         isActive: true
       },
       create: {
@@ -172,6 +173,7 @@ async function main(): Promise<void> {
         descriptionAr: "???? ?????? ???????? ???????.",
         price: 299,
         durationDays: 180,
+        durationMonths: 6,
         isActive: true
       }
     }),
@@ -184,6 +186,7 @@ async function main(): Promise<void> {
         descriptionAr: "???? ??????? ?????? ???????? ??????????.",
         price: 599,
         durationDays: 365,
+        durationMonths: 12,
         isActive: true
       },
       create: {
@@ -194,6 +197,7 @@ async function main(): Promise<void> {
         descriptionAr: "???? ??????? ?????? ???????? ??????????.",
         price: 599,
         durationDays: 365,
+        durationMonths: 12,
         isActive: true
       }
     }),
@@ -206,6 +210,7 @@ async function main(): Promise<void> {
         descriptionAr: "???? ?????? ?? ????? ??????? ?????.",
         price: 899,
         durationDays: 365,
+        durationMonths: 12,
         isActive: true
       },
       create: {
@@ -216,10 +221,17 @@ async function main(): Promise<void> {
         descriptionAr: "???? ?????? ?? ????? ??????? ?????.",
         price: 899,
         durationDays: 365,
+        durationMonths: 12,
         isActive: true
       }
     })
   ]);
+
+  await prisma.membershipBenefit.deleteMany({
+    where: {
+      planId: { in: [bronze.id, silver.id, gold.id] }
+    }
+  });
 
   await prisma.membershipPlanService.deleteMany({
     where: {
@@ -264,6 +276,71 @@ async function main(): Promise<void> {
         serviceId: inverter.id,
         totalUses: 3,
         preventDuplicatePerBooking: true
+      }
+    ]
+  });
+
+  await prisma.membershipBenefit.createMany({
+    data: [
+      {
+        planId: bronze.id,
+        code: `service_${diagnostics.id}`,
+        titleEn: diagnostics.nameEn,
+        titleAr: diagnostics.nameAr,
+        descriptionEn: diagnostics.descriptionEn,
+        descriptionAr: diagnostics.descriptionAr,
+        limitCount: 2,
+        isActive: true
+      },
+      {
+        planId: silver.id,
+        code: `service_${diagnostics.id}`,
+        titleEn: diagnostics.nameEn,
+        titleAr: diagnostics.nameAr,
+        descriptionEn: diagnostics.descriptionEn,
+        descriptionAr: diagnostics.descriptionAr,
+        limitCount: 4,
+        isActive: true
+      },
+      {
+        planId: silver.id,
+        code: `service_${battery.id}`,
+        titleEn: battery.nameEn,
+        titleAr: battery.nameAr,
+        descriptionEn: battery.descriptionEn,
+        descriptionAr: battery.descriptionAr,
+        limitCount: 2,
+        isActive: true
+      },
+      {
+        planId: gold.id,
+        code: `service_${diagnostics.id}`,
+        titleEn: diagnostics.nameEn,
+        titleAr: diagnostics.nameAr,
+        descriptionEn: diagnostics.descriptionEn,
+        descriptionAr: diagnostics.descriptionAr,
+        limitCount: 6,
+        isActive: true
+      },
+      {
+        planId: gold.id,
+        code: `service_${battery.id}`,
+        titleEn: battery.nameEn,
+        titleAr: battery.nameAr,
+        descriptionEn: battery.descriptionEn,
+        descriptionAr: battery.descriptionAr,
+        limitCount: 4,
+        isActive: true
+      },
+      {
+        planId: gold.id,
+        code: `service_${inverter.id}`,
+        titleEn: inverter.nameEn,
+        titleAr: inverter.nameAr,
+        descriptionEn: inverter.descriptionEn,
+        descriptionAr: inverter.descriptionAr,
+        limitCount: 3,
+        isActive: true
       }
     ]
   });

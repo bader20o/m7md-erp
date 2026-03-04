@@ -1,43 +1,68 @@
-import { prisma } from "@/lib/prisma";
+import QRCode from "qrcode";
+import { redirect } from "next/navigation";
+import { AdminAttendanceDashboard } from "@/components/attendance/admin-attendance-dashboard";
+import { getFixedAttendancePayloads, requireAttendanceAdmin } from "@/lib/attendance";
+import { getSession } from "@/lib/auth";
+import { env } from "@/lib/env";
 
-export default async function AdminAttendancePage(): Promise<React.ReactElement> {
-  const attendance = await prisma.attendance.findMany({
-    include: {
-      employee: {
-        include: {
-          user: { select: { fullName: true, phone: true } }
-        }
+type Props = {
+  params: Promise<{ locale: string }>;
+};
+
+export default async function AdminAttendancePage({ params }: Props): Promise<React.ReactElement> {
+  const { locale } = await params;
+  const session = await getSession();
+
+  if (!session) {
+    redirect(`/${locale}/login`);
+  }
+
+  try {
+    await requireAttendanceAdmin(session);
+  } catch {
+    return (
+      <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+        Access denied. Admins and managers only.
+      </div>
+    );
+  }
+
+  const payloads = getFixedAttendancePayloads();
+  const [checkInImageDataUrl, checkOutImageDataUrl] = await Promise.all([
+    QRCode.toDataURL(payloads.checkIn, {
+      margin: 1,
+      width: 220,
+      color: {
+        dark: "#e2fff3",
+        light: "#0f172a"
       }
-    },
-    orderBy: { checkInAt: "desc" },
-    take: 300
-  });
+    }),
+    QRCode.toDataURL(payloads.checkOut, {
+      margin: 1,
+      width: 220,
+      color: {
+        dark: "#e2fff3",
+        light: "#0f172a"
+      }
+    })
+  ]);
 
   return (
-    <section className="space-y-4">
-      <h1 className="text-2xl font-semibold">Attendance</h1>
-      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
-        <table className="w-full text-sm">
-          <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-600">
-            <tr>
-              <th className="px-3 py-2">Employee</th>
-              <th className="px-3 py-2">Check In</th>
-              <th className="px-3 py-2">Check Out</th>
-              <th className="px-3 py-2">Note</th>
-            </tr>
-          </thead>
-          <tbody>
-            {attendance.map((row) => (
-              <tr key={row.id} className="border-t border-slate-100">
-                <td className="px-3 py-2">{row.employee.user.fullName || row.employee.user.phone}</td>
-                <td className="px-3 py-2">{row.checkInAt.toLocaleString()}</td>
-                <td className="px-3 py-2">{row.checkOutAt ? row.checkOutAt.toLocaleString() : "-"}</td>
-                <td className="px-3 py-2">{row.note || "-"}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </section>
+    <AdminAttendanceDashboard
+      locale={locale}
+      timezone={env.ATTENDANCE_TIMEZONE}
+      qrCards={[
+        {
+          label: "Check In",
+          payload: payloads.checkIn,
+          imageDataUrl: checkInImageDataUrl
+        },
+        {
+          label: "Check Out",
+          payload: payloads.checkOut,
+          imageDataUrl: checkOutImageDataUrl
+        }
+      ]}
+    />
   );
 }

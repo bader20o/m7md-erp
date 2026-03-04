@@ -1,5 +1,6 @@
 import { EmployeePermission, Role } from "@prisma/client";
 import { ApiError } from "@/lib/api";
+import { isPrismaSchemaCompatibilityError } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import type { SessionPayload } from "@/lib/auth";
 
@@ -66,10 +67,18 @@ export async function getPermissionsForUser(userId: string, role: Role): Promise
     return [];
   }
 
-  const employee = await prisma.employee.findUnique({
-    where: { userId },
-    select: { permissionGrants: { select: { permission: true } } }
-  });
+  let employee;
+  try {
+    employee = await prisma.employee.findUnique({
+      where: { userId },
+      select: { permissionGrants: { select: { permission: true } } }
+    });
+  } catch (error) {
+    if (isPrismaSchemaCompatibilityError(error)) {
+      return [];
+    }
+    throw error;
+  }
 
   if (!employee) {
     return [];
@@ -106,4 +115,3 @@ export async function requireAnyPermission(
   }
   return activeSession;
 }
-

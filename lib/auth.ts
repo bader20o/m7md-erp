@@ -1,7 +1,7 @@
 import bcrypt from "bcryptjs";
 import { SignJWT, jwtVerify } from "jose";
 import { cookies } from "next/headers";
-import { Prisma, Role, UserStatus } from "@prisma/client";
+import { EmployeeRoleProfile, Prisma, Role, UserStatus } from "@prisma/client";
 import { env } from "@/lib/env";
 import { prisma } from "@/lib/prisma";
 
@@ -23,6 +23,50 @@ export type SessionLookupResult =
       code: "NO_SESSION" | "INVALID_SESSION" | "USER_NOT_FOUND";
       message: string;
     };
+
+export type AuthUserRecord = {
+  id: string;
+  phone: string;
+  passwordHash: string;
+  role: Role;
+  fullName: string | null;
+  locale: string;
+  isActive: boolean;
+  status: UserStatus;
+  bannedUntil: Date | null;
+  banReason: string | null;
+  banMessage: string | null;
+  sessionVersion: number;
+  forcePasswordReset: boolean;
+  mustChangePassword: boolean;
+  createdAt: Date;
+};
+
+export type SessionUserProfile = {
+  id: string;
+  phone: string;
+  role: Role;
+  employeeId: string | null;
+  roleProfile: EmployeeRoleProfile | null;
+  status: UserStatus;
+  avatarUrl: string | null;
+  bio: string | null;
+  carCompany: string | null;
+  carType: string | null;
+  carModel: string | null;
+  carYear: string | null;
+  location: string | null;
+  fullName: string | null;
+  locale: string;
+  theme: string;
+  isActive: boolean;
+  forcePasswordReset: boolean;
+  mustChangePassword: boolean;
+  bannedUntil: Date | null;
+  banReason: string | null;
+  banMessage: string | null;
+  createdAt: Date;
+};
 
 export async function hashPassword(value: string): Promise<string> {
   return bcrypt.hash(value, 10);
@@ -76,6 +120,310 @@ function isPrismaConnectionError(error: unknown): boolean {
   );
 }
 
+export function isPrismaSchemaCompatibilityError(error: unknown): boolean {
+  return (
+    error instanceof Prisma.PrismaClientKnownRequestError &&
+    (error.code === "P2021" || error.code === "P2022")
+  );
+}
+
+function normalizeAuthUser(
+  user: {
+    id: string;
+    phone: string;
+    passwordHash: string;
+    role: Role;
+    fullName: string | null;
+    locale?: string | null;
+    isActive?: boolean | null;
+    status?: UserStatus | null;
+    bannedUntil?: Date | null;
+    banReason?: string | null;
+    banMessage?: string | null;
+    sessionVersion?: number | null;
+    forcePasswordReset?: boolean | null;
+    mustChangePassword?: boolean | null;
+    createdAt: Date;
+  }
+): AuthUserRecord {
+  return {
+    id: user.id,
+    phone: user.phone,
+    passwordHash: user.passwordHash,
+    role: user.role,
+    fullName: user.fullName ?? null,
+    locale: user.locale ?? "en",
+    isActive: user.isActive ?? true,
+    status: user.status ?? UserStatus.ACTIVE,
+    bannedUntil: user.bannedUntil ?? null,
+    banReason: user.banReason ?? null,
+    banMessage: user.banMessage ?? null,
+    sessionVersion: user.sessionVersion ?? 0,
+    forcePasswordReset: user.forcePasswordReset ?? false,
+    mustChangePassword: user.mustChangePassword ?? false,
+    createdAt: user.createdAt
+  };
+}
+
+function normalizeSessionUserProfile(
+  user: {
+    id: string;
+    phone: string;
+    role: Role;
+    employeeProfile?: {
+      id: string;
+      roleProfile: EmployeeRoleProfile;
+    } | null;
+    fullName: string | null;
+    locale?: string | null;
+    isActive?: boolean | null;
+    status?: UserStatus | null;
+    avatarUrl?: string | null;
+    bio?: string | null;
+    carCompany?: string | null;
+    carType?: string | null;
+    carModel?: string | null;
+    carYear?: string | null;
+    location?: string | null;
+    theme?: string | null;
+    forcePasswordReset?: boolean | null;
+    mustChangePassword?: boolean | null;
+    bannedUntil?: Date | null;
+    banReason?: string | null;
+    banMessage?: string | null;
+    createdAt: Date;
+  }
+): SessionUserProfile {
+  return {
+    id: user.id,
+    phone: user.phone,
+    role: user.role,
+    employeeId: user.employeeProfile?.id ?? null,
+    roleProfile: user.employeeProfile?.roleProfile ?? null,
+    status: user.status ?? UserStatus.ACTIVE,
+    avatarUrl: user.avatarUrl ?? null,
+    bio: user.bio ?? null,
+    carCompany: user.carCompany ?? null,
+    carType: user.carType ?? null,
+    carModel: user.carModel ?? null,
+    carYear: user.carYear ?? null,
+    location: user.location ?? null,
+    fullName: user.fullName ?? null,
+    locale: user.locale ?? "en",
+    theme: user.theme ?? "system",
+    isActive: user.isActive ?? true,
+    forcePasswordReset: user.forcePasswordReset ?? false,
+    mustChangePassword: user.mustChangePassword ?? false,
+    bannedUntil: user.bannedUntil ?? null,
+    banReason: user.banReason ?? null,
+    banMessage: user.banMessage ?? null,
+    createdAt: user.createdAt
+  };
+}
+
+export async function findAuthUserByPhone(phone: string): Promise<AuthUserRecord | null> {
+  try {
+    const user = await prisma.user.findUnique({
+      where: { phone },
+      select: {
+        id: true,
+        phone: true,
+        passwordHash: true,
+        role: true,
+        fullName: true,
+        locale: true,
+        isActive: true,
+        status: true,
+        bannedUntil: true,
+        banReason: true,
+        banMessage: true,
+        sessionVersion: true,
+        forcePasswordReset: true,
+        mustChangePassword: true,
+        createdAt: true
+      }
+    });
+
+    return user ? normalizeAuthUser(user) : null;
+  } catch (error) {
+    if (!isPrismaSchemaCompatibilityError(error)) {
+      throw error;
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { phone },
+      select: {
+        id: true,
+        phone: true,
+        passwordHash: true,
+        role: true,
+        fullName: true,
+        locale: true,
+        isActive: true,
+        createdAt: true
+      }
+    });
+
+    return user ? normalizeAuthUser(user) : null;
+  }
+}
+
+export async function findAuthUserById(id: string): Promise<AuthUserRecord | null> {
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        phone: true,
+        passwordHash: true,
+        role: true,
+        fullName: true,
+        locale: true,
+        isActive: true,
+        status: true,
+        bannedUntil: true,
+        banReason: true,
+        banMessage: true,
+        sessionVersion: true,
+        forcePasswordReset: true,
+        mustChangePassword: true,
+        createdAt: true
+      }
+    });
+
+    return user ? normalizeAuthUser(user) : null;
+  } catch (error) {
+    if (!isPrismaSchemaCompatibilityError(error)) {
+      throw error;
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        phone: true,
+        passwordHash: true,
+        role: true,
+        fullName: true,
+        locale: true,
+        isActive: true,
+        createdAt: true
+      }
+    });
+
+    return user ? normalizeAuthUser(user) : null;
+  }
+}
+
+export async function findSessionUserProfileById(id: string): Promise<SessionUserProfile | null> {
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        phone: true,
+        role: true,
+        employeeProfile: {
+          select: {
+            id: true,
+            roleProfile: true
+          }
+        },
+        status: true,
+        avatarUrl: true,
+        bio: true,
+        carCompany: true,
+        carType: true,
+        carModel: true,
+        carYear: true,
+        location: true,
+        fullName: true,
+        locale: true,
+        theme: true,
+        isActive: true,
+        forcePasswordReset: true,
+        mustChangePassword: true,
+        bannedUntil: true,
+        banReason: true,
+        banMessage: true,
+        createdAt: true
+      }
+    });
+
+    return user ? normalizeSessionUserProfile(user) : null;
+  } catch (error) {
+    if (!isPrismaSchemaCompatibilityError(error)) {
+      throw error;
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        phone: true,
+        role: true,
+        employeeProfile: {
+          select: {
+            id: true,
+            roleProfile: true
+          }
+        },
+        fullName: true,
+        locale: true,
+        isActive: true,
+        createdAt: true
+      }
+    });
+
+    return user ? normalizeSessionUserProfile(user) : null;
+  }
+}
+
+export async function recordLoginMetadata(
+  userId: string,
+  metadata: { ipAddress: string | null; userAgent: string | null }
+): Promise<void> {
+  try {
+    await prisma.user.update({
+      where: { id: userId },
+      data: {
+        lastLoginAt: new Date(),
+        lastLoginIp: metadata.ipAddress,
+        lastLoginUserAgent: metadata.userAgent
+      }
+    });
+  } catch (error) {
+    if (!isPrismaSchemaCompatibilityError(error)) {
+      throw error;
+    }
+  }
+}
+
+export async function recordLogoutMetadata(userId: string): Promise<void> {
+  try {
+    await prisma.user.update({
+      where: { id: userId },
+      data: {
+        lastLogoutAt: new Date()
+      }
+    });
+  } catch (error) {
+    if (!isPrismaSchemaCompatibilityError(error)) {
+      throw error;
+    }
+  }
+}
+
+async function restoreActiveUser(userId: string): Promise<void> {
+  await prisma.user.update({
+    where: { id: userId },
+    data: {
+      status: UserStatus.ACTIVE,
+      isActive: true
+    }
+  });
+}
+
 export async function getSessionResult(): Promise<SessionLookupResult> {
   const cookieStore = await cookies();
   const token = cookieStore.get(COOKIE_NAME)?.value;
@@ -98,18 +446,7 @@ export async function getSessionResult(): Promise<SessionLookupResult> {
       };
     }
 
-    const user = await prisma.user.findUnique({
-      where: { id: payload.sub },
-      select: {
-        id: true,
-        phone: true,
-        role: true,
-        status: true,
-        bannedUntil: true,
-        isActive: true,
-        sessionVersion: true
-      }
-    });
+    const user = await findAuthUserById(payload.sub);
 
     if (!user) {
       return {
@@ -129,17 +466,7 @@ export async function getSessionResult(): Promise<SessionLookupResult> {
 
     if (user.status === UserStatus.SUSPENDED) {
       if (user.bannedUntil && user.bannedUntil.getTime() <= Date.now()) {
-        await prisma.user.update({
-          where: { id: user.id },
-          data: {
-            status: UserStatus.ACTIVE,
-            isActive: true,
-            bannedUntil: null,
-            suspendedAt: null,
-            suspensionReason: null,
-            suspendedByAdminId: null
-          }
-        });
+        await restoreActiveUser(user.id);
       } else {
         return {
           ok: false,
@@ -151,17 +478,7 @@ export async function getSessionResult(): Promise<SessionLookupResult> {
 
     if (user.status === UserStatus.BANNED) {
       if (user.bannedUntil && user.bannedUntil.getTime() <= Date.now()) {
-        await prisma.user.update({
-          where: { id: user.id },
-          data: {
-            status: UserStatus.ACTIVE,
-            isActive: true,
-            bannedUntil: null,
-            banReason: null,
-            banMessage: null,
-            bannedByAdminId: null
-          }
-        });
+        await restoreActiveUser(user.id);
       } else {
         return {
           ok: false,

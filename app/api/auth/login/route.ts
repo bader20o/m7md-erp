@@ -2,7 +2,14 @@ import { UserStatus } from "@prisma/client";
 import { ApiError, fail, ok, parseJsonBody } from "@/lib/api";
 import { evaluateBan, toRemainingDurationLabel } from "@/lib/account-status";
 import { logAudit } from "@/lib/audit";
-import { setSessionCookie, signSession, verifyPassword } from "@/lib/auth";
+import {
+  findAuthUserByPhone,
+  recordLoginMetadata,
+  setSessionCookie,
+  signSession,
+  verifyPassword
+} from "@/lib/auth";
+import { ensureDefaultAdminUser } from "@/lib/default-admin";
 import { headers } from "next/headers";
 import { prisma } from "@/lib/prisma";
 import { loginSchema } from "@/lib/validators/auth";
@@ -10,10 +17,9 @@ import { loginSchema } from "@/lib/validators/auth";
 export async function POST(request: Request): Promise<Response> {
   try {
     const body = await parseJsonBody(request, loginSchema);
+    await ensureDefaultAdminUser(body.phone);
 
-    const user = await prisma.user.findUnique({
-      where: { phone: body.phone }
-    });
+    const user = await findAuthUserByPhone(body.phone);
 
     if (!user) {
       throw new ApiError(401, "INVALID_CREDENTIALS", "Invalid phone or password.");
@@ -25,11 +31,7 @@ export async function POST(request: Request): Promise<Response> {
           where: { id: user.id },
           data: {
             status: UserStatus.ACTIVE,
-            isActive: true,
-            bannedUntil: null,
-            suspendedAt: null,
-            suspensionReason: null,
-            suspendedByAdminId: null
+            isActive: true
           }
         });
       } else {
@@ -57,11 +59,7 @@ export async function POST(request: Request): Promise<Response> {
         where: { id: user.id },
         data: {
           status: UserStatus.ACTIVE,
-          isActive: true,
-          bannedUntil: null,
-          banReason: null,
-          banMessage: null,
-          bannedByAdminId: null
+          isActive: true
         }
       });
     }
@@ -76,14 +74,7 @@ export async function POST(request: Request): Promise<Response> {
     const ipAddress = forwarded?.split(",")[0]?.trim() ?? null;
     const userAgent = requestHeaders.get("user-agent");
 
-    await prisma.user.update({
-      where: { id: user.id },
-      data: {
-        lastLoginAt: new Date(),
-        lastLoginIp: ipAddress,
-        lastLoginUserAgent: userAgent
-      }
-    });
+    await recordLoginMetadata(user.id, { ipAddress, userAgent });
 
     const token = await signSession({
       sub: user.id,

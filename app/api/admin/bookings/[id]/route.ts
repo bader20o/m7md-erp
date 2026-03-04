@@ -23,7 +23,7 @@ export async function GET(request: Request, context: Params): Promise<Response> 
             where: { id },
             include: {
                 customer: { select: { fullName: true, phone: true } },
-                service: { select: { nameEn: true, basePrice: true } }
+                service: { select: { nameEn: true, basePrice: true, priceType: true } }
             }
         });
 
@@ -62,6 +62,11 @@ export async function PATCH(request: Request, context: Params): Promise<Response
         const body = patchBookingSchema.parse(parsedBody);
         const { id } = await context.params;
 
+        // Block COMPLETED via PATCH — must use POST /complete endpoint
+        if (body.status === BookingStatus.COMPLETED) {
+            throw new ApiError(400, "USE_COMPLETE_ENDPOINT", "To mark a booking as completed, use POST /api/admin/bookings/{id}/complete with finalPrice.");
+        }
+
         const booking = await prisma.booking.findUnique({
             where: { id },
             select: { id: true, status: true }
@@ -87,10 +92,6 @@ export async function PATCH(request: Request, context: Params): Promise<Response
             updateData.cancelledByUserId = actor.sub;
         } else if (body.note && body.status === 'REJECTED') {
             updateData.rejectReason = body.note;
-        }
-
-        if (body.status === BookingStatus.COMPLETED) {
-            updateData.completedAt = new Date();
         }
 
         const item = await prisma.booking.update({

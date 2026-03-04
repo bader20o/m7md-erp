@@ -87,6 +87,11 @@ enum BookingStatus {
   NOT_SERVED
 }
 
+enum PriceType {
+  FIXED
+  AFTER_INSPECTION
+}
+
 enum TransactionType {
   INCOME
   EXPENSE
@@ -113,9 +118,11 @@ enum ReviewStatus {
 }
 
 enum MembershipOrderStatus {
+  PENDING
   ACTIVE
+  REJECTED
+  CANCELLED
   EXPIRED
-  SUSPENDED
 }
 
 enum MembershipPlanTier {
@@ -130,8 +137,18 @@ enum SalaryPaymentStatus {
 }
 
 enum AttendanceType {
-  IN
-  OUT
+  CHECK_IN
+  CHECK_OUT
+}
+
+enum AttendanceEventStatus {
+  ACCEPTED
+  REJECTED
+}
+
+enum AttendanceDayStatus {
+  OPEN
+  CLOSED
 }
 
 enum NotificationType {
@@ -174,80 +191,84 @@ enum StockMovementType {
 }
 
 model User {
-  id                         String                      @id @default(cuid())
-  phone                      String                      @unique
-  passwordHash               String
-  role                       Role                        @default(CUSTOMER)
-  status                     UserStatus                  @default(ACTIVE)
-  fullName                   String?
-  bio                        String?
-  carCompany                 String?
-  carType                    String?
-  location                   String?
-  governorate                String?
-  city                       String?
-  address                    String?
-  carModel                   String?
-  carYear                    String?
-  licensePlate               String?
-  preferredContact           String?
-  avatarUrl                  String?
-  locale                     String                      @default("en")
-  theme                      String                      @default("system")
-  isActive                   Boolean                     @default(true)
-  forcePasswordReset         Boolean                     @default(false)
-  mustChangePassword         Boolean                     @default(false)
-  bannedUntil                DateTime?
-  banReason                  String?
-  banMessage                 String?
-  bannedByAdminId            String?
-  suspendedAt                DateTime?
-  suspendedByAdminId         String?
-  suspensionReason           String?
-  lastPasswordChangeAt       DateTime?
-  lastLoginAt                DateTime?
-  lastLogoutAt               DateTime?
-  lastLoginIp                String?
-  lastLoginUserAgent         String?
-  sessionVersion             Int                         @default(0)
-  createdAt                  DateTime                    @default(now())
-  updatedAt                  DateTime                    @updatedAt
-  customerBookings           Booking[]                   @relation("CustomerBookings")
-  walkInBookingsCreated      Booking[]                   @relation("WalkInCreatedBy")
-  cancelledBookings          Booking[]                   @relation("BookingCancelledBy")
-  membershipOrders           MembershipOrder[]           @relation("MembershipOrderCustomer")
-  reviews                    Review[]
-  reviewsModerated           Review[]                    @relation("ReviewModeratedBy")
-  notifications              Notification[]
-  auditLogs                  AuditLog[]                  @relation("ActorAuditLogs")
-  transactions               Transaction[]               @relation("TransactionCreatedBy")
-  transactionsUpdated        Transaction[]               @relation("TransactionUpdatedBy")
-  transactionsDeleted        Transaction[]               @relation("TransactionDeletedBy")
-  expenses                   Expense[]                   @relation("ExpenseCreatedBy")
-  invoiceLinesCreated        InvoiceLine[]               @relation("InvoiceLineCreatedBy")
-  salaryRecorded             SalaryPayment[]             @relation("SalaryRecordedBy")
-  employeeProfile            Employee?
-  slotLocks                  BookingSlotLock[]
-  initiatedBackups           Backup[]                    @relation("BackupInitiatedBy")
-  restoredBackups            Backup[]                    @relation("BackupRestoredBy")
-  chatMessages               ChatMessage[]               @relation("UserChatMessages")
-  chatParticipants           ChatParticipant[]
-  seenChatMessages           ChatMessageSeen[]
-  conversationMessages       ConversationMessage[]       @relation("ConversationSender")
-  deletedConversationMessages ConversationMessage[]      @relation("ConversationDeletedBy")
-  conversationParticipants   ConversationParticipant[]
-  membershipUsagesRecorded   MembershipUsage[]           @relation("MembershipUsageRecordedBy")
-  membershipUsageAdjustments MembershipUsageAdjustment[] @relation("MembershipUsageAdjustedBy")
-  stockMovementsCreated      StockMovement[]             @relation("StockMovementCreatedBy")
-  suspendedUsers             User[]                      @relation("SuspendedByAdmin")
-  suspendedByAdmin           User?                       @relation("SuspendedByAdmin", fields: [suspendedByAdminId], references: [id], onDelete: SetNull)
-  bannedUsers                User[]                      @relation("BannedByAdmin")
-  bannedByAdmin              User?                       @relation("BannedByAdmin", fields: [bannedByAdminId], references: [id], onDelete: SetNull)
-  employeeProfilesCreated    Employee[]                  @relation("EmployeeCreatedByAdmin")
-  customerLedgerEntries      CustomerAccountEntry[]      @relation("CustomerLedgerEntries")
-  ledgerEntriesCreated       CustomerAccountEntry[]      @relation("LedgerEntriesCreatedByAdmin")
-  tasksCreated               Task[]                      @relation("TaskCreatedByAdmin")
-  tasksAssigned              Task[]                      @relation("TaskAssignedToUser")
+  id                          String                      @id @default(cuid())
+  phone                       String                      @unique
+  passwordHash                String
+  role                        Role                        @default(CUSTOMER)
+  status                      UserStatus                  @default(ACTIVE)
+  fullName                    String?
+  bio                         String?
+  carCompany                  String?
+  carType                     String?
+  location                    String?
+  governorate                 String?
+  city                        String?
+  address                     String?
+  carModel                    String?
+  carYear                     String?
+  licensePlate                String?
+  preferredContact            String?
+  avatarUrl                   String?
+  locale                      String                      @default("en")
+  theme                       String                      @default("system")
+  isActive                    Boolean                     @default(true)
+  forcePasswordReset          Boolean                     @default(false)
+  mustChangePassword          Boolean                     @default(false)
+  bannedUntil                 DateTime?
+  banReason                   String?
+  banMessage                  String?
+  bannedByAdminId             String?
+  suspendedAt                 DateTime?
+  suspendedByAdminId          String?
+  suspensionReason            String?
+  lastPasswordChangeAt        DateTime?
+  lastLoginAt                 DateTime?
+  lastLogoutAt                DateTime?
+  lastLoginIp                 String?
+  lastLoginUserAgent          String?
+  sessionVersion              Int                         @default(0)
+  createdAt                   DateTime                    @default(now())
+  updatedAt                   DateTime                    @updatedAt
+  customerBookings            Booking[]                   @relation("CustomerBookings")
+  walkInBookingsCreated       Booking[]                   @relation("WalkInCreatedBy")
+  cancelledBookings           Booking[]                   @relation("BookingCancelledBy")
+  membershipOrders            MembershipOrder[]           @relation("MembershipOrderCustomer")
+  membershipOrdersApproved    MembershipOrder[]           @relation("MembershipOrderApprovedBy")
+  membershipOrdersRejected    MembershipOrder[]           @relation("MembershipOrderRejectedBy")
+  reviews                     Review[]
+  reviewsModerated            Review[]                    @relation("ReviewModeratedBy")
+  notifications               Notification[]
+  auditLogs                   AuditLog[]                  @relation("ActorAuditLogs")
+  transactions                Transaction[]               @relation("TransactionCreatedBy")
+  transactionsUpdated         Transaction[]               @relation("TransactionUpdatedBy")
+  transactionsDeleted         Transaction[]               @relation("TransactionDeletedBy")
+  expenses                    Expense[]                   @relation("ExpenseCreatedBy")
+  invoiceLinesCreated         InvoiceLine[]               @relation("InvoiceLineCreatedBy")
+  salaryRecorded              SalaryPayment[]             @relation("SalaryRecordedBy")
+  employeeProfile             Employee?
+  slotLocks                   BookingSlotLock[]
+  initiatedBackups            Backup[]                    @relation("BackupInitiatedBy")
+  restoredBackups             Backup[]                    @relation("BackupRestoredBy")
+  chatMessages                ChatMessage[]               @relation("UserChatMessages")
+  chatParticipants            ChatParticipant[]
+  seenChatMessages            ChatMessageSeen[]
+  conversationMessages        ConversationMessage[]       @relation("ConversationSender")
+  deletedConversationMessages ConversationMessage[]       @relation("ConversationDeletedBy")
+  conversationParticipants    ConversationParticipant[]
+  membershipUsagesRecorded    MembershipUsage[]           @relation("MembershipUsageRecordedBy")
+  membershipUsageAdjustments  MembershipUsageAdjustment[] @relation("MembershipUsageAdjustedBy")
+  membershipBenefitUses       MembershipBenefitUse[]      @relation("MembershipBenefitUseConfirmedBy")
+  membershipAdminNotes        MembershipAdminNote[]       @relation("MembershipAdminNoteCreatedBy")
+  stockMovementsCreated       StockMovement[]             @relation("StockMovementCreatedBy")
+  suspendedUsers              User[]                      @relation("SuspendedByAdmin")
+  suspendedByAdmin            User?                       @relation("SuspendedByAdmin", fields: [suspendedByAdminId], references: [id], onDelete: SetNull)
+  bannedUsers                 User[]                      @relation("BannedByAdmin")
+  bannedByAdmin               User?                       @relation("BannedByAdmin", fields: [bannedByAdminId], references: [id], onDelete: SetNull)
+  employeeProfilesCreated     Employee[]                  @relation("EmployeeCreatedByAdmin")
+  customerLedgerEntries       CustomerAccountEntry[]      @relation("CustomerLedgerEntries")
+  ledgerEntriesCreated        CustomerAccountEntry[]      @relation("LedgerEntriesCreatedByAdmin")
+  tasksCreated                Task[]                      @relation("TaskCreatedByAdmin")
+  tasksAssigned               Task[]                      @relation("TaskAssignedToUser")
 }
 
 model Service {
@@ -256,6 +277,8 @@ model Service {
   nameAr                 String
   category               String?
   basePrice              Decimal?
+  priceType              PriceType                   @default(FIXED)
+  supportedCarTypes      String?
   imageUrl               String?
   descriptionEn          String?
   descriptionAr          String?
@@ -294,6 +317,7 @@ model Booking {
   serviceNameSnapshotAr    String
   serviceCategorySnapshot  String?
   serviceBasePriceSnapshot Decimal?
+  priceTypeSnapshot        PriceType                  @default(FIXED)
   completedAt              DateTime?
   createdAt                DateTime                   @default(now())
   updatedAt                DateTime                   @updatedAt
@@ -306,7 +330,7 @@ model Booking {
   assignments              BookingServiceAssignment[]
   review                   Review?
   membershipUsages         MembershipUsage[]
-  stockMovements          StockMovement[]
+  stockMovements           StockMovement[]
 
   @@index([customerId, appointmentAt])
   @@index([serviceId, appointmentAt])
@@ -329,43 +353,43 @@ model BookingSlotLock {
 }
 
 model Transaction {
-  id                String           @id @default(cuid())
-  type              TransactionType
-  itemName          String           @default("Unknown Item")
-  unitPrice         Float            @default(0)
-  quantity          Int              @default(1)
-  amount            Decimal
+  id                    String           @id @default(cuid())
+  type                  TransactionType
+  itemName              String           @default("Unknown Item")
+  unitPrice             Float            @default(0)
+  quantity              Int              @default(1)
+  amount                Decimal
   sellPriceAtTimeOfSale Decimal?
-  costAtTimeOfSale  Decimal?
-  costTotal         Decimal          @default(0)
-  profitAmount      Decimal          @default(0)
-  note              String?
-  description       String?
-  bookingId         String?          @unique
-  expenseId         String?          @unique
-  invoiceLineId     String?          @unique
-  membershipOrderId String?
-  invoiceId         String?          @unique
-  incomeSource      IncomeSource?
-  expenseCategory   ExpenseCategory?
-  referenceType     String?
-  referenceId       String?
-  occurredAt        DateTime         @default(now())
-  recordedAt        DateTime         @default(now())
-  createdById       String?
-  updatedById       String?
-  deletedById       String?
-  deletedAt         DateTime?
-  createdAt         DateTime         @default(now())
-  updatedAt         DateTime         @updatedAt
-  booking           Booking?         @relation(fields: [bookingId], references: [id], onDelete: SetNull)
-  expense           Expense?         @relation(fields: [expenseId], references: [id], onDelete: SetNull)
-  invoiceLine       InvoiceLine?     @relation(fields: [invoiceLineId], references: [id], onDelete: SetNull)
-  invoice           Invoice?         @relation("InvoiceTransaction", fields: [invoiceId], references: [id], onDelete: SetNull)
-  membershipOrder   MembershipOrder? @relation(fields: [membershipOrderId], references: [id], onDelete: SetNull)
-  createdBy         User?            @relation("TransactionCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
-  updatedBy         User?            @relation("TransactionUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
-  deletedBy         User?            @relation("TransactionDeletedBy", fields: [deletedById], references: [id], onDelete: SetNull)
+  costAtTimeOfSale      Decimal?
+  costTotal             Decimal          @default(0)
+  profitAmount          Decimal          @default(0)
+  note                  String?
+  description           String?
+  bookingId             String?          @unique
+  expenseId             String?          @unique
+  invoiceLineId         String?          @unique
+  membershipOrderId     String?
+  invoiceId             String?          @unique
+  incomeSource          IncomeSource?
+  expenseCategory       ExpenseCategory?
+  referenceType         String?
+  referenceId           String?
+  occurredAt            DateTime         @default(now())
+  recordedAt            DateTime         @default(now())
+  createdById           String?
+  updatedById           String?
+  deletedById           String?
+  deletedAt             DateTime?
+  createdAt             DateTime         @default(now())
+  updatedAt             DateTime         @updatedAt
+  booking               Booking?         @relation(fields: [bookingId], references: [id], onDelete: SetNull)
+  expense               Expense?         @relation(fields: [expenseId], references: [id], onDelete: SetNull)
+  invoiceLine           InvoiceLine?     @relation(fields: [invoiceLineId], references: [id], onDelete: SetNull)
+  invoice               Invoice?         @relation("InvoiceTransaction", fields: [invoiceId], references: [id], onDelete: SetNull)
+  membershipOrder       MembershipOrder? @relation(fields: [membershipOrderId], references: [id], onDelete: SetNull)
+  createdBy             User?            @relation("TransactionCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  updatedBy             User?            @relation("TransactionUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+  deletedBy             User?            @relation("TransactionDeletedBy", fields: [deletedById], references: [id], onDelete: SetNull)
 
   @@index([type, incomeSource, occurredAt])
   @@index([type, expenseCategory, occurredAt])
@@ -374,15 +398,15 @@ model Transaction {
 }
 
 model RequestIdempotency {
-  id          String   @id @default(cuid())
-  key         String   @unique
-  endpoint    String
-  actorId     String
-  requestHash String
+  id           String   @id @default(cuid())
+  key          String   @unique
+  endpoint     String
+  actorId      String
+  requestHash  String
   responseJson Json
-  statusCode  Int
-  createdAt   DateTime @default(now())
-  expiresAt   DateTime
+  statusCode   Int
+  createdAt    DateTime @default(now())
+  expiresAt    DateTime
 
   @@index([actorId, endpoint])
   @@index([expiresAt])
@@ -402,58 +426,58 @@ model ItemCatalog {
 }
 
 model Supplier {
-  id           String        @id @default(cuid())
-  name         String
-  phone        String?
-  email        String?
-  address      String?
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
-  expenses     Expense[]
-  invoiceLines InvoiceLine[]
+  id             String          @id @default(cuid())
+  name           String
+  phone          String?
+  email          String?
+  address        String?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  expenses       Expense[]
+  invoiceLines   InvoiceLine[]
   stockMovements StockMovement[]
 }
 
 model Invoice {
-  id             String        @id @default(cuid())
-  number         String        @unique
-  type           InvoiceType   @default(PURCHASE)
+  id             String          @id @default(cuid())
+  number         String          @unique
+  type           InvoiceType     @default(PURCHASE)
   note           String?
-  status         InvoiceStatus @default(DRAFT)
+  status         InvoiceStatus   @default(DRAFT)
   totalAmount    Decimal?
-  issueDate      DateTime      @default(now())
+  issueDate      DateTime        @default(now())
   dueDate        DateTime?
   paidAt         DateTime?
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
   expenses       Expense[]
   invoiceLines   InvoiceLine[]
   stockMovements StockMovement[]
-  transaction    Transaction?  @relation("InvoiceTransaction")
+  transaction    Transaction?    @relation("InvoiceTransaction")
 }
 
 model InvoiceLine {
-  id              String           @id @default(cuid())
+  id              String          @id @default(cuid())
   invoiceId       String
   partId          String?
   supplierId      String?
   serviceId       String?
-  lineType        InvoiceLineType  @default(INVENTORY)
+  lineType        InvoiceLineType @default(INVENTORY)
   description     String
-  quantity        Int              @default(1)
+  quantity        Int             @default(1)
   unitAmount      Decimal
   lineTotal       Decimal
   costSnapshot    Decimal?
-  expenseCategory ExpenseCategory  @default(SUPPLIER)
-  occurredAt      DateTime         @default(now())
+  expenseCategory ExpenseCategory @default(SUPPLIER)
+  occurredAt      DateTime        @default(now())
   createdById     String?
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
-  invoice         Invoice          @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
-  part            Part?            @relation(fields: [partId], references: [id], onDelete: SetNull)
-  supplier        Supplier?        @relation(fields: [supplierId], references: [id], onDelete: SetNull)
-  service         Service?         @relation(fields: [serviceId], references: [id], onDelete: SetNull)
-  createdBy       User?            @relation("InvoiceLineCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  invoice         Invoice         @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  part            Part?           @relation(fields: [partId], references: [id], onDelete: SetNull)
+  supplier        Supplier?       @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  service         Service?        @relation(fields: [serviceId], references: [id], onDelete: SetNull)
+  createdBy       User?           @relation("InvoiceLineCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
   transaction     Transaction?
 
   @@index([invoiceId, occurredAt])
@@ -532,11 +556,13 @@ model MembershipPlan {
   descriptionAr String?
   price         Decimal
   durationDays  Int
+  durationMonths Int                    @default(12)
   color         String?
   isActive      Boolean                 @default(true)
   createdAt     DateTime                @default(now())
   updatedAt     DateTime                @updatedAt
   entitlements  MembershipPlanService[]
+  benefits      MembershipBenefit[]
   orders        MembershipOrder[]
 
   @@unique([tier])
@@ -559,20 +585,104 @@ model MembershipOrder {
   id            String                      @id @default(cuid())
   customerId    String
   planId        String
-  status        MembershipOrderStatus       @default(ACTIVE)
+  status        MembershipOrderStatus       @default(PENDING)
   priceSnapshot Decimal
+  requestedAt   DateTime                    @default(now())
+  approvedAt    DateTime?
+  rejectedAt    DateTime?
+  expiresAt     DateTime?
+  approvedByAdminId String?
+  rejectedByAdminId String?
+  rejectionReason String?
+  deliveryCompanyName String?
+  deliveryPhone String?
+  deliveryTrackingCode String?
+  deliveryNote  String?
   startDate     DateTime?
   endDate       DateTime?
   paidAt        DateTime?
   createdAt     DateTime                    @default(now())
   updatedAt     DateTime                    @updatedAt
   customer      User                        @relation("MembershipOrderCustomer", fields: [customerId], references: [id], onDelete: Restrict)
+  approvedByAdmin User?                     @relation("MembershipOrderApprovedBy", fields: [approvedByAdminId], references: [id], onDelete: SetNull)
+  rejectedByAdmin User?                     @relation("MembershipOrderRejectedBy", fields: [rejectedByAdminId], references: [id], onDelete: SetNull)
   plan          MembershipPlan              @relation(fields: [planId], references: [id], onDelete: Restrict)
+  orderBenefits MembershipOrderBenefit[]
+  benefitUses   MembershipBenefitUse[]
+  adminNotes    MembershipAdminNote[]
   usages        MembershipUsage[]
   adjustments   MembershipUsageAdjustment[]
   transactions  Transaction[]
 
   @@index([customerId, status])
+  @@index([status, requestedAt])
+  @@index([planId, status])
+}
+
+model MembershipBenefit {
+  id            String                   @id @default(cuid())
+  planId        String
+  code          String
+  titleEn       String
+  titleAr       String
+  descriptionEn String?
+  descriptionAr String?
+  limitCount    Int                      @default(1)
+  isActive      Boolean                  @default(true)
+  createdAt     DateTime                 @default(now())
+  updatedAt     DateTime                 @updatedAt
+  plan          MembershipPlan           @relation(fields: [planId], references: [id], onDelete: Cascade)
+  snapshots     MembershipOrderBenefit[]
+
+  @@unique([planId, code])
+  @@index([planId, isActive])
+}
+
+model MembershipOrderBenefit {
+  id                String                 @id @default(cuid())
+  membershipOrderId String
+  planBenefitId     String?
+  code              String
+  titleEn           String
+  titleAr           String
+  descriptionEn     String?
+  descriptionAr     String?
+  limitCount        Int
+  isActive          Boolean                @default(true)
+  createdAt         DateTime               @default(now())
+  membershipOrder   MembershipOrder        @relation(fields: [membershipOrderId], references: [id], onDelete: Cascade)
+  planBenefit       MembershipBenefit?     @relation(fields: [planBenefitId], references: [id], onDelete: SetNull)
+  uses              MembershipBenefitUse[]
+
+  @@unique([membershipOrderId, code])
+  @@index([membershipOrderId])
+}
+
+model MembershipBenefitUse {
+  id                       String                  @id @default(cuid())
+  membershipOrderId        String
+  membershipOrderBenefitId String
+  usedAt                   DateTime                @default(now())
+  usedByAdminId            String
+  confirmNote              String?
+  createdAt                DateTime                @default(now())
+  membershipOrder          MembershipOrder         @relation(fields: [membershipOrderId], references: [id], onDelete: Cascade)
+  membershipOrderBenefit   MembershipOrderBenefit  @relation(fields: [membershipOrderBenefitId], references: [id], onDelete: Cascade)
+  usedByAdmin              User                    @relation("MembershipBenefitUseConfirmedBy", fields: [usedByAdminId], references: [id], onDelete: Restrict)
+
+  @@index([membershipOrderId, membershipOrderBenefitId])
+}
+
+model MembershipAdminNote {
+  id                String           @id @default(cuid())
+  membershipOrderId String
+  note              String
+  createdAt         DateTime         @default(now())
+  createdByAdminId  String
+  membershipOrder   MembershipOrder  @relation(fields: [membershipOrderId], references: [id], onDelete: Cascade)
+  createdByAdmin    User             @relation("MembershipAdminNoteCreatedBy", fields: [createdByAdminId], references: [id], onDelete: Restrict)
+
+  @@index([membershipOrderId, createdAt])
 }
 
 model MembershipUsage {
@@ -608,47 +718,48 @@ model MembershipUsageAdjustment {
 }
 
 model Employee {
-  id                String                     @id @default(cuid())
-  userId            String                     @unique
-  createdByAdminId  String?
-  nationalIdHash    String                     @unique
-  nationalIdEncrypted String
-  birthDateEncrypted String
-  jobTitleEncrypted String
+  id                     String                     @id @default(cuid())
+  userId                 String                     @unique
+  createdByAdminId       String?
+  nationalIdHash         String                     @unique
+  nationalIdEncrypted    String
+  birthDateEncrypted     String
+  jobTitleEncrypted      String
   defaultSalaryEncrypted String?
-  workScheduleEncrypted String?
-  roleProfile       EmployeeRoleProfile        @default(EMPLOYEE)
-  employmentType    EmploymentType             @default(FULL_TIME)
-  employmentStatus  EmploymentStatus           @default(ACTIVE)
-  idCardImageUrl    String?
-  profilePhotoUrl   String?
-  department        String?
-  startDate         DateTime?
-  emergencyContact  String?
-  address           String?
-  permissionOverrides Json?
-  paymentFrequency  String?
-  bonusHistory      Json?
-  deductions        Json?
-  leaveBalance      Json?
-  internalNotes     String?
-  permissionsUpdatedAt DateTime?
-  jobTitle          String?
-  monthlyBase       Decimal?
-  qrSecret          String                     @default(cuid())
-  isActive          Boolean                    @default(true)
-  hiredAt           DateTime                   @default(now())
-  createdAt         DateTime                   @default(now())
-  updatedAt         DateTime                   @updatedAt
-  user              User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  createdByAdmin    User?                      @relation("EmployeeCreatedByAdmin", fields: [createdByAdminId], references: [id], onDelete: SetNull)
-  attendance        Attendance[]
-  attendanceEvents  AttendanceEvent[]
-  salaries          SalaryPayment[]
-  services          EmployeeService[]
-  assignments       BookingServiceAssignment[]
-  performedBookings Booking[]                  @relation("BookingPerformedByEmployee")
-  permissionGrants  EmployeePermissionGrant[]
+  workScheduleEncrypted  String?
+  roleProfile            EmployeeRoleProfile        @default(EMPLOYEE)
+  employmentType         EmploymentType             @default(FULL_TIME)
+  employmentStatus       EmploymentStatus           @default(ACTIVE)
+  idCardImageUrl         String?
+  profilePhotoUrl        String?
+  department             String?
+  startDate              DateTime?
+  emergencyContact       String?
+  address                String?
+  permissionOverrides    Json?
+  paymentFrequency       String?
+  bonusHistory           Json?
+  deductions             Json?
+  leaveBalance           Json?
+  internalNotes          String?
+  permissionsUpdatedAt   DateTime?
+  jobTitle               String?
+  monthlyBase            Decimal?
+  qrSecret               String                     @default(cuid())
+  isActive               Boolean                    @default(true)
+  hiredAt                DateTime                   @default(now())
+  createdAt              DateTime                   @default(now())
+  updatedAt              DateTime                   @updatedAt
+  user                   User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdByAdmin         User?                      @relation("EmployeeCreatedByAdmin", fields: [createdByAdminId], references: [id], onDelete: SetNull)
+  attendance             Attendance[]
+  attendanceDays         AttendanceDay[]
+  attendanceEvents       AttendanceEvent[]
+  salaries               SalaryPayment[]
+  services               EmployeeService[]
+  assignments            BookingServiceAssignment[]
+  performedBookings      Booking[]                  @relation("BookingPerformedByEmployee")
+  permissionGrants       EmployeePermissionGrant[]
 }
 
 model EmployeePermissionGrant {
@@ -715,19 +826,37 @@ model Attendance {
   @@index([employeeId, checkInAt])
 }
 
-model AttendanceEvent {
-  id         String         @id @default(cuid())
-  employeeId String
-  type       AttendanceType
-  occurredAt DateTime       @default(now())
-  latitude   Decimal?
-  longitude  Decimal?
-  geoNote    String?
-  qrPayload  String?
-  createdAt  DateTime       @default(now())
-  employee   Employee       @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+model AttendanceDay {
+  id            String              @id @default(cuid())
+  employeeId    String
+  dayKey        String
+  checkInAt     DateTime?
+  checkOutAt    DateTime?
+  workedMinutes Int?
+  status        AttendanceDayStatus @default(OPEN)
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+  employee      Employee            @relation(fields: [employeeId], references: [id], onDelete: Cascade)
 
-  @@index([employeeId, occurredAt])
+  @@unique([employeeId, dayKey])
+  @@index([dayKey])
+}
+
+model AttendanceEvent {
+  id           String                @id @default(cuid())
+  employeeId   String
+  type         AttendanceType
+  occurredAt   DateTime              @default(now())
+  dayKey       String
+  status       AttendanceEventStatus
+  rejectReason String?
+  ipAddress    String?
+  userAgent    String?
+  createdAt    DateTime              @default(now())
+  employee     Employee              @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([employeeId, dayKey])
+  @@index([occurredAt])
 }
 
 model SalaryPayment {
@@ -911,20 +1040,20 @@ model ChatParticipant {
 }
 
 model ChatMessage {
-  id                String            @id @default(cuid())
-  threadId          String
-  senderId          String
-  messageType       ChatMessageType   @default(TEXT)
-  body              String
-  mediaUrl          String?
-  mediaMimeType     String?
-  mediaDurationSec  Int?
-  deletedAt         DateTime?
-  deletedById       String?
-  createdAt         DateTime          @default(now())
-  thread            ChatThread        @relation(fields: [threadId], references: [id], onDelete: Cascade)
-  sender            User              @relation("UserChatMessages", fields: [senderId], references: [id], onDelete: Cascade)
-  seenBy            ChatMessageSeen[]
+  id               String            @id @default(cuid())
+  threadId         String
+  senderId         String
+  messageType      ChatMessageType   @default(TEXT)
+  body             String
+  mediaUrl         String?
+  mediaMimeType    String?
+  mediaDurationSec Int?
+  deletedAt        DateTime?
+  deletedById      String?
+  createdAt        DateTime          @default(now())
+  thread           ChatThread        @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  sender           User              @relation("UserChatMessages", fields: [senderId], references: [id], onDelete: Cascade)
+  seenBy           ChatMessageSeen[]
 }
 
 model ChatMessageSeen {
@@ -995,21 +1124,21 @@ enum TaskStatus {
 }
 
 model Task {
-  id             String           @id @default(cuid())
-  title          String
-  description    String?
-  priority       TaskPriority     @default(MEDIUM)
-  status         TaskStatus       @default(TODO)
-  dueAt          DateTime?
-  assignedToId   String
-  createdById    String
-  completedAt    DateTime?
-  employeeNote   String?
-  adminNote      String?
-  createdAt      DateTime         @default(now())
-  updatedAt      DateTime         @updatedAt
-  assignedTo     User             @relation("TaskAssignedToUser", fields: [assignedToId], references: [id], onDelete: Cascade)
-  createdBy      User             @relation("TaskCreatedByAdmin", fields: [createdById], references: [id], onDelete: Restrict)
+  id           String       @id @default(cuid())
+  title        String
+  description  String?
+  priority     TaskPriority @default(MEDIUM)
+  status       TaskStatus   @default(TODO)
+  dueAt        DateTime?
+  assignedToId String
+  createdById  String
+  completedAt  DateTime?
+  employeeNote String?
+  adminNote    String?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+  assignedTo   User         @relation("TaskAssignedToUser", fields: [assignedToId], references: [id], onDelete: Cascade)
+  createdBy    User         @relation("TaskCreatedByAdmin", fields: [createdById], references: [id], onDelete: Restrict)
 
   @@index([assignedToId])
   @@index([status])

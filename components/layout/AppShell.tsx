@@ -268,7 +268,7 @@ export function AppShell({ locale, dir, dict, user, children }: AppShellProps): 
                       }`}
                   >
                     <Icon size={16} aria-hidden={true} />
-                    <span className="flex-1">{itemLabel(dict, item)}</span>
+                    <span className="flex-1 font-bold">{itemLabel(dict, item)}</span>
                     {item.key === "chat" && chatUnreadCount > 0 ? (
                       <span className="rounded-full bg-brand-700 px-2 py-0.5 text-[10px] font-semibold text-white">
                         {chatUnreadCount}
@@ -301,7 +301,7 @@ export function AppShell({ locale, dir, dict, user, children }: AppShellProps): 
                         }`}
                     >
                       <Icon size={16} aria-hidden={true} />
-                      <span className="flex-1">{itemLabel(dict, item)}</span>
+                      <span className="flex-1 font-bold">{itemLabel(dict, item)}</span>
                       {item.key === "chat" && chatUnreadCount > 0 ? (
                         <span className="rounded-full bg-brand-700 px-2 py-0.5 text-[10px] font-semibold text-white">
                           {chatUnreadCount}

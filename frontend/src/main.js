@@ -15,6 +15,7 @@ import { AdminAccounting } from "./pages/admin/Accounting.js";
 import { AdminAnalytics } from "./pages/admin/Analytics.js";
 import { AdminBookings } from "./pages/admin/Bookings.js";
 import { AdminCustomers } from "./pages/admin/Customers.js";
+import { AdminAttendance } from "./pages/admin/Attendance.js";
 import { AdminEmployees } from "./pages/admin/Employees.js";
 import { AdminInventory } from "./pages/admin/Inventory.js";
 import { AdminMemberships } from "./pages/admin/Memberships.js";
@@ -22,6 +23,7 @@ import { AdminProfile } from "./pages/admin/Profile.js";
 import { AdminServices } from "./pages/admin/Services.js";
 import { AdminSettings } from "./pages/admin/Settings.js";
 import { AdminTasks } from "./pages/admin/Tasks.js";
+import { EmployeeQrScan } from "./pages/employee/QrScan.js";
 import { Profile } from "./pages/customer/Profile.js";
 import { BookService } from "./pages/customer/BookService.js";
 import { Chat } from "./pages/customer/Chat.js";
@@ -178,6 +180,11 @@ const App = {
     const appDiv = document.getElementById("app");
     if (!appDiv) return;
 
+    if (typeof window.__pageCleanup === "function") {
+      window.__pageCleanup();
+      window.__pageCleanup = null;
+    }
+
     const canonicalPath = canonicalizePath(this.currentPath);
     if (canonicalPath !== this.currentPath) {
       window.history.replaceState({}, "", canonicalPath);
@@ -278,6 +285,7 @@ App.register("/profile", customerRoute(Profile));
 App.register("/admin/dashboard", adminRoute(AdminAnalytics));
 App.register("/admin/analytics", adminRoute(AdminAnalytics));
 App.register("/admin/customers", adminRoute(AdminCustomers));
+App.register("/admin/attendance", adminRoute(AdminAttendance));
 App.register("/admin/bookings", adminRoute(AdminBookings));
 App.register("/admin/chat", adminRoute(Chat));
 App.register("/admin/inventory", adminRoute(AdminInventory));
@@ -289,6 +297,7 @@ App.register("/tasks", adminRoute(AdminTasks));
 App.register("/admin/tasks", adminRoute(AdminTasks));
 App.register("/admin/settings", adminRoute(AdminSettings));
 App.register("/admin/profile", adminRoute(AdminProfile));
+App.register("/employee/qr-scan", adminRoute(EmployeeQrScan));
 App.register("/forbidden", adminRoute(ForbiddenPage));
 
 if (document.readyState === 'loading') {

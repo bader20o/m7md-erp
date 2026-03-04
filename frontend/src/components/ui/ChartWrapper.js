@@ -101,19 +101,19 @@ export function MultiBarChart(data, options = {}) {
         <div class="relative w-full h-full flex items-end justify-center rounded-t-md hover:bg-white/5 transition-colors overflow-visible border-b border-white/10 group-hover:border-white/30 cursor-crosshair">
            
            <!-- Rich Tooltip -->
-           <div class="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 bg-slate-900 text-white text-[10px] py-2 px-3 rounded-xl border border-white/10 shadow-2xl opacity-0 group-hover:opacity-100 transition-opacity z-50 pointer-events-none min-w-[120px]">
+           <div class="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 bg-slate-900 text-white text-[10px] py-2 px-3 rounded-xl border border-white/10 shadow-2xl opacity-0 group-hover:opacity-100 transition-opacity z-50 pointer-events-none min-w-[160px] whitespace-nowrap">
              <div class="font-bold text-muted border-b border-white/10 pb-1 mb-1 text-center">${item.label}</div>
-             <div class="flex justify-between items-center gap-4">
+             <div class="flex items-center justify-between gap-4 whitespace-nowrap">
                 <span class="text-muted">Income</span>
-                <span class="font-bold text-success">${format(item.income)}</span>
+                <span class="font-bold text-success text-right tabular-nums">${format(item.income)}</span>
              </div>
-             <div class="flex justify-between items-center gap-4">
+             <div class="flex items-center justify-between gap-4 whitespace-nowrap">
                 <span class="text-muted">Expenses</span>
-                <span class="font-bold text-danger">${format(item.expenses)}</span>
+                <span class="font-bold text-danger text-right tabular-nums">${format(item.expenses)}</span>
              </div>
-             <div class="flex justify-between items-center gap-4 mt-1 pt-1 border-t border-white/10">
+             <div class="flex items-center justify-between gap-4 mt-1 pt-1 border-t border-white/10 whitespace-nowrap">
                 <span class="text-muted">Profit</span>
-                <span class="font-bold border px-1 rounded ${item.profit > 0 ? 'text-success border-success/20 bg-success/10' : item.profit < 0 ? 'text-danger border-danger/20 bg-danger/10' : 'text-text border-white/10 bg-white/5'}">${format(item.profit)}</span>
+                <span class="font-bold border px-1 rounded text-right tabular-nums ${item.profit > 0 ? 'text-success border-success/20 bg-success/10' : item.profit < 0 ? 'text-danger border-danger/20 bg-danger/10' : 'text-text border-white/10 bg-white/5'}">${format(item.profit)}</span>
              </div>
            </div>
 

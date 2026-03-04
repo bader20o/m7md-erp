@@ -12,6 +12,7 @@ export function AdminSidebar({ locale }: { locale: string }): React.ReactElement
       items: [
         { label: "Bookings", href: `/${locale}/admin/bookings` },
         { label: "Reviews", href: `/${locale}/admin/reviews` },
+        { label: "Membership Plans", href: `/${locale}/admin/memberships` },
         { label: "Membership Orders", href: `/${locale}/admin/membership-orders` },
         { label: "Users", href: `/${locale}/admin/users` }
       ]

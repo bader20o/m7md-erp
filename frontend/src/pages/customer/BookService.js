@@ -3,14 +3,30 @@ import { apiFetch } from '../../lib/api.js';
 import { store } from '../../lib/store.js';
 import { CardSkeleton } from '../../components/ui/Skeleton.js';
 import { DateInput } from '../../components/ui/DateInput.js';
+import {
+  formatDuration,
+  getPriceText,
+  parseSupportedCarTypes,
+  renderPriceBadge,
+  renderServiceCard,
+  sanitizeServiceText
+} from '../../components/services/ServiceCard.js';
+
+const CAR_TYPE_TABS = [
+  { value: 'ALL', label: 'All' },
+  { value: 'EV', label: 'EV' },
+  { value: 'HYBRID', label: 'Hybrid' },
+  { value: 'FUEL', label: 'Fuel' }
+];
 
 export function BookService() {
-
   let currentStep = 1;
   let selectedService = null;
   let selectedDate = null;
   let selectedTime = null;
   let servicesParams = [];
+  let activeCarType = 'ALL';
+  let appliedInitialServiceId = false;
 
   window.onMount = async () => {
     loadServices();
@@ -21,55 +37,166 @@ export function BookService() {
     });
   };
 
+  function serviceMatchesCarType(service, carType) {
+    if (carType === 'ALL') return true;
+    const supported = parseSupportedCarTypes(service.supportedCarTypes);
+    if (supported.length === 0) return true;
+    return supported.includes(carType);
+  }
+
+  function getServiceCardBadge(service) {
+    const supported = parseSupportedCarTypes(service.supportedCarTypes);
+    const preferred = activeCarType !== 'ALL' && supported.includes(activeCarType)
+      ? activeCarType
+      : supported[0];
+
+    if (preferred === 'HYBRID') return 'Hybrid';
+    if (preferred === 'FUEL') return 'Fuel';
+    if (preferred === 'EV') return 'EV';
+
+    const category = String(service.category || '').toLowerCase();
+    if (category.includes('hybrid')) return 'Hybrid';
+    if (category.includes('fuel') || category.includes('engine')) return 'Fuel';
+    return 'EV';
+  }
+
+  function renderCarTypeTabs() {
+    const tabs = CAR_TYPE_TABS.map((tab) => {
+      const activeClass = activeCarType === tab.value
+        ? 'border-sky-500 bg-sky-500 text-white shadow-sm'
+        : 'border-border bg-transparent text-muted hover:border-primary/30 hover:text-text';
+      return `
+        <button
+          type="button"
+          class="flex-1 rounded-lg border px-3 py-2 text-xs font-semibold transition-all ${activeClass}"
+          onclick="window.setBookCarType('${tab.value}')"
+        >
+          ${tab.label}
+        </button>
+      `;
+    }).join('');
+
+    return `<div class="flex gap-1 rounded-xl border border-border bg-bg/80 p-1 mb-4">${tabs}</div>`;
+  }
+
+  function renderSelectedServiceSummary(service, isRtl) {
+    if (!service) return '';
+
+    const title = sanitizeServiceText(isRtl ? service.nameAr : service.nameEn);
+    const duration = formatDuration(service.durationMinutes);
+    const priceMarkup = renderPriceBadge(service.basePrice);
+
+    return `
+      <div class="mt-4 flex items-center justify-between gap-3 rounded-xl border border-sky-200 bg-sky-500/10 px-4 py-3 ${isRtl ? 'flex-row-reverse' : ''}">
+        <div class="${isRtl ? 'text-right' : ''}">
+          <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-sky-700">Selected</p>
+          <p class="text-sm font-semibold text-text">${title}</p>
+        </div>
+        <div class="flex items-center gap-2 ${isRtl ? 'flex-row-reverse' : ''}">
+          <span class="rounded-full bg-muted/10 px-2.5 py-1 text-xs font-semibold text-text">${duration}</span>
+          ${priceMarkup}
+        </div>
+      </div>
+    `;
+  }
+
+  function applyInitialServiceSelection() {
+    if (appliedInitialServiceId || selectedService) return;
+
+    const initialServiceId = new URLSearchParams(window.location.search).get('serviceId');
+    if (!initialServiceId) return;
+
+    const match = servicesParams.find((service) => service.id === initialServiceId);
+    if (!match) return;
+
+    selectedService = match;
+    appliedInitialServiceId = true;
+  }
+
+  function renderServiceCards() {
+    const list = document.getElementById('step-1-list');
+    const lang = store.state.lang;
+    const isRtl = lang === 'ar';
+    const filtered = servicesParams.filter((service) => serviceMatchesCarType(service, activeCarType));
+
+    list.className = 'space-y-4';
+
+    if (filtered.length === 0) {
+      list.innerHTML = `
+        ${renderCarTypeTabs()}
+        <div class="rounded-xl border border-border bg-bg px-4 py-8 text-center text-sm text-muted">
+          No services available for this car type.
+        </div>
+      `;
+      return;
+    }
+
+    const cards = filtered.map((service) => {
+      const selected = selectedService?.id === service.id;
+      const title = sanitizeServiceText(lang === 'ar' ? service.nameAr : service.nameEn);
+      const description = sanitizeServiceText(lang === 'ar' ? service.descriptionAr : service.descriptionEn);
+      const badgeLabel = getServiceCardBadge(service);
+
+      return `
+        ${renderServiceCard({
+          service,
+          title,
+          description,
+          badgeLabel,
+          selected,
+          selectedLabel: 'Selected',
+          onClick: `window.selectService('${service.id}')`,
+          className: isRtl ? 'text-right' : '',
+          dark: true
+        })}
+      `;
+    }).join('');
+
+    list.innerHTML = `
+      ${renderCarTypeTabs()}
+      <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">${cards}</div>
+      ${renderSelectedServiceSummary(selectedService, isRtl)}
+    `;
+  }
+
   async function loadServices() {
     const list = document.getElementById('step-1-list');
     list.innerHTML = Array(3).fill(CardSkeleton()).join('');
+
     try {
       const res = await apiFetch('/services');
       if (res && res.items) {
-        servicesParams = res.items.filter(s => s.isActive);
-        const lang = store.state.lang;
-
-        list.className = 'grid grid-cols-1 md:grid-cols-3 gap-4';
-        list.innerHTML = servicesParams.map(s => {
-          const title = lang === 'ar' ? s.nameAr : s.nameEn;
-          return `
-            <div id="service-card-${s.id}" class="bg-surface border border-border rounded-xl p-5 cursor-pointer transition-all hover:border-primary group" onclick="window.selectService('${s.id}')">
-              <h4 class="font-heading font-bold text-text mb-2 group-hover:text-primary transition-colors">${title}</h4>
-              <p class="text-xs text-muted mb-4 line-clamp-2">${lang === 'ar' ? (s.descriptionAr || '') : (s.descriptionEn || '')}</p>
-              <div class="flex justify-between items-center mt-auto">
-                <span class="text-xs font-semibold px-2 py-1 bg-muted/10 rounded">${s.durationMinutes} min</span>
-                <span class="text-xs font-semibold text-muted">Price after approval</span>
-              </div>
-            </div>
-          `;
-        }).join('');
+        servicesParams = res.items.filter((service) => service.isActive);
+        applyInitialServiceSelection();
+        renderServiceCards();
+        document.getElementById('step-1-next').disabled = !selectedService;
       }
     } catch (e) {
       list.innerHTML = `<div class="text-danger p-4 container text-center">${t('common.error')}</div>`;
     }
   }
 
+  window.setBookCarType = (carType) => {
+    activeCarType = carType;
+
+    if (selectedService && !serviceMatchesCarType(selectedService, activeCarType)) {
+      selectedService = null;
+      document.getElementById('step-1-next').disabled = true;
+    }
+
+    renderServiceCards();
+  };
+
   window.selectService = (id) => {
-    // Clear previous selection
-    document.querySelectorAll('[id^="service-card-"]').forEach(el => {
-      el.classList.remove('border-primary', 'bg-primary/5', 'ring-2', 'ring-primary/20');
-      el.classList.add('border-border');
-    });
-
-    selectedService = servicesParams.find(s => s.id === id);
-    const card = document.getElementById(`service-card-${id}`);
-    card.classList.remove('border-border');
-    card.classList.add('border-primary', 'bg-primary/5', 'ring-2', 'ring-primary/20');
-
-    document.getElementById('step-1-next').disabled = false;
+    selectedService = servicesParams.find((service) => service.id === id) || null;
+    renderServiceCards();
+    document.getElementById('step-1-next').disabled = !selectedService;
   };
 
   window.nextStep = (step) => {
     document.getElementById(`step-${currentStep}`).classList.add('hidden');
     document.getElementById(`step-${step}`).classList.remove('hidden');
 
-    // Update Stepper UI
     document.getElementById(`stepper-num-${currentStep}`).classList.remove('bg-primary', 'text-white');
     document.getElementById(`stepper-num-${currentStep}`).classList.add('bg-muted/20', 'text-muted');
     document.getElementById(`stepper-num-${step}`).classList.remove('bg-muted/20', 'text-muted');
@@ -88,16 +215,16 @@ export function BookService() {
     const timeGrid = document.getElementById('time-grid');
     const slots = ['09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00'];
 
-    timeGrid.innerHTML = slots.map(t => `
-      <div id="slot-${t.replace(':', '')}" class="p-3 border border-border rounded-xl text-center cursor-pointer hover:border-primary transition-colors text-sm font-medium" onclick="window.selectTime('${t}')">
-        ${t}
+    timeGrid.innerHTML = slots.map((time) => `
+      <div id="slot-${time.replace(':', '')}" class="p-3 border border-border rounded-xl text-center cursor-pointer hover:border-primary transition-colors text-sm font-medium" onclick="window.selectTime('${time}')">
+        ${time}
       </div>
     `).join('');
   }
 
   window.selectTime = (time) => {
     selectedTime = time;
-    document.querySelectorAll('[id^="slot-"]').forEach(el => {
+    document.querySelectorAll('[id^="slot-"]').forEach((el) => {
       el.classList.remove('border-primary', 'bg-primary/10', 'text-primary');
       el.classList.add('border-border');
     });
@@ -109,16 +236,16 @@ export function BookService() {
 
   function populateConfirmation() {
     const lang = store.state.lang;
-    document.getElementById('conf-service').textContent = lang === 'ar' ? selectedService.nameAr : selectedService.nameEn;
+    const title = sanitizeServiceText(lang === 'ar' ? selectedService.nameAr : selectedService.nameEn);
+    document.getElementById('conf-service').textContent = title;
     document.getElementById('conf-datetime').textContent = `${selectedDate} at ${selectedTime}`;
-    document.getElementById('conf-price').textContent = 'Price will appear after admin approval';
+    document.getElementById('conf-price').textContent = getPriceText(selectedService.basePrice);
   }
 
   window.submitBooking = async () => {
     const notes = document.getElementById('booking-notes').value;
     const btn = document.getElementById('submit-btn');
 
-    // Combine Date & Time to ISO
     const appointmentAt = new Date(`${selectedDate}T${selectedTime}:00`).toISOString();
 
     try {
@@ -131,7 +258,7 @@ export function BookService() {
           serviceId: selectedService.id,
           appointmentAt,
           notes,
-          branchId: 'MAIN' // Assuming MAIN default
+          branchId: 'MAIN'
         }
       });
 
@@ -155,7 +282,6 @@ export function BookService() {
         <p class="text-muted mt-1">Select your service, choose a time, and drop off your vehicle.</p>
       </div>
 
-      <!-- Stepper Header -->
       <div class="flex items-center justify-between bg-surface border border-border p-4 rounded-xl mb-4">
         <div class="flex items-center gap-3">
           <div id="stepper-num-1" class="w-8 h-8 rounded-full bg-primary text-white flex items-center justify-center font-bold text-sm transition-colors">1</div>
@@ -173,12 +299,10 @@ export function BookService() {
         </div>
       </div>
 
-      <!-- STEP 1: Service Selection -->
       <div id="step-1" class="fade-in">
         <div class="bg-surface border border-border rounded-xl p-6 mb-6">
           <h2 class="text-lg font-bold text-text mb-4">What does your EV need?</h2>
           <div id="step-1-list" class="flex flex-col gap-4">
-             <!-- Skeletons loaded via JS -->
           </div>
         </div>
         <div class="flex justify-end">
@@ -186,7 +310,6 @@ export function BookService() {
         </div>
       </div>
 
-      <!-- STEP 2: Date & Time -->
       <div id="step-2" class="hidden fade-in">
         <div class="bg-surface border border-border rounded-xl p-6 mb-6 grid grid-cols-1 md:grid-cols-2 gap-8">
           <div>
@@ -206,7 +329,6 @@ export function BookService() {
         </div>
       </div>
 
-      <!-- STEP 3: Confirm -->
       <div id="step-3" class="hidden fade-in">
         <div class="bg-surface border border-border rounded-xl p-6 mb-6">
           <h2 class="text-lg font-bold text-text mb-6">Review your Booking</h2>
@@ -239,7 +361,6 @@ export function BookService() {
           <button id="submit-btn" onclick="submitBooking()" class="px-6 py-2.5 bg-primary hover:bg-primary-hover text-white justify-center flex items-center w-40 rounded-lg font-bold transition-all shadow-md">Confirm & Book</button>
         </div>
       </div>
-
     </div>
   `;
 }

@@ -1,7 +1,22 @@
 import "./globals.css";
 import type { Metadata } from "next";
+import { Readex_Pro, Space_Grotesk } from "next/font/google";
 import { cookies } from "next/headers";
 import { getDictionary, getDirection } from "@/lib/i18n";
+
+const spaceGrotesk = Space_Grotesk({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+  variable: "--font-space-grotesk",
+  display: "swap"
+});
+
+const readexPro = Readex_Pro({
+  subsets: ["arabic", "latin"],
+  weight: ["400", "500", "600", "700"],
+  variable: "--font-readex-pro",
+  display: "swap"
+});
 
 export const metadata: Metadata = {
   title: "Mohammad Khwaileh Center",
@@ -15,7 +30,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
 
   return (
     <html lang={locale} dir={getDirection(locale)}>
-      <body>
+      <body className={`${spaceGrotesk.variable} ${readexPro.variable}`}>
         <span className="sr-only">{dict.centerName}</span>
         {children}
       </body>

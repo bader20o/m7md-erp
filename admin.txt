@@ -2,8 +2,12 @@ admin:
 0780000000
 ChangeMe123!
 
+admin:
+0799900090
+Admin123!
+
 Customer:
-079880001
+0798800001
 Customer123!
 
 Employee:

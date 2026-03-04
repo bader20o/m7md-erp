@@ -94,6 +94,14 @@ export const menuItems: MenuItemConfig[] = [
     icon: "CalendarCheck"
   },
   {
+    key: "employee_qr_scan",
+    labelKey: "menuQrScan",
+    href: "/employee/qr-scan",
+    rolesAllowed: ["EMPLOYEE"],
+    group: "main",
+    icon: "ScanLine"
+  },
+  {
     key: "admin_bookings",
     labelKey: "menuBookings",
     href: "/admin/bookings",
@@ -108,6 +116,14 @@ export const menuItems: MenuItemConfig[] = [
     rolesAllowed: ["EMPLOYEE", "ADMIN"],
     group: "customers",
     icon: "MessageSquare"
+  },
+  {
+    key: "admin_memberships",
+    labelKey: "menuMemberships",
+    href: "/admin/memberships",
+    rolesAllowed: ["EMPLOYEE", "ADMIN"],
+    group: "customers",
+    icon: "CreditCard"
   },
   {
     key: "admin_membership_orders",

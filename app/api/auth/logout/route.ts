@@ -1,7 +1,6 @@
 import { fail, ok } from "@/lib/api";
 import { logAudit } from "@/lib/audit";
-import { clearSessionCookie, getSession } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
+import { clearSessionCookie, getSession, recordLogoutMetadata } from "@/lib/auth";
 
 export async function POST(): Promise<Response> {
   try {
@@ -16,12 +15,7 @@ export async function POST(): Promise<Response> {
         actorId: session.sub
       });
 
-      await prisma.user.update({
-        where: { id: session.sub },
-        data: {
-          lastLogoutAt: new Date()
-        }
-      });
+      await recordLogoutMetadata(session.sub);
     }
 
     return ok({ loggedOut: true });

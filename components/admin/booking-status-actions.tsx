@@ -25,6 +25,7 @@ type Props = {
   employeeOptions: EmployeeOption[];
   existingFinalPrice?: string | number | null;
   existingInternalNote?: string | null;
+  priceType?: "FIXED" | "AFTER_INSPECTION";
 };
 
 type ApiErrorPayload = {
@@ -41,7 +42,8 @@ export function BookingStatusActions({
   status,
   employeeOptions,
   existingFinalPrice,
-  existingInternalNote
+  existingInternalNote,
+  priceType = "FIXED"
 }: Props): React.ReactElement {
   const router = useRouter();
   const [rejectReason, setRejectReason] = useState("");
@@ -55,6 +57,9 @@ export function BookingStatusActions({
   const showApprovedActions = status === "APPROVED";
   const hasAnyActions = showPendingActions || showApprovedActions;
 
+  const isAfterInspection = priceType === "AFTER_INSPECTION";
+  const priceValid = Number(finalPrice) > 0;
+
   const sortedEmployees = useMemo(
     () => employeeOptions.slice().sort((a, b) => a.label.localeCompare(b.label)),
     [employeeOptions]
@@ -65,6 +70,24 @@ export function BookingStatusActions({
     setError(null);
     const response = await fetch(url, {
       method: "POST",
+      headers: payload ? { "Content-Type": "application/json" } : undefined,
+      body: payload ? JSON.stringify(payload) : undefined
+    });
+    const json = (await response.json()) as unknown;
+    setLoadingAction(null);
+    if (!response.ok) {
+      setError(getErrorMessage(json, "Action failed."));
+      return;
+    }
+    setRejectReason("");
+    router.refresh();
+  }
+
+  async function callPatch(url: string, payload?: Record<string, unknown>): Promise<void> {
+    setLoadingAction(url);
+    setError(null);
+    const response = await fetch(url, {
+      method: "PATCH",
       headers: payload ? { "Content-Type": "application/json" } : undefined,
       body: payload ? JSON.stringify(payload) : undefined
     });
@@ -138,11 +161,11 @@ export function BookingStatusActions({
             />
             <button
               type="button"
-              onClick={() => callAction(`/api/admin/bookings/${bookingId}/reject`, { rejectReason })}
+              onClick={() => callPatch(`/api/admin/bookings/${bookingId}`, { status: "REJECTED", note: rejectReason })}
               disabled={Boolean(loadingAction) || rejectReason.trim().length < 3}
               className="rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-700 transition duration-200 hover:bg-red-100 disabled:opacity-70"
             >
-              {loadingAction === `/api/admin/bookings/${bookingId}/reject` ? "Rejecting..." : "Reject"}
+              {loadingAction === `/api/admin/bookings/${bookingId}` ? "Rejecting..." : "Reject"}
             </button>
           </div>
         </div>
@@ -150,12 +173,21 @@ export function BookingStatusActions({
 
       {showApprovedActions ? (
         <div className="grid gap-2">
+          {isAfterInspection ? (
+            <div className="rounded-xl border border-amber-200 bg-amber-50 p-3">
+              <p className="text-xs font-semibold text-amber-700">Inspection Pricing</p>
+              <p className="mt-0.5 text-xs text-amber-600">
+                Final price must be entered before completing this booking.
+              </p>
+            </div>
+          ) : null}
+
           <div className="grid gap-2 md:grid-cols-2">
             <input
               value={finalPrice}
               onChange={(event) => setFinalPrice(event.target.value)}
               className="rounded-xl border border-slate-300 px-3 py-2 text-sm"
-              placeholder="Final price"
+              placeholder={isAfterInspection ? "Final price (required) *" : "Final price"}
               type="number"
               step="0.01"
               min="0"
@@ -189,18 +221,18 @@ export function BookingStatusActions({
                   performedByEmployeeId: performedByEmployeeId || undefined
                 })
               }
-              disabled={Boolean(loadingAction) || Number(finalPrice) <= 0}
+              disabled={Boolean(loadingAction) || !priceValid}
               className="rounded-xl bg-emerald-700 px-4 py-2 text-sm font-semibold text-white transition duration-200 hover:bg-emerald-800 disabled:opacity-70"
             >
               {loadingAction === `/api/admin/bookings/${bookingId}/complete` ? "Completing..." : "Complete"}
             </button>
             <button
               type="button"
-              onClick={() => callAction(`/api/admin/bookings/${bookingId}/no-show`)}
+              onClick={() => callPatch(`/api/admin/bookings/${bookingId}`, { status: "NO_SHOW" })}
               disabled={Boolean(loadingAction)}
               className="rounded-xl border border-violet-200 bg-violet-50 px-4 py-2 text-sm font-semibold text-violet-700 transition duration-200 hover:bg-violet-100 disabled:opacity-70"
             >
-              {loadingAction === `/api/admin/bookings/${bookingId}/no-show` ? "Updating..." : "No Show"}
+              {loadingAction === `/api/admin/bookings/${bookingId}` ? "Updating..." : "No Show"}
             </button>
           </div>
         </div>

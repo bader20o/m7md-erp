@@ -84,14 +84,14 @@ export function Services() {
               </div>
               <div class="p-6 flex flex-col gap-4 flex-1">
                 <div class="flex items-start justify-between gap-3">
-                  <h3 class="font-heading font-bold text-lg text-text leading-tight">${title}</h3>
+                  <h3 class="card-title font-heading text-text leading-tight">${title}</h3>
                   ${
                     service.category
                       ? `<span class="bg-muted/10 text-muted px-2 py-1 rounded text-xs font-semibold uppercase tracking-wider">${service.category}</span>`
                       : ''
                   }
                 </div>
-                <p class="text-sm text-muted flex-1">${desc || 'No description available.'}</p>
+                <p class="card-description flex-1">${desc || 'No description available.'}</p>
                 <div class="flex items-center justify-between gap-3">
                   <div class="text-sm text-text">
                     <span class="font-semibold">${t('services.duration', { min: service.durationMinutes })}</span>

@@ -86,6 +86,7 @@ export default async function AdminBookingsPage({ params }: Props): Promise<Reac
               employeeOptions={employeeOptions}
               existingFinalPrice={item.finalPrice?.toString() ?? null}
               existingInternalNote={item.internalNote}
+              priceType={item.service.priceType}
             />
           </article>
         ))}

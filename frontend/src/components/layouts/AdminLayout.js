@@ -152,17 +152,18 @@ export function AdminLayout(children) {
 
   const filteredNav = ADMIN_NAV_ITEMS.filter((item) => {
     if (!item.roles.includes(user.role)) return false;
+    if (typeof item.isVisible === "function" && !item.isVisible(user)) return false;
     if (!item.permission) return true;
     if (isAdminRole(user.role)) return true;
     return hasPermission(user, item.permission);
   });
 
   const listNav = filteredNav.map((item) => {
-    const active = item.match.includes(App.currentPath);
+    const active = item.match.includes(App.currentPath.split(/[?#]/)[0]);
     return `
       <a href="${item.path}" onclick="navigate(event, '${item.path}')" class="flex items-center gap-3 px-4 py-3 rounded-xl mb-1 ${active ? "bg-primary text-white font-medium shadow-md" : "text-muted hover:bg-surface hover:text-text"} transition-all">
         <svg class="w-5 h-5 ${active ? "text-white" : ""}" fill="none" stroke="currentColor" viewBox="0 0 24 24">${item.icon}</svg>
-        <span>${item.label}</span>
+        <span class="font-bold">${item.label}</span>
       </a>
     `;
   }).join("");

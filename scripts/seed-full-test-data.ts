@@ -45,6 +45,57 @@ const SERVICE_CATALOG = [
   { code: "cell_balance", nameEn: "Battery Cell Balancing", nameAr: "موازنة خلايا البطارية", category: "Battery", basePrice: 275, durationMinutes: 150 }
 ] as const;
 
+const SERVICE_DESCRIPTIONS = {
+  ev_diag: {
+    descriptionEn: "System-wide battery, charging, and power electronics diagnostics.",
+    descriptionAr: "فحص شامل للبطارية ونظام الشحن والإلكترونيات."
+  },
+  hybrid_scan: {
+    descriptionEn: "Capacity and cell-health scan for hybrid battery packs.",
+    descriptionAr: "فحص سعة البطارية وحالة الخلايا للهايبرد."
+  },
+  ac_service: {
+    descriptionEn: "Cooling efficiency check with cabin airflow and pressure testing.",
+    descriptionAr: "فحص كفاءة التبريد وتدفق الهواء وضغط النظام."
+  },
+  brake_service: {
+    descriptionEn: "Inspection, cleaning, and service for pads, discs, and brake response.",
+    descriptionAr: "فحص وتنظيف وصيانة الفحمات والأقراص واستجابة الفرامل."
+  },
+  alignment: {
+    descriptionEn: "Precision alignment to improve handling and reduce tire wear.",
+    descriptionAr: "ضبط دقيق لزوايا العجلات لتحسين الثبات وتقليل اهتراء الإطارات."
+  },
+  cooling_flush: {
+    descriptionEn: "Cooling circuit flush and thermal flow check for battery protection.",
+    descriptionAr: "غسيل دائرة التبريد وفحص تدفق الحرارة لحماية البطارية."
+  },
+  charger_port: {
+    descriptionEn: "Connector cleaning and contact inspection for reliable charging.",
+    descriptionAr: "تنظيف المنفذ وفحص التوصيلات لشحن مستقر."
+  },
+  regen_cal: {
+    descriptionEn: "Brake blending and regen response calibration for smoother stopping.",
+    descriptionAr: "معايرة دمج الفرامل والكبح الاسترجاعي لتوقف أكثر سلاسة."
+  },
+  inverter: {
+    descriptionEn: "Health check for inverter output, temperature, and fault signals.",
+    descriptionAr: "فحص أداء الانفرتر وحرارته وإشارات الأعطال."
+  },
+  dc_dc: {
+    descriptionEn: "Voltage conversion test to verify low-voltage system stability.",
+    descriptionAr: "فحص تحويل الجهد للتأكد من استقرار النظام منخفض الجهد."
+  },
+  pump_replace: {
+    descriptionEn: "Cooling pump replacement with system bleed and flow verification.",
+    descriptionAr: "تبديل مضخة التبريد مع تنفيس النظام وفحص التدفق."
+  },
+  cell_balance: {
+    descriptionEn: "Cell voltage balancing to improve pack consistency and performance.",
+    descriptionAr: "موازنة جهد الخلايا لتحسين توازن الحزمة والأداء."
+  }
+} satisfies Record<string, { descriptionEn: string; descriptionAr: string }>;
+
 const SUPPLIER_DATA = [
   { code: "volt", name: "Volt Parts Trading", phone: "065600111", address: "Sahab Industrial Zone" },
   { code: "green", name: "Green Motion Supplies", phone: "065600222", address: "Marka North" },
@@ -132,6 +183,10 @@ type SeedEmployee = { id: string; userId: string; fullName: string; monthlyBase:
 type SeedService = { id: string; code: string; nameEn: string; nameAr: string; category: string | null; basePrice: number; durationMinutes: number };
 type SeedPart = { id: string; code: string; name: string; costPrice: number; sellPrice: number; lowStockThreshold: number; stockQty: number };
 type SeedSupplier = { id: string; name: string };
+
+function seedCustomerPhone(index: number): string {
+  return `07988${String(index + 1).padStart(5, "0")}`;
+}
 
 async function main(): Promise<void> {
   console.log("Seeding full admin test dataset...");
@@ -393,6 +448,7 @@ async function clearPreviousSeedData(adminId: string): Promise<void> {
 async function seedServices(): Promise<SeedService[]> {
   const result: SeedService[] = [];
   for (const service of SERVICE_CATALOG) {
+    const descriptions = SERVICE_DESCRIPTIONS[service.code];
     const item = await prisma.service.create({
       data: {
         id: `${SEED_PREFIX}_service_${service.code}`,
@@ -401,8 +457,8 @@ async function seedServices(): Promise<SeedService[]> {
         category: service.category,
         basePrice: service.basePrice,
         durationMinutes: service.durationMinutes,
-        descriptionEn: `${SEED_NOTE} ${service.nameEn} seed service`,
-        descriptionAr: `${SEED_NOTE} ${service.nameAr}`,
+        descriptionEn: descriptions?.descriptionEn ?? service.nameEn,
+        descriptionAr: descriptions?.descriptionAr ?? service.nameAr,
         isActive: true
       }
     });
@@ -519,6 +575,7 @@ async function seedAttendance(adminId: string, employees: SeedEmployee[], daySta
 
       const checkInAt = addMinutes(addHours(dayStart, 8), 45 + ((employeePosition + dayOffset) % 25));
       const checkOutAt = addHours(checkInAt, 8 + ((employeePosition + dayOffset) % 2));
+      const dayKey = formatDate(checkInAt);
 
       await prisma.attendance.create({
         data: {
@@ -526,8 +583,20 @@ async function seedAttendance(adminId: string, employees: SeedEmployee[], daySta
           employeeId: employee.id,
           checkInAt,
           checkOutAt,
-          qrPayload: `${SEED_PREFIX}:${employee.id}:${formatDate(checkInAt)}`,
+          qrPayload: `${SEED_PREFIX}:${employee.id}:${dayKey}`,
           note: `${SEED_NOTE} Shift recorded`
+        }
+      });
+
+      await prisma.attendanceDay.create({
+        data: {
+          id: `${SEED_PREFIX}_attendance_day_${String(attendanceIndex).padStart(4, "0")}`,
+          employeeId: employee.id,
+          dayKey,
+          checkInAt,
+          checkOutAt,
+          workedMinutes: Math.max(Math.round((checkOutAt.getTime() - checkInAt.getTime()) / 60000), 0),
+          status: "CLOSED"
         }
       });
 
@@ -536,18 +605,20 @@ async function seedAttendance(adminId: string, employees: SeedEmployee[], daySta
           {
             id: `${SEED_PREFIX}_attendance_event_${String(eventIndex).padStart(4, "0")}`,
             employeeId: employee.id,
-            type: "IN",
+            type: "CHECK_IN",
             occurredAt: checkInAt,
-            qrPayload: `${SEED_PREFIX}:IN:${employee.id}`,
-            geoNote: `${SEED_NOTE} Front gate`
+            dayKey,
+            status: "ACCEPTED",
+            userAgent: "seed-script"
           },
           {
             id: `${SEED_PREFIX}_attendance_event_${String(eventIndex + 1).padStart(4, "0")}`,
             employeeId: employee.id,
-            type: "OUT",
+            type: "CHECK_OUT",
             occurredAt: checkOutAt,
-            qrPayload: `${SEED_PREFIX}:OUT:${employee.id}`,
-            geoNote: `${SEED_NOTE} Workshop exit`
+            dayKey,
+            status: "ACCEPTED",
+            userAgent: "seed-script"
           }
         ]
       });
@@ -619,7 +690,7 @@ async function seedCustomers(adminId: string, dayStarts: Date[]): Promise<SeedUs
     const item = await prisma.user.create({
       data: {
         id: `${SEED_PREFIX}_customer_${String(index + 1).padStart(2, "0")}`,
-        phone: `07988${String(index + 1).padStart(4, "0")}`,
+        phone: seedCustomerPhone(index),
         passwordHash,
         role: Role.CUSTOMER,
         status: UserStatus.ACTIVE,

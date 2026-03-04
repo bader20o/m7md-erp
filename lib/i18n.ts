@@ -30,6 +30,7 @@ const en = {
   menuProfile: "Profile",
   menuChat: "Chat",
   menuTasks: "My Tasks",
+  menuQrScan: "QR Scan",
   menuBookings: "Bookings",
   menuReviews: "Reviews",
   menuMembershipOrders: "Membership Orders",
@@ -185,6 +186,7 @@ const en = {
 } as const;
 
 const ar: Record<keyof typeof en, string> = {
+  menuQrScan: "QR Scan",
   menuTasks: "المهام",
   menuAdminTasks: "المهام",
   centerName: "مركز محمد خويلة",

@@ -24,7 +24,10 @@ export default async function NewBookingPage({ params, searchParams }: Props): P
       descriptionEn: true,
       descriptionAr: true,
       basePrice: true,
-      durationMinutes: true
+      durationMinutes: true,
+      priceType: true,
+      supportedCarTypes: true,
+      category: true
     },
     orderBy: { createdAt: "desc" }
   });

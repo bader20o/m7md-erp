@@ -2,6 +2,10 @@ import { PERMISSIONS, ROLES, hasPermission, isAdminRole } from "./roles.js";
 
 export const PUBLIC_ROUTES = new Set(["/", "/services", "/contact", "/login", "/register"]);
 
+function canAccessAttendanceAdmin(user) {
+  return user?.role === ROLES.ADMIN || user?.roleProfile === "MANAGER";
+}
+
 export const CUSTOMER_ROUTES = new Set([
   "/home",
   "/dashboard",
@@ -28,9 +32,16 @@ export const ADMIN_ROUTE_ACCESS = {
   "/admin/employees": {
     roles: [ROLES.ADMIN]
   },
+  "/admin/attendance": {
+    roles: [ROLES.ADMIN, ROLES.EMPLOYEE],
+    allow: canAccessAttendanceAdmin
+  },
   "/admin/bookings": {
     roles: [ROLES.ADMIN, ROLES.EMPLOYEE],
     permission: PERMISSIONS.BOOKINGS
+  },
+  "/employee/qr-scan": {
+    roles: [ROLES.EMPLOYEE]
   },
   "/admin/chat": {
     roles: [ROLES.ADMIN, ROLES.EMPLOYEE]
@@ -127,6 +138,14 @@ export const ADMIN_NAV_ITEMS = [
     icon: '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/>'
   },
   {
+    path: "/admin/attendance",
+    match: ["/admin/attendance"],
+    label: "Attendance",
+    roles: [ROLES.ADMIN, ROLES.EMPLOYEE],
+    isVisible: canAccessAttendanceAdmin,
+    icon: '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 14l2 2 4-4"/>'
+  },
+  {
     path: "/admin/bookings",
     match: ["/admin/bookings"],
     label: "Bookings",
@@ -174,6 +193,13 @@ export const ADMIN_NAV_ITEMS = [
     icon: '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>'
   },
   {
+    path: "/employee/qr-scan",
+    match: ["/employee/qr-scan"],
+    label: "QR Scan",
+    roles: [ROLES.EMPLOYEE],
+    icon: '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h3V4H5a1 1 0 00-1 1v5h3V7zm10-3h-5v3h3v3h3V5a1 1 0 00-1-1zM7 17H4v2a1 1 0 001 1h5v-3H7v-3H4v3zm10 0h-3v3h5a1 1 0 001-1v-5h-3v3z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 9h6v6H9z"/>'
+  },
+  {
     path: "/tasks",
     match: ["/tasks"],
     label: "My Tasks",
@@ -200,6 +226,7 @@ export function isAllowedAdminRoute(pathname, user) {
   const config = ADMIN_ROUTE_ACCESS[pathname];
   if (!config || !user) return false;
   if (!config.roles.includes(user.role)) return false;
+  if (typeof config.allow === "function" && !config.allow(user)) return false;
   if (!config.permission) return true;
   if (isAdminRole(user.role)) return true;
   return hasPermission(user, config.permission);

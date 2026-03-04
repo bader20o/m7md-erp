@@ -1,4 +1,4 @@
-import { BookingStatus, IncomeSource, Prisma, Role, TransactionType } from "@prisma/client";
+import { BookingStatus, IncomeSource, PriceType, Prisma, Role, TransactionType } from "@prisma/client";
 import { ApiError, fail, ok, parseJsonBody } from "@/lib/api";
 import { logAudit } from "@/lib/audit";
 import { assertBookingTransition } from "@/lib/booking-status";
@@ -36,11 +36,17 @@ export async function POST(request: Request, context: Params): Promise<Response>
         throw new ApiError(404, "BOOKING_NOT_FOUND", "Booking not found.");
       }
 
+      // Idempotent: already completed with transaction → return as-is
       if (booking.status === BookingStatus.COMPLETED && booking.transaction) {
         return booking;
       }
 
       assertBookingTransition(booking.status, BookingStatus.COMPLETED);
+
+      // Enforce finalPrice for AFTER_INSPECTION bookings
+      if (booking.priceTypeSnapshot === PriceType.AFTER_INSPECTION && Number(body.finalPrice) <= 0) {
+        throw new ApiError(400, "FINAL_PRICE_REQUIRED", "Final price is required for inspection-priced bookings.");
+      }
 
       const updatedBooking = await tx.booking.update({
         where: { id },

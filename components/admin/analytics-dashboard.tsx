@@ -116,6 +116,11 @@ type Props = {
 
 const PIE_COLORS = ["#0f766e", "#64748b", "#dc2626"];
 const SPARSE_LINE_DOT = { r: 2.5, strokeWidth: 1.5, fill: "#ffffff" };
+const CHART_TOOLTIP_WRAPPER_STYLE = {
+  position: "absolute",
+  zIndex: 9999,
+  pointerEvents: "none"
+} as const;
 
 function toDateInputValue(value: Date): string {
   return format(value, "yyyy-MM-dd");
@@ -182,7 +187,7 @@ function ChartFrame({ children }: { children: React.ReactElement }): React.React
   }, []);
 
   return (
-    <div className="mt-3 h-72 min-h-[18rem] w-full min-w-0 overflow-hidden">
+    <div className="relative mt-3 h-72 min-h-[18rem] w-full min-w-0 overflow-visible">
       {ready ? (
         <ResponsiveContainer width="99%" height="100%" minWidth={280} minHeight={260}>
           {children}
@@ -471,7 +476,9 @@ export function AnalyticsDashboard({ locale, dir, dict }: Props): React.ReactEle
                   />
                   <YAxis domain={[0, "auto"]} tick={{ fontSize: 12 }} width={80} />
                   <Tooltip
+                    allowEscapeViewBox={{ x: true, y: true }}
                     contentStyle={{ direction: dir, textAlign: dir === "rtl" ? "right" : "left" }}
+                    wrapperStyle={CHART_TOOLTIP_WRAPPER_STYLE}
                     formatter={(value: number | string | undefined, name: string | undefined) => [
                       formatCurrency(Number(value ?? 0)),
                       legendLabelByDataKey[name ?? ""] ?? name ?? ""
@@ -514,7 +521,9 @@ export function AnalyticsDashboard({ locale, dir, dict }: Props): React.ReactEle
                   />
                   <YAxis tick={{ fontSize: 12 }} width={80} />
                   <Tooltip
+                    allowEscapeViewBox={{ x: true, y: true }}
                     contentStyle={{ direction: dir, textAlign: dir === "rtl" ? "right" : "left" }}
+                    wrapperStyle={CHART_TOOLTIP_WRAPPER_STYLE}
                     formatter={(value: number | string | undefined, name: string | undefined) => [
                       formatCurrency(Number(value ?? 0)),
                       legendLabelByDataKey[name ?? ""] ?? name ?? ""
@@ -534,7 +543,9 @@ export function AnalyticsDashboard({ locale, dir, dict }: Props): React.ReactEle
               <ChartFrame>
                 <PieChart>
                   <Tooltip
+                    allowEscapeViewBox={{ x: true, y: true }}
                     contentStyle={{ direction: dir, textAlign: dir === "rtl" ? "right" : "left" }}
+                    wrapperStyle={CHART_TOOLTIP_WRAPPER_STYLE}
                     formatter={(value: number | string | undefined) => [
                       formatCurrency(Number(value ?? 0)),
                       dict.analyticsAmountLabel

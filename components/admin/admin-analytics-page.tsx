@@ -140,6 +140,11 @@ type Props = {
 const EXPENSE_COLORS = ["#94a3b8", "#64748b", "#475569"];
 const GROUP_BY_VALUES: GroupBy[] = ["day", "week", "month"];
 const CHART_GROUP_BY_VALUES: Array<"day" | "week"> = ["day", "week"];
+const CHART_TOOLTIP_WRAPPER_STYLE = {
+  position: "absolute",
+  zIndex: 9999,
+  pointerEvents: "none"
+} as const;
 
 function safeParse<T>(value: string | null): T | null {
   try {
@@ -227,7 +232,7 @@ function ChartFrame({ children }: { children: React.ReactElement }): React.React
   }, []);
 
   return (
-    <div className="mt-3 h-72 min-h-[18rem] w-full min-w-0">
+    <div className="relative mt-3 h-72 min-h-[18rem] w-full min-w-0 overflow-visible">
       {ready ? (
         <ResponsiveContainer width="100%" height="100%" minWidth={280} minHeight={260}>
           {children}
@@ -580,7 +585,9 @@ export function AdminAnalyticsPage({ locale, dir, dict, adminUserId }: Props): R
                   <XAxis dataKey="bucketStart" tickFormatter={(value) => toDisplayDate(value, locale)} minTickGap={20} tick={{ fill: "#94a3b8", fontSize: 12 }} axisLine={false} tickLine={false} />
                   <YAxis tick={{ fill: "#94a3b8", fontSize: 12 }} axisLine={false} tickLine={false} width={84} />
                   <Tooltip
+                    allowEscapeViewBox={{ x: true, y: true }}
                     contentStyle={{ direction: dir, textAlign: dir === "rtl" ? "right" : "left", backgroundColor: "#020617", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 16, color: "#e2e8f0" }}
+                    wrapperStyle={CHART_TOOLTIP_WRAPPER_STYLE}
                     labelFormatter={(value) => toDisplayDate(value, locale)}
                     formatter={(value: number | string | undefined, name: string | undefined) => [
                       formatMoney(Number(value ?? 0), locale),
@@ -602,7 +609,9 @@ export function AdminAnalyticsPage({ locale, dir, dict, adminUserId }: Props): R
                   <XAxis dataKey="bucketStart" tickFormatter={(value) => toDisplayDate(value, locale)} minTickGap={20} tick={{ fill: "#94a3b8", fontSize: 12 }} axisLine={false} tickLine={false} />
                   <YAxis tick={{ fill: "#94a3b8", fontSize: 12 }} axisLine={false} tickLine={false} />
                   <Tooltip
+                    allowEscapeViewBox={{ x: true, y: true }}
                     contentStyle={{ direction: dir, textAlign: dir === "rtl" ? "right" : "left", backgroundColor: "#020617", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 16, color: "#e2e8f0" }}
+                    wrapperStyle={CHART_TOOLTIP_WRAPPER_STYLE}
                     labelFormatter={(value) => toDisplayDate(value, locale)}
                   />
                   <Bar radius={[8, 8, 0, 0]} dataKey="orders" fill="#94a3b8" />
@@ -616,7 +625,9 @@ export function AdminAnalyticsPage({ locale, dir, dict, adminUserId }: Props): R
               <ChartFrame>
                 <PieChart>
                   <Tooltip
+                    allowEscapeViewBox={{ x: true, y: true }}
                     contentStyle={{ direction: dir, textAlign: dir === "rtl" ? "right" : "left", backgroundColor: "#020617", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 16, color: "#e2e8f0" }}
+                    wrapperStyle={CHART_TOOLTIP_WRAPPER_STYLE}
                     formatter={(value: number | string | undefined) => [formatMoney(Number(value ?? 0), locale), dict.analyticsAmountLabel]}
                   />
                   <Pie
@@ -642,7 +653,9 @@ export function AdminAnalyticsPage({ locale, dir, dict, adminUserId }: Props): R
                   <XAxis dataKey="label" interval={0} tick={{ fill: "#94a3b8", fontSize: 12 }} axisLine={false} tickLine={false} />
                   <YAxis tick={{ fill: "#94a3b8", fontSize: 12 }} axisLine={false} tickLine={false} />
                   <Tooltip
+                    allowEscapeViewBox={{ x: true, y: true }}
                     contentStyle={{ direction: dir, textAlign: dir === "rtl" ? "right" : "left", backgroundColor: "#020617", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 16, color: "#e2e8f0" }}
+                    wrapperStyle={CHART_TOOLTIP_WRAPPER_STYLE}
                     formatter={(value: number | string | undefined) => [formatMoney(Number(value ?? 0), locale), dict.analyticsAmountLabel]}
                   />
                   <Bar radius={[8, 8, 0, 0]} dataKey="amount" fill="#94a3b8" />

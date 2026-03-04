@@ -87,6 +87,11 @@ enum BookingStatus {
   NOT_SERVED
 }
 
+enum PriceType {
+  FIXED
+  AFTER_INSPECTION
+}
+
 enum TransactionType {
   INCOME
   EXPENSE
@@ -113,9 +118,11 @@ enum ReviewStatus {
 }
 
 enum MembershipOrderStatus {
+  PENDING
   ACTIVE
+  REJECTED
+  CANCELLED
   EXPIRED
-  SUSPENDED
 }
 
 enum MembershipPlanTier {
@@ -130,8 +137,18 @@ enum SalaryPaymentStatus {
 }
 
 enum AttendanceType {
-  IN
-  OUT
+  CHECK_IN
+  CHECK_OUT
+}
+
+enum AttendanceEventStatus {
+  ACCEPTED
+  REJECTED
+}
+
+enum AttendanceDayStatus {
+  OPEN
+  CLOSED
 }
 
 enum NotificationType {
@@ -216,6 +233,8 @@ model User {
   walkInBookingsCreated       Booking[]                   @relation("WalkInCreatedBy")
   cancelledBookings           Booking[]                   @relation("BookingCancelledBy")
   membershipOrders            MembershipOrder[]           @relation("MembershipOrderCustomer")
+  membershipOrdersApproved    MembershipOrder[]           @relation("MembershipOrderApprovedBy")
+  membershipOrdersRejected    MembershipOrder[]           @relation("MembershipOrderRejectedBy")
   reviews                     Review[]
   reviewsModerated            Review[]                    @relation("ReviewModeratedBy")
   notifications               Notification[]
@@ -238,6 +257,8 @@ model User {
   conversationParticipants    ConversationParticipant[]
   membershipUsagesRecorded    MembershipUsage[]           @relation("MembershipUsageRecordedBy")
   membershipUsageAdjustments  MembershipUsageAdjustment[] @relation("MembershipUsageAdjustedBy")
+  membershipBenefitUses       MembershipBenefitUse[]      @relation("MembershipBenefitUseConfirmedBy")
+  membershipAdminNotes        MembershipAdminNote[]       @relation("MembershipAdminNoteCreatedBy")
   stockMovementsCreated       StockMovement[]             @relation("StockMovementCreatedBy")
   suspendedUsers              User[]                      @relation("SuspendedByAdmin")
   suspendedByAdmin            User?                       @relation("SuspendedByAdmin", fields: [suspendedByAdminId], references: [id], onDelete: SetNull)
@@ -256,6 +277,8 @@ model Service {
   nameAr                 String
   category               String?
   basePrice              Decimal?                    @db.Decimal(12, 2)
+  priceType              PriceType                   @default(FIXED)
+  supportedCarTypes      String?
   imageUrl               String?
   descriptionEn          String?
   descriptionAr          String?
@@ -294,6 +317,7 @@ model Booking {
   serviceNameSnapshotAr    String
   serviceCategorySnapshot  String?
   serviceBasePriceSnapshot Decimal?                   @db.Decimal(12, 2)
+  priceTypeSnapshot        PriceType                  @default(FIXED)
   completedAt              DateTime?
   createdAt                DateTime                   @default(now())
   updatedAt                DateTime                   @updatedAt
@@ -532,11 +556,13 @@ model MembershipPlan {
   descriptionAr String?
   price         Decimal                 @db.Decimal(12, 2)
   durationDays  Int
+  durationMonths Int                    @default(12)
   color         String?
   isActive      Boolean                 @default(true)
   createdAt     DateTime                @default(now())
   updatedAt     DateTime                @updatedAt
   entitlements  MembershipPlanService[]
+  benefits      MembershipBenefit[]
   orders        MembershipOrder[]
 
   @@unique([tier])
@@ -559,20 +585,104 @@ model MembershipOrder {
   id            String                      @id @default(cuid())
   customerId    String
   planId        String
-  status        MembershipOrderStatus       @default(ACTIVE)
+  status        MembershipOrderStatus       @default(PENDING)
   priceSnapshot Decimal                     @db.Decimal(12, 2)
+  requestedAt   DateTime                    @default(now())
+  approvedAt    DateTime?
+  rejectedAt    DateTime?
+  expiresAt     DateTime?
+  approvedByAdminId String?
+  rejectedByAdminId String?
+  rejectionReason String?
+  deliveryCompanyName String?
+  deliveryPhone String?
+  deliveryTrackingCode String?
+  deliveryNote  String?
   startDate     DateTime?
   endDate       DateTime?
   paidAt        DateTime?
   createdAt     DateTime                    @default(now())
   updatedAt     DateTime                    @updatedAt
   customer      User                        @relation("MembershipOrderCustomer", fields: [customerId], references: [id], onDelete: Restrict)
+  approvedByAdmin User?                     @relation("MembershipOrderApprovedBy", fields: [approvedByAdminId], references: [id], onDelete: SetNull)
+  rejectedByAdmin User?                     @relation("MembershipOrderRejectedBy", fields: [rejectedByAdminId], references: [id], onDelete: SetNull)
   plan          MembershipPlan              @relation(fields: [planId], references: [id], onDelete: Restrict)
+  orderBenefits MembershipOrderBenefit[]
+  benefitUses   MembershipBenefitUse[]
+  adminNotes    MembershipAdminNote[]
   usages        MembershipUsage[]
   adjustments   MembershipUsageAdjustment[]
   transactions  Transaction[]
 
   @@index([customerId, status])
+  @@index([status, requestedAt])
+  @@index([planId, status])
+}
+
+model MembershipBenefit {
+  id            String                   @id @default(cuid())
+  planId        String
+  code          String
+  titleEn       String
+  titleAr       String
+  descriptionEn String?
+  descriptionAr String?
+  limitCount    Int                      @default(1)
+  isActive      Boolean                  @default(true)
+  createdAt     DateTime                 @default(now())
+  updatedAt     DateTime                 @updatedAt
+  plan          MembershipPlan           @relation(fields: [planId], references: [id], onDelete: Cascade)
+  snapshots     MembershipOrderBenefit[]
+
+  @@unique([planId, code])
+  @@index([planId, isActive])
+}
+
+model MembershipOrderBenefit {
+  id                String                 @id @default(cuid())
+  membershipOrderId String
+  planBenefitId     String?
+  code              String
+  titleEn           String
+  titleAr           String
+  descriptionEn     String?
+  descriptionAr     String?
+  limitCount        Int
+  isActive          Boolean                @default(true)
+  createdAt         DateTime               @default(now())
+  membershipOrder   MembershipOrder        @relation(fields: [membershipOrderId], references: [id], onDelete: Cascade)
+  planBenefit       MembershipBenefit?     @relation(fields: [planBenefitId], references: [id], onDelete: SetNull)
+  uses              MembershipBenefitUse[]
+
+  @@unique([membershipOrderId, code])
+  @@index([membershipOrderId])
+}
+
+model MembershipBenefitUse {
+  id                       String                  @id @default(cuid())
+  membershipOrderId        String
+  membershipOrderBenefitId String
+  usedAt                   DateTime                @default(now())
+  usedByAdminId            String
+  confirmNote              String?
+  createdAt                DateTime                @default(now())
+  membershipOrder          MembershipOrder         @relation(fields: [membershipOrderId], references: [id], onDelete: Cascade)
+  membershipOrderBenefit   MembershipOrderBenefit  @relation(fields: [membershipOrderBenefitId], references: [id], onDelete: Cascade)
+  usedByAdmin              User                    @relation("MembershipBenefitUseConfirmedBy", fields: [usedByAdminId], references: [id], onDelete: Restrict)
+
+  @@index([membershipOrderId, membershipOrderBenefitId])
+}
+
+model MembershipAdminNote {
+  id                String           @id @default(cuid())
+  membershipOrderId String
+  note              String
+  createdAt         DateTime         @default(now())
+  createdByAdminId  String
+  membershipOrder   MembershipOrder  @relation(fields: [membershipOrderId], references: [id], onDelete: Cascade)
+  createdByAdmin    User             @relation("MembershipAdminNoteCreatedBy", fields: [createdByAdminId], references: [id], onDelete: Restrict)
+
+  @@index([membershipOrderId, createdAt])
 }
 
 model MembershipUsage {
@@ -643,6 +753,7 @@ model Employee {
   user                   User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
   createdByAdmin         User?                      @relation("EmployeeCreatedByAdmin", fields: [createdByAdminId], references: [id], onDelete: SetNull)
   attendance             Attendance[]
+  attendanceDays         AttendanceDay[]
   attendanceEvents       AttendanceEvent[]
   salaries               SalaryPayment[]
   services               EmployeeService[]
@@ -715,19 +826,37 @@ model Attendance {
   @@index([employeeId, checkInAt])
 }
 
-model AttendanceEvent {
-  id         String         @id @default(cuid())
-  employeeId String
-  type       AttendanceType
-  occurredAt DateTime       @default(now())
-  latitude   Decimal?       @db.Decimal(9, 6)
-  longitude  Decimal?       @db.Decimal(9, 6)
-  geoNote    String?
-  qrPayload  String?
-  createdAt  DateTime       @default(now())
-  employee   Employee       @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+model AttendanceDay {
+  id            String              @id @default(cuid())
+  employeeId    String
+  dayKey        String
+  checkInAt     DateTime?
+  checkOutAt    DateTime?
+  workedMinutes Int?
+  status        AttendanceDayStatus @default(OPEN)
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+  employee      Employee            @relation(fields: [employeeId], references: [id], onDelete: Cascade)
 
-  @@index([employeeId, occurredAt])
+  @@unique([employeeId, dayKey])
+  @@index([dayKey])
+}
+
+model AttendanceEvent {
+  id           String                @id @default(cuid())
+  employeeId   String
+  type         AttendanceType
+  occurredAt   DateTime              @default(now())
+  dayKey       String
+  status       AttendanceEventStatus
+  rejectReason String?
+  ipAddress    String?
+  userAgent    String?
+  createdAt    DateTime              @default(now())
+  employee     Employee              @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([employeeId, dayKey])
+  @@index([occurredAt])
 }
 
 model SalaryPayment {

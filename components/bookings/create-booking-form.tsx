@@ -1,6 +1,8 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
+import { sanitizeServiceText } from "@/lib/sanitize-service-text";
+import { ServiceCard } from "@/components/services/ServiceCard";
 
 type ServiceItem = {
   id: string;
@@ -11,69 +13,92 @@ type ServiceItem = {
   descriptionAr: string | null;
   basePrice?: number | string | null;
   durationMinutes: number;
+  priceType?: "FIXED" | "AFTER_INSPECTION";
+  supportedCarTypes?: string | null;
+  category?: string | null;
 };
 
+type CarTypeFilter = "ALL" | "EV" | "HYBRID" | "FUEL";
+
+const CAR_TYPE_TABS: { value: CarTypeFilter; label: string }[] = [
+  { value: "ALL", label: "All" },
+  { value: "EV", label: "EV" },
+  { value: "HYBRID", label: "Hybrid" },
+  { value: "FUEL", label: "Fuel" }
+];
+
 function formatDuration(minutes: number): string {
-  if (minutes < 60) {
-    return `${minutes} min`;
-  }
-
+  if (minutes < 60) return `${minutes} min`;
   const hours = Math.floor(minutes / 60);
-  const remainingMinutes = minutes % 60;
-  return remainingMinutes ? `${hours}h ${remainingMinutes}m` : `${hours}h`;
+  const rem = minutes % 60;
+  return rem ? `${hours}h ${rem}m` : `${hours}h`;
 }
 
-function formatPrice(price: ServiceItem["basePrice"]): string {
-  if (price === null || price === undefined || price === "") {
-    return "Price after inspection";
-  }
-
-  const numeric = Number(price);
-  if (Number.isNaN(numeric)) {
-    return "Price after inspection";
-  }
-
-  return `${numeric.toFixed(2)} JOD`;
+function normalizeServiceText(text: string): string {
+  return text.replace(/\s+/g, " ").trim().toLocaleLowerCase();
 }
 
-function PlaceholderIcon(): React.ReactElement {
-  return (
-    <svg
-      aria-hidden="true"
-      viewBox="0 0 64 64"
-      className="h-12 w-12 text-slate-200/70"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2.5"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M37 13l6 6-8 8 4 4 8-8 6 6v10L41 51H31l-6-6 8-8-4-4-8 8-6-6V25L27 13h10Z" />
-      <path d="M17 47l-4 4" />
-    </svg>
-  );
+function parseCarTypes(raw: string | null | undefined): string[] {
+  if (!raw) return [];
+
+  try {
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) {
+      return parsed
+        .map((value) => String(value).trim().toUpperCase())
+        .filter(Boolean);
+    }
+  } catch {
+    // Ignore malformed JSON and fall back to comma-delimited parsing.
+  }
+
+  return raw
+    .split(",")
+    .map((value) => value.trim().toUpperCase())
+    .filter(Boolean);
+}
+
+function getPrimaryCarType(service: ServiceItem): string {
+  const supportedTypes = parseCarTypes(service.supportedCarTypes);
+  if (supportedTypes.length > 0) {
+    return supportedTypes[0];
+  }
+
+  return service.category?.trim() || "GENERAL";
 }
 
 export function CreateBookingForm({
   locale,
-  services,
-  initialServiceId
+  services
 }: {
   locale: string;
   services: ServiceItem[];
   initialServiceId?: string;
 }): React.ReactElement {
-  const [serviceId, setServiceId] = useState(
-    services.some((service) => service.id === initialServiceId) ? (initialServiceId ?? "") : (services[0]?.id ?? "")
-  );
+  const [serviceId, setServiceId] = useState("");
   const [appointmentAt, setAppointmentAt] = useState("");
   const [notes, setNotes] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [carTypeFilter, setCarTypeFilter] = useState<CarTypeFilter>("ALL");
+
+  const isRtl = locale === "ar";
+
+  const filteredServices = useMemo(() => {
+    if (carTypeFilter === "ALL") return services;
+
+    return services.filter((service) => {
+      const types = parseCarTypes(service.supportedCarTypes);
+      if (types.length === 0) return true;
+      return types.includes(carTypeFilter);
+    });
+  }, [carTypeFilter, services]);
 
   async function onSubmit(event: React.FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
+    if (!serviceId) return;
+
     setError(null);
     setSuccess(null);
     setLoading(true);
@@ -88,6 +113,7 @@ export function CreateBookingForm({
       })
     });
     const json = await response.json();
+
     setLoading(false);
 
     if (!response.ok) {
@@ -101,6 +127,7 @@ export function CreateBookingForm({
   return (
     <form
       onSubmit={onSubmit}
+      dir={isRtl ? "rtl" : "ltr"}
       className="grid gap-5 rounded-[24px] border border-sky-100 bg-white p-6 shadow-[0_24px_70px_-42px_rgba(17,94,169,0.45)]"
     >
       <div className="rounded-2xl border border-sky-100 bg-sky-50/70 p-4 text-sm text-slate-600">
@@ -110,55 +137,49 @@ export function CreateBookingForm({
 
       <label className="grid gap-2">
         <span className="text-sm font-medium text-slate-800">Service</span>
+
+        <div className="flex gap-1 rounded-xl bg-slate-100 p-1">
+          {CAR_TYPE_TABS.map((tab) => (
+            <button
+              key={tab.value}
+              type="button"
+              onClick={() => setCarTypeFilter(tab.value)}
+              className={`flex-1 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all duration-200 ${
+                carTypeFilter === tab.value ? "bg-white text-sky-700 shadow-sm" : "text-slate-500 hover:text-slate-700"
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
         <div className="grid gap-4 sm:grid-cols-2">
-          {services.map((service) => {
-            const selected = service.id === serviceId;
-            const serviceName = locale === "ar" ? service.nameAr : service.nameEn;
-            const description =
-              (locale === "ar" ? service.descriptionAr : service.descriptionEn)?.trim() ||
-              "Inspection-focused servicing with final pricing reviewed after vehicle assessment.";
+          {filteredServices.length === 0 ? (
+            <div className="col-span-full py-8 text-center text-sm text-slate-400">No services available for this car type.</div>
+          ) : (
+            filteredServices.map((service) => {
+              const selected = service.id === serviceId;
+              const serviceName = sanitizeServiceText(locale === "ar" ? service.nameAr : service.nameEn);
+              const description = sanitizeServiceText(locale === "ar" ? service.descriptionAr : service.descriptionEn);
+              const shouldRenderDescription = Boolean(description) && normalizeServiceText(description) !== normalizeServiceText(serviceName);
+              const durationLabel = sanitizeServiceText(formatDuration(service.durationMinutes));
 
-            return (
-              <button
-                key={service.id}
-                type="button"
-                onClick={() => setServiceId(service.id)}
-                className={`group flex h-full min-h-[320px] flex-col overflow-hidden rounded-2xl border text-left transition duration-200 ${
-                  selected
-                    ? "border-sky-500 bg-sky-50 shadow-[0_18px_40px_-28px_rgba(14,116,144,0.45)]"
-                    : "border-slate-200 bg-white hover:-translate-y-1 hover:bg-slate-50"
-                }`}
-                aria-pressed={selected}
-              >
-                <div className="relative aspect-[4/3] w-full overflow-hidden rounded-xl">
-                  {service.imageUrl ? (
-                    <img
-                      src={service.imageUrl}
-                      alt={serviceName}
-                      loading="lazy"
-                      className="h-full w-full object-cover"
-                    />
-                  ) : (
-                    <div className="flex h-full w-full items-center justify-center bg-slate-950">
-                      <div className="flex flex-col items-center gap-2 opacity-80">
-                        <PlaceholderIcon />
-                        <span className="text-xs font-medium tracking-[0.18em] text-slate-300 uppercase">
-                          Service image
-                        </span>
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                <div className="flex flex-1 flex-col gap-3 p-4">
-                  <h3 className="text-base font-semibold text-slate-900">{serviceName}</h3>
-                  <p className="line-clamp-2 text-sm text-slate-600">{description}</p>
-                  <p className="text-sm font-semibold text-sky-800">{formatPrice(service.basePrice)}</p>
-                  <p className="mt-auto text-sm text-slate-500">{formatDuration(service.durationMinutes)}</p>
-                </div>
-              </button>
-            );
-          })}
+              return (
+                <ServiceCard
+                  key={service.id}
+                  onClick={() => setServiceId(service.id)}
+                  selected={selected}
+                  title={serviceName}
+                  description={shouldRenderDescription ? description : null}
+                  duration={durationLabel}
+                  price={service.basePrice}
+                  image={service.imageUrl}
+                  carType={getPrimaryCarType(service)}
+                  className={isRtl ? "text-right" : ""}
+                />
+              );
+            })
+          )}
         </div>
       </label>
 
@@ -187,10 +208,12 @@ export function CreateBookingForm({
 
       <button
         type="submit"
-        disabled={loading}
-        className="rounded-2xl bg-sky-700 px-4 py-3 text-sm font-semibold text-white transition duration-200 hover:bg-sky-800 disabled:opacity-70"
+        disabled={loading || !serviceId}
+        className={`rounded-2xl px-4 py-3 text-sm font-semibold text-white transition duration-200 ${
+          serviceId ? "bg-sky-700 hover:bg-sky-800" : "cursor-not-allowed bg-slate-300"
+        } disabled:opacity-70`}
       >
-        {loading ? "Booking..." : "Book Now"}
+        {loading ? "Booking..." : !serviceId ? "Select a service to continue" : "Book Now"}
       </button>
     </form>
   );
