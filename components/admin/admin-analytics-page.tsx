@@ -6,6 +6,9 @@ import {
   BarChart,
   CartesianGrid,
   Cell,
+  Legend,
+  Line,
+  LineChart,
   Pie,
   PieChart,
   ResponsiveContainer,
@@ -67,7 +70,10 @@ type Payload = {
   }>;
   breakdowns: {
     incomeBySource: Array<{ source: "BOOKING" | "WALK_IN" | "MEMBERSHIP"; amount: number }>;
-    expensesByCategory: Array<{ category: "SUPPLIER" | "GENERAL" | "SALARY"; amount: number }>;
+    expensesByCategory: Array<{
+      category: "SUPPLIER" | "GENERAL" | "SALARY" | "INVENTORY_PURCHASE" | "INVENTORY_ADJUSTMENT";
+      amount: number;
+    }>;
     ordersByStatus: Array<{ status: BookingStatus; count: number }>;
   };
   membership: {
@@ -106,7 +112,13 @@ type Payload = {
       occurredAt: string;
       type: "INCOME" | "EXPENSE";
       incomeSource: "BOOKING" | "WALK_IN" | "MEMBERSHIP" | null;
-      expenseCategory: "SUPPLIER" | "GENERAL" | "SALARY" | null;
+      expenseCategory:
+        | "SUPPLIER"
+        | "GENERAL"
+        | "SALARY"
+        | "INVENTORY_PURCHASE"
+        | "INVENTORY_ADJUSTMENT"
+        | null;
       itemName: string;
       quantity: number;
       unitPrice: number;
@@ -232,7 +244,7 @@ function ChartFrame({ children }: { children: React.ReactElement }): React.React
   }, []);
 
   return (
-    <div className="relative mt-3 h-72 min-h-[18rem] w-full min-w-0 overflow-visible">
+    <div className="relative mt-3 h-[320px] w-full min-w-0 overflow-visible">
       {ready ? (
         <ResponsiveContainer width="100%" height="100%" minWidth={280} minHeight={260}>
           {children}
@@ -251,6 +263,8 @@ function sourceLabel(value: string | null, dict: Dictionary): string {
   if (value === "SUPPLIER") return dict.analyticsCategorySupplier;
   if (value === "GENERAL") return dict.analyticsCategoryGeneral;
   if (value === "SALARY") return dict.analyticsCategorySalary;
+  if (value === "INVENTORY_PURCHASE") return "Inventory Purchase";
+  if (value === "INVENTORY_ADJUSTMENT") return "Inventory Adjustment";
   return dict.analyticsUnknown;
 }
 
@@ -392,7 +406,34 @@ export function AdminAnalyticsPage({ locale, dir, dict, adminUserId }: Props): R
         label: sourceLabel(item.source, dict)
       }))
     : [];
-  const groupedSeries = chartData?.timeseries ?? data?.timeseries ?? [];
+  const groupedSeriesRaw = chartData?.timeseries ?? data?.timeseries ?? [];
+  const groupedSeries = useMemo(
+    () =>
+      groupedSeriesRaw.map((item) => {
+        const income = Number(item.income ?? 0);
+        const expense = Number(
+          (item as { expense?: number; expenses?: number }).expense ??
+            (item as { expense?: number; expenses?: number }).expenses ??
+            0
+        );
+        const profitValue = Number(item.profit);
+        const profit = Number.isFinite(profitValue) ? profitValue : income - expense;
+        return {
+          bucketStart: item.bucketStart,
+          income,
+          expense,
+          profit
+        };
+      }),
+    [groupedSeriesRaw]
+  );
+
+  useEffect(() => {
+    if (groupedSeries.length > 0) {
+      console.log("chartData[0]", groupedSeries[0]);
+    }
+  }, [groupedSeries]);
+
   const summaryHighlights = data
     ? [
         `Revenue ${formatMoney(data.kpis.totalIncome, locale)} against expenses ${formatMoney(data.kpis.totalExpenses, locale)} in the selected range.`,
@@ -580,10 +621,24 @@ export function AdminAnalyticsPage({ locale, dir, dict, adminUserId }: Props): R
                 </div>
               </div>
               <ChartFrame>
-                <BarChart data={groupedSeries} barGap={6}>
+                <LineChart data={groupedSeries} margin={{ top: 10, right: 12, left: 0, bottom: 30 }}>
                   <CartesianGrid vertical={false} stroke="rgba(148,163,184,0.12)" />
                   <XAxis dataKey="bucketStart" tickFormatter={(value) => toDisplayDate(value, locale)} minTickGap={20} tick={{ fill: "#94a3b8", fontSize: 12 }} axisLine={false} tickLine={false} />
-                  <YAxis tick={{ fill: "#94a3b8", fontSize: 12 }} axisLine={false} tickLine={false} width={84} />
+                  <YAxis
+                    tick={{ fill: "#94a3b8", fontSize: 12 }}
+                    axisLine={false}
+                    tickLine={false}
+                    width={84}
+                    allowDecimals={false}
+                    tickFormatter={(value) => Number(value || 0).toLocaleString(locale)}
+                    domain={[
+                      (min: number) => Math.min(0, Number(min || 0) * 1.1),
+                      (max: number) => {
+                        const padded = Math.max(0, Number(max || 0) * 1.1);
+                        return padded < 100 ? 100 : padded;
+                      }
+                    ]}
+                  />
                   <Tooltip
                     allowEscapeViewBox={{ x: true, y: true }}
                     contentStyle={{ direction: dir, textAlign: dir === "rtl" ? "right" : "left", backgroundColor: "#020617", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 16, color: "#e2e8f0" }}
@@ -591,12 +646,26 @@ export function AdminAnalyticsPage({ locale, dir, dict, adminUserId }: Props): R
                     labelFormatter={(value) => toDisplayDate(value, locale)}
                     formatter={(value: number | string | undefined, name: string | undefined) => [
                       formatMoney(Number(value ?? 0), locale),
-                      name === "income" ? dict.analyticsTotalIncome : dict.analyticsTotalExpenses
+                      name === "income"
+                        ? dict.analyticsTotalIncome
+                        : name === "expense"
+                          ? dict.analyticsTotalExpenses
+                          : dict.analyticsTotalProfit
                     ]}
                   />
-                  <Bar radius={[8, 8, 0, 0]} dataKey="income" fill="#e2e8f0" />
-                  <Bar radius={[8, 8, 0, 0]} dataKey="expenses" fill="#64748b" />
-                </BarChart>
+                  <Legend
+                    formatter={(value: string) =>
+                      value === "income"
+                        ? dict.analyticsTotalIncome
+                        : value === "expense"
+                          ? dict.analyticsTotalExpenses
+                          : dict.analyticsTotalProfit
+                    }
+                  />
+                  <Line type="monotone" dataKey="income" stroke="rgb(34 197 94)" strokeWidth={2} dot={false} />
+                  <Line type="monotone" dataKey="expense" stroke="rgb(239 68 68)" strokeWidth={2} dot={false} />
+                  <Line type="monotone" dataKey="profit" stroke="rgb(59 130 246)" strokeWidth={2} dot={false} />
+                </LineChart>
               </ChartFrame>
               {chartLoading ? <p className="text-xs text-slate-500">Updating chart...</p> : null}
             </article>
