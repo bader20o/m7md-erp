@@ -10,6 +10,13 @@ const updateSystemSettingsSchema = z.object({
   businessName: z.string().min(2).max(160),
   businessPhone: z.string().min(7).max(30),
   businessAddress: z.string().min(2).max(240),
+  email: z.string().email().max(160).nullable().optional(),
+  whatsapp: z.string().max(30).nullable().optional(),
+  website: z.string().max(300).nullable().optional(),
+  instagram: z.string().max(300).nullable().optional(),
+  facebook: z.string().max(300).nullable().optional(),
+  tiktok: z.string().max(300).nullable().optional(),
+  youtube: z.string().max(300).nullable().optional(),
   workingHours: z.array(
     z.object({
       day: z.number().int().min(0).max(6),
@@ -52,6 +59,11 @@ export async function PUT(request: Request): Promise<Response> {
   try {
     const actor = requireRoles(await getSession(), [Role.ADMIN]);
     const body = await parseJsonBody(request, updateSystemSettingsSchema);
+    const normalizeOptional = (value: string | null | undefined): string | null => {
+      if (typeof value !== "string") return null;
+      const normalized = value.trim();
+      return normalized.length ? normalized : null;
+    };
 
     const item = await prisma.systemSetting.upsert({
       where: { id: 1 },
@@ -59,6 +71,13 @@ export async function PUT(request: Request): Promise<Response> {
         businessName: body.businessName,
         businessPhone: body.businessPhone,
         businessAddress: body.businessAddress,
+        email: normalizeOptional(body.email),
+        whatsapp: normalizeOptional(body.whatsapp),
+        website: normalizeOptional(body.website),
+        instagram: normalizeOptional(body.instagram),
+        facebook: normalizeOptional(body.facebook),
+        tiktok: normalizeOptional(body.tiktok),
+        youtube: normalizeOptional(body.youtube),
         workingHours: body.workingHours,
         holidays: body.holidays,
         currency: "JOD",
@@ -69,6 +88,13 @@ export async function PUT(request: Request): Promise<Response> {
         businessName: body.businessName,
         businessPhone: body.businessPhone,
         businessAddress: body.businessAddress,
+        email: normalizeOptional(body.email),
+        whatsapp: normalizeOptional(body.whatsapp),
+        website: normalizeOptional(body.website),
+        instagram: normalizeOptional(body.instagram),
+        facebook: normalizeOptional(body.facebook),
+        tiktok: normalizeOptional(body.tiktok),
+        youtube: normalizeOptional(body.youtube),
         workingHours: body.workingHours,
         holidays: body.holidays,
         currency: "JOD",
@@ -83,6 +109,8 @@ export async function PUT(request: Request): Promise<Response> {
       actorId: actor.sub,
       payload: {
         businessName: item.businessName,
+        email: item.email,
+        whatsapp: item.whatsapp,
         currency: "JOD"
       }
     });

@@ -9,7 +9,7 @@ export default async function LoginPage({ params }: Props): Promise<React.ReactE
   const dict = getDictionary(locale);
 
   return (
-    <div className="mx-auto max-w-md space-y-4">
+    <div className="mx-auto w-full max-w-md space-y-4 px-1 sm:px-0">
       <h1 className="text-2xl font-semibold">{dict.authLoginTitle}</h1>
       <LoginForm locale={locale} />
       <p className="text-sm text-slate-600">
@@ -21,4 +21,3 @@ export default async function LoginPage({ params }: Props): Promise<React.ReactE
     </div>
   );
 }
-

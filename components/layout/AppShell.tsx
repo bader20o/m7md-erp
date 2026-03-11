@@ -337,7 +337,7 @@ export function AppShell({ locale, dir, dict, user, children }: AppShellProps): 
               <button
                 type="button"
                 onClick={() => setDrawerOpen(true)}
-                className="rounded-md border border-slate-300 p-2 text-slate-700 hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-700"
+                className="flex h-11 w-11 items-center justify-center rounded-md border border-slate-300 text-slate-700 hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-700"
                 aria-label={dict.menuOpenNavigation}
                 aria-controls="mobile-sidebar-drawer"
                 aria-expanded={isDrawerOpen}
@@ -374,7 +374,7 @@ export function AppShell({ locale, dir, dict, user, children }: AppShellProps): 
               <button
                 type="button"
                 onClick={() => setDrawerOpen(false)}
-                className="rounded-md border border-slate-300 p-2 text-slate-700 hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-700"
+                className="flex h-11 w-11 items-center justify-center rounded-md border border-slate-300 text-slate-700 hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-700"
                 aria-label={dict.menuCloseNavigation}
               >
                 <X size={18} aria-hidden={true} />

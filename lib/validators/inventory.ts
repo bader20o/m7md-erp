@@ -74,7 +74,10 @@ export const listMovementsQuerySchema = z.object({
 export const createMovementSchema = z.object({
   partId: z.string().min(1),
   type: z.enum(["IN", "OUT", "ADJUST"]),
+  pricingMode: z.enum(["UNIT", "TOTAL"]),
   quantity: z.coerce.number().int().min(1),
+  unitCost: z.coerce.number().positive().optional(),
+  totalCost: z.coerce.number().positive().optional(),
   occurredAt: z.coerce.date(),
   note: z.string().trim().max(500).optional(),
   bookingId: z.string().optional(),
@@ -87,6 +90,22 @@ export const createMovementSchema = z.object({
       code: z.ZodIssueCode.custom,
       path: ["note"],
       message: "note is required for IN and OUT movements."
+    });
+  }
+
+  if (value.pricingMode === "UNIT" && (!Number.isFinite(value.unitCost) || Number(value.unitCost) <= 0)) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["unitCost"],
+      message: "unitCost is required when pricingMode is UNIT."
+    });
+  }
+
+  if (value.pricingMode === "TOTAL" && (!Number.isFinite(value.totalCost) || Number(value.totalCost) <= 0)) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["totalCost"],
+      message: "totalCost is required when pricingMode is TOTAL."
     });
   }
 });

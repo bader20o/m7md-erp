@@ -128,7 +128,7 @@ export function CreateBookingForm({
     <form
       onSubmit={onSubmit}
       dir={isRtl ? "rtl" : "ltr"}
-      className="grid gap-5 rounded-[24px] border border-sky-100 bg-white p-6 shadow-[0_24px_70px_-42px_rgba(17,94,169,0.45)]"
+      className="grid gap-5 rounded-[24px] border border-sky-100 bg-white p-4 shadow-[0_24px_70px_-42px_rgba(17,94,169,0.45)] sm:p-6"
     >
       <div className="rounded-2xl border border-sky-100 bg-sky-50/70 p-4 text-sm text-slate-600">
         <p className="font-semibold text-slate-900">Booking pricing</p>
@@ -138,13 +138,13 @@ export function CreateBookingForm({
       <label className="grid gap-2">
         <span className="text-sm font-medium text-slate-800">Service</span>
 
-        <div className="flex gap-1 rounded-xl bg-slate-100 p-1">
+        <div className="grid gap-2 rounded-xl bg-slate-100 p-1 sm:grid-cols-4 sm:gap-1">
           {CAR_TYPE_TABS.map((tab) => (
             <button
               key={tab.value}
               type="button"
               onClick={() => setCarTypeFilter(tab.value)}
-              className={`flex-1 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all duration-200 ${
+              className={`min-h-11 rounded-lg px-3 py-2 text-xs font-semibold transition-all duration-200 ${
                 carTypeFilter === tab.value ? "bg-white text-sky-700 shadow-sm" : "text-slate-500 hover:text-slate-700"
               }`}
             >
@@ -153,7 +153,7 @@ export function CreateBookingForm({
           ))}
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid gap-4 md:grid-cols-2">
           {filteredServices.length === 0 ? (
             <div className="col-span-full py-8 text-center text-sm text-slate-400">No services available for this car type.</div>
           ) : (
@@ -189,7 +189,7 @@ export function CreateBookingForm({
           type="datetime-local"
           value={appointmentAt}
           onChange={(event) => setAppointmentAt(event.target.value)}
-          className="rounded-2xl border border-slate-200 px-4 py-3"
+          className="min-w-0 rounded-2xl border border-slate-200 px-4 py-3"
           required
         />
       </label>
@@ -206,15 +206,17 @@ export function CreateBookingForm({
       {error ? <p className="text-sm text-red-700">{error}</p> : null}
       {success ? <p className="text-sm text-green-700">{success}</p> : null}
 
-      <button
-        type="submit"
-        disabled={loading || !serviceId}
-        className={`rounded-2xl px-4 py-3 text-sm font-semibold text-white transition duration-200 ${
-          serviceId ? "bg-sky-700 hover:bg-sky-800" : "cursor-not-allowed bg-slate-300"
-        } disabled:opacity-70`}
-      >
-        {loading ? "Booking..." : !serviceId ? "Select a service to continue" : "Book Now"}
-      </button>
+      <div className="sticky bottom-0 -mx-4 border-t border-sky-100 bg-white/95 px-4 pb-1 pt-3 backdrop-blur sm:static sm:mx-0 sm:border-0 sm:bg-transparent sm:px-0 sm:pb-0 sm:pt-0">
+        <button
+          type="submit"
+          disabled={loading || !serviceId}
+          className={`w-full rounded-2xl px-4 py-3 text-sm font-semibold text-white transition duration-200 ${
+            serviceId ? "bg-sky-700 hover:bg-sky-800" : "cursor-not-allowed bg-slate-300"
+          } disabled:opacity-70`}
+        >
+          {loading ? "Booking..." : !serviceId ? "Select a service to continue" : "Book Now"}
+        </button>
+      </div>
     </form>
   );
 }

@@ -1,4 +1,5 @@
 import { AccountingEntryForms } from "@/components/admin/accounting-entry-forms";
+import { ResponsiveDataTable } from "@/components/ui/responsive-data-table";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
@@ -67,7 +68,7 @@ export default async function AdminTransactionsPage(): Promise<React.ReactElemen
       <div className="flex justify-end">
         <a
           href="/api/admin/reports/export-accounting"
-          className="rounded-md border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+          className="inline-flex min-h-11 items-center justify-center rounded-xl border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
         >
           Export Accounting (.xlsx)
         </a>
@@ -78,34 +79,78 @@ export default async function AdminTransactionsPage(): Promise<React.ReactElemen
         parts={parts}
         recordedByName={recordedByName}
       />
-      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
-        <table className="w-full text-sm">
-          <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-600">
-            <tr>
-              <th className="px-3 py-2">Item</th>
-              <th className="px-3 py-2">Unit Price</th>
-              <th className="px-3 py-2">Qty</th>
-              <th className="px-3 py-2">Total</th>
-              <th className="px-3 py-2">Date</th>
-              <th className="px-3 py-2">By</th>
-              <th className="px-3 py-2">Note</th>
-            </tr>
-          </thead>
-          <tbody>
-            {transactions.map((item) => (
-              <tr key={item.id} className="border-t border-slate-100">
-                <td className="px-3 py-2">{item.itemName}</td>
-                <td className="px-3 py-2">${item.unitPrice.toFixed(2)}</td>
-                <td className="px-3 py-2">{item.quantity}</td>
-                <td className="px-3 py-2 font-medium">${item.amount.toString()}</td>
-                <td className="px-3 py-2">{item.recordedAt.toLocaleString()}</td>
-                <td className="px-3 py-2">{item.createdBy?.fullName || item.createdBy?.phone || "-"}</td>
-                <td className="px-3 py-2 text-xs text-slate-600">{item.note || "-"}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <ResponsiveDataTable
+        items={transactions}
+        getKey={(item) => item.id}
+        emptyState="No transactions found."
+        tableClassName="border border-slate-200 bg-white"
+        columns={[
+          {
+            key: "item",
+            header: "Item",
+            cell: (item) => item.itemName
+          },
+          {
+            key: "unit-price",
+            header: "Unit Price",
+            cell: (item) => `$${item.unitPrice.toFixed(2)}`
+          },
+          {
+            key: "qty",
+            header: "Qty",
+            cell: (item) => item.quantity
+          },
+          {
+            key: "total",
+            header: "Total",
+            cell: (item) => <span className="font-medium">{`$${item.amount.toString()}`}</span>
+          },
+          {
+            key: "date",
+            header: "Date",
+            cell: (item) => item.recordedAt.toLocaleString()
+          },
+          {
+            key: "by",
+            header: "By",
+            cell: (item) => item.createdBy?.fullName || item.createdBy?.phone || "-"
+          },
+          {
+            key: "note",
+            header: "Note",
+            cell: (item) => <span className="text-xs text-slate-600">{item.note || "-"}</span>
+          }
+        ]}
+        cardTitle={(item) => item.itemName}
+        cardBadge={(item) => (
+          <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
+            {`$${item.amount.toString()}`}
+          </span>
+        )}
+        cardSubtitle={(item) => item.recordedAt.toLocaleString()}
+        cardFields={[
+          {
+            key: "unit-price",
+            label: "Unit Price",
+            value: (item) => `$${item.unitPrice.toFixed(2)}`
+          },
+          {
+            key: "qty",
+            label: "Qty",
+            value: (item) => item.quantity
+          },
+          {
+            key: "by",
+            label: "By",
+            value: (item) => item.createdBy?.fullName || item.createdBy?.phone || "-"
+          },
+          {
+            key: "note",
+            label: "Note",
+            value: (item) => item.note || "-"
+          }
+        ]}
+      />
     </section>
   );
 }

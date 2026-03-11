@@ -1,4 +1,4 @@
-import { Role } from "@prisma/client";
+import { Prisma, Role } from "@prisma/client";
 import { z } from "zod";
 import { ApiError, fail, ok, parseJsonBody } from "@/lib/api";
 import { getSession, hashPassword, verifyPassword } from "@/lib/auth";
@@ -77,6 +77,13 @@ function parseDecryptedJson(value: string | null): Record<string, unknown> | nul
   return null;
 }
 
+function isMissingTableError(error: unknown): boolean {
+  return (
+    error instanceof Prisma.PrismaClientKnownRequestError &&
+    error.code === "P2021"
+  );
+}
+
 export async function GET(request: Request): Promise<Response> {
   try {
     const session = requireSession(await getSession());
@@ -106,14 +113,23 @@ export async function GET(request: Request): Promise<Response> {
     const attendanceTo = url.searchParams.get("attendanceTo");
     const activityRange = activityFrom || activityTo ? resolvePerformanceRange(activityFrom, activityTo) : undefined;
     const attendanceRange = attendanceFrom || attendanceTo ? resolvePerformanceRange(attendanceFrom, attendanceTo) : undefined;
-    const employeeExtras =
-      user.role === Role.EMPLOYEE && user.employeeProfile
-        ? await Promise.all([
+    let employeeExtras:
+      | [Awaited<ReturnType<typeof buildEmployeePerformance>>, Awaited<ReturnType<typeof buildEmployeeActivity>>, Awaited<ReturnType<typeof buildEmployeeAttendance>>]
+      | null = null;
+
+    if (user.role === Role.EMPLOYEE && user.employeeProfile) {
+      try {
+        employeeExtras = await Promise.all([
           buildEmployeePerformance(user.employeeProfile.id, user.id, user.employeeProfile.roleProfile, performanceRange),
           buildEmployeeActivity(user.id, user.employeeProfile.id, activityRange),
           buildEmployeeAttendance(user.employeeProfile.id, attendanceRange)
-        ])
-        : null;
+        ]);
+      } catch (error) {
+        if (!isMissingTableError(error)) {
+          throw error;
+        }
+      }
+    }
 
     return ok({
       user: {

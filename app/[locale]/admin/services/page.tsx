@@ -16,6 +16,7 @@ export default async function AdminServicesPage({ params }: Props): Promise<Reac
     descriptionEn: service.descriptionEn,
     descriptionAr: service.descriptionAr,
     durationMinutes: service.durationMinutes,
+    supportedCarTypes: service.supportedCarTypes,
     isActive: service.isActive
   }));
 

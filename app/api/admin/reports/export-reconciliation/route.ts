@@ -21,6 +21,10 @@ function dateKey(value: Date): string {
   return value.toISOString().slice(0, 10);
 }
 
+function expenseMagnitude(item: { amount: unknown }): number {
+  return Math.abs(Number(item.amount));
+}
+
 export async function GET(request: Request): Promise<Response> {
   try {
     requireRoles(await getSession(), [Role.ADMIN]);
@@ -79,7 +83,7 @@ export async function GET(request: Request): Promise<Response> {
       .reduce((sum, item) => sum + Number(item.amount), 0);
     const totalExpenses = transactions
       .filter((item) => item.type === TransactionType.EXPENSE)
-      .reduce((sum, item) => sum + Number(item.amount), 0);
+      .reduce((sum, item) => sum + expenseMagnitude(item), 0);
     const inventorySaleIncome = transactions
       .filter(
         (item) =>

@@ -753,7 +753,9 @@ export async function getAnalyticsOverview(input: OverviewInput): Promise<Analyt
   const expensesByCategoryMap: Record<ExpenseCategory, number> = {
     SUPPLIER: 0,
     GENERAL: 0,
-    SALARY: 0
+    SALARY: 0,
+    INVENTORY_PURCHASE: 0,
+    INVENTORY_ADJUSTMENT: 0
   };
   const ordersByStatusMap = new Map<BookingStatus, number>();
 
@@ -761,7 +763,8 @@ export async function getAnalyticsOverview(input: OverviewInput): Promise<Analyt
   let totalExpenses = 0;
 
   for (const row of transactionRows) {
-    const amount = toNumber(row.amount);
+    const amount =
+      row.type === TransactionType.EXPENSE ? Math.abs(toNumber(row.amount)) : toNumber(row.amount);
     const bucket = timeseriesMap.get(getBucketKey(row.occurredAt, input.groupBy));
     if (row.type === TransactionType.INCOME) {
       totalIncome += amount;
@@ -841,7 +844,8 @@ export async function getAnalyticsOverview(input: OverviewInput): Promise<Analyt
   let todayIncome = 0;
   let todayExpenses = 0;
   for (const row of todayTransactionRows) {
-    const amount = toNumber(row.amount);
+    const amount =
+      row.type === TransactionType.EXPENSE ? Math.abs(toNumber(row.amount)) : toNumber(row.amount);
     if (row.type === TransactionType.INCOME) {
       todayIncome += amount;
     } else if (row.type === TransactionType.EXPENSE) {
@@ -1020,7 +1024,15 @@ export async function getAnalyticsOverview(input: OverviewInput): Promise<Analyt
       expensesByCategory: [
         { category: ExpenseCategory.SUPPLIER, amount: round2(expensesByCategoryMap.SUPPLIER) },
         { category: ExpenseCategory.GENERAL, amount: round2(expensesByCategoryMap.GENERAL) },
-        { category: ExpenseCategory.SALARY, amount: round2(expensesByCategoryMap.SALARY) }
+        { category: ExpenseCategory.SALARY, amount: round2(expensesByCategoryMap.SALARY) },
+        {
+          category: ExpenseCategory.INVENTORY_PURCHASE,
+          amount: round2(expensesByCategoryMap.INVENTORY_PURCHASE)
+        },
+        {
+          category: ExpenseCategory.INVENTORY_ADJUSTMENT,
+          amount: round2(expensesByCategoryMap.INVENTORY_ADJUSTMENT)
+        }
       ],
       ordersByStatus: Array.from(ordersByStatusMap.entries()).map(([status, count]) => ({
         status,

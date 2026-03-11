@@ -24,6 +24,7 @@ html[lang="ar"] {
 body {
   margin: 0;
   min-height: 100vh;
+  overflow-x: hidden;
   background:
     radial-gradient(circle at top left, rgba(23, 157, 114, 0.12), transparent 45%),
     radial-gradient(circle at bottom right, rgba(12, 100, 74, 0.10), transparent 35%),
@@ -36,6 +37,17 @@ body {
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+html {
+  overflow-x: hidden;
+}
+
+img,
+svg,
+canvas,
+video {
+  max-width: 100%;
 }
 
 a {
@@ -148,6 +160,7 @@ a {
   select {
     font-size: var(--type-input) !important;
     line-height: 1.5 !important;
+    min-height: 44px;
   }
 
   input::placeholder,
@@ -165,5 +178,28 @@ a {
   table tbody td {
     font-size: 14px !important;
     font-weight: 400 !important;
+  }
+}
+
+@media (max-width: 640px) {
+  :root {
+    --type-h1: 28px;
+    --type-h2: 22px;
+    --type-h3: 18px;
+    --type-h4: 16px;
+    --type-body: 14px;
+    --type-small: 12px;
+    --type-button: 14px;
+    --type-input: 14px;
+  }
+
+  body {
+    line-height: 1.55;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .debug-overflow * {
+    outline: 1px solid rgba(239, 68, 68, 0.5);
   }
 }

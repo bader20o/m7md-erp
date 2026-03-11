@@ -18,6 +18,8 @@ export const cancelBookingSchema = z.object({
 
 export const completeBookingSchema = z.object({
   finalPrice: z.coerce.number().min(0),
+  originalPrice: z.coerce.number().positive().optional(),
+  rewardId: z.string().min(1).optional(),
   internalNote: z.string().max(1000).optional(),
   performedByEmployeeId: z.string().min(1).optional()
 });

@@ -46,13 +46,13 @@ export async function GET(request: Request): Promise<Response> {
         },
         _sum: { amount: true }
       }),
-      prisma.transaction.aggregate({
+      prisma.transaction.findMany({
         where: {
           type: TransactionType.EXPENSE,
           deletedAt: null,
           recordedAt: rangeFilter
         },
-        _sum: { amount: true }
+        select: { amount: true }
       })
     ]);
 
@@ -60,7 +60,7 @@ export async function GET(request: Request): Promise<Response> {
       appBookingIncome: completedBookingsIncome._sum.finalPrice ?? 0,
       walkInIncome: walkInIncome._sum.amount ?? 0,
       membershipIncome: membershipIncome._sum.amount ?? 0,
-      expenses: expenses._sum.amount ?? 0
+      expenses: expenses.reduce((sum, item) => sum + Math.abs(Number(item.amount)), 0)
     });
   } catch (error) {
     return fail(error);

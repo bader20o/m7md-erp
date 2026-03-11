@@ -219,7 +219,7 @@ export function AdminAttendance() {
                 </div>
               </div>
               <div class="mt-5 flex flex-col items-center gap-4 lg:flex-row lg:items-center">
-                <img src="${qrData[item.key].imageDataUrl}" alt="${item.title}" class="h-48 w-48 rounded-2xl border border-border bg-white p-3" />
+                <img src="${qrData[item.key].imageDataUrl}" alt="${item.title}" class="h-64 w-64 shrink-0 rounded-2xl border border-border bg-white p-3 xl:h-72 xl:w-72" />
                 <div class="w-full rounded-2xl border border-border bg-bg px-4 py-4 text-sm text-text">
                   <div class="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted">Security</div>
                   <div class="mt-3 text-sm text-muted">This QR is live, short-lived, and invalid after the countdown ends. Use it only on the in-center attendance screen.</div>

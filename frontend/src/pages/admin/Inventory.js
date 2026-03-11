@@ -29,6 +29,12 @@ export function AdminInventory() {
     const movementNoteLabel = document.getElementById('inventory-movement-note-label');
     const movementTypeInput = document.getElementById('inventory-movement-type');
     const movementQtyInput = document.getElementById('inventory-movement-qty');
+    const movementPricingModeInput = document.getElementById('inventory-movement-pricing-mode');
+    const movementUnitCostWrap = document.getElementById('inventory-movement-unit-wrap');
+    const movementTotalCostWrap = document.getElementById('inventory-movement-total-wrap');
+    const movementUnitCostInput = document.getElementById('inventory-movement-unit-cost');
+    const movementTotalCostInput = document.getElementById('inventory-movement-total-cost');
+    const movementComputedText = document.getElementById('inventory-movement-computed');
     const movementNoteInput = document.getElementById('inventory-movement-note');
 
     const state = {
@@ -47,6 +53,46 @@ export function AdminInventory() {
       movementForm.reset();
       movementQtyInput.value = '1';
       movementTypeInput.value = '';
+      movementPricingModeInput.value = 'UNIT';
+      movementUnitCostWrap.classList.remove('hidden');
+      movementTotalCostWrap.classList.add('hidden');
+      movementComputedText.textContent = 'Computed Total: -';
+    }
+
+    function round(value, decimals) {
+      const factor = 10 ** decimals;
+      return Math.round((value + Number.EPSILON) * factor) / factor;
+    }
+
+    function latestUnitCostForPart(partId, fallback) {
+      const movement = state.movements.find((item) => item.partId === partId && Number(item.unitCost) > 0);
+      if (movement) return Number(movement.unitCost).toFixed(3);
+      if (Number(fallback) > 0) return Number(fallback).toFixed(3);
+      return '';
+    }
+
+    function updatePricingModeUI() {
+      const quantity = Number(movementQtyInput.value || 0);
+      const mode = movementPricingModeInput.value;
+      const unitCost = Number(movementUnitCostInput.value || 0);
+      const totalCost = Number(movementTotalCostInput.value || 0);
+
+      movementUnitCostWrap.classList.toggle('hidden', mode !== 'UNIT');
+      movementTotalCostWrap.classList.toggle('hidden', mode !== 'TOTAL');
+
+      if (!quantity || quantity <= 0) {
+        movementComputedText.textContent = mode === 'UNIT' ? 'Computed Total: -' : 'Computed Unit: -';
+        return;
+      }
+
+      if (mode === 'UNIT') {
+        const computedTotal = unitCost > 0 ? round(round(unitCost, 3) * quantity, 2).toFixed(2) : '-';
+        movementComputedText.textContent = `Computed Total: ${computedTotal === '-' ? '-' : `${computedTotal} JOD`}`;
+        return;
+      }
+
+      const computedUnit = totalCost > 0 ? round(round(totalCost, 2) / quantity, 3).toFixed(3) : '-';
+      movementComputedText.textContent = `Computed Unit: ${computedUnit === '-' ? '-' : `${computedUnit} JOD`}`;
     }
 
     function openAddPartModal() {
@@ -107,12 +153,13 @@ export function AdminInventory() {
                     <span class="px-2 py-1 rounded-md text-[10px] font-bold uppercase ${movementBadge(movement.type)}">${movement.type}</span>
                   </td>
                   <td class="px-3 py-2 text-xs text-center font-semibold">${movement.quantity}</td>
+                  <td class="px-3 py-2 text-xs text-center">${Number(movement.unitCost || 0).toFixed(3)} / ${Number(movement.totalCost || 0).toFixed(2)} JOD</td>
                   <td class="px-3 py-2 text-xs">${movement.note || '-'}</td>
                 </tr>
               `
           )
           .join('')
-        : '<tr><td colspan="4" class="px-3 py-6 text-center text-xs text-muted">No stock movements.</td></tr>';
+        : '<tr><td colspan="5" class="px-3 py-6 text-center text-xs text-muted">No stock movements.</td></tr>';
 
       detailsNode.innerHTML = `
         <div class="space-y-4">
@@ -145,6 +192,7 @@ export function AdminInventory() {
                     <th class="px-3 py-2 text-[10px] uppercase text-muted">Date</th>
                     <th class="px-3 py-2 text-[10px] uppercase text-muted text-center">Type</th>
                     <th class="px-3 py-2 text-[10px] uppercase text-muted text-center">Qty</th>
+                    <th class="px-3 py-2 text-[10px] uppercase text-muted text-center">Cost</th>
                     <th class="px-3 py-2 text-[10px] uppercase text-muted">Note</th>
                   </tr>
                 </thead>
@@ -231,6 +279,9 @@ export function AdminInventory() {
 
       movementTypeInput.value = type;
       movementQtyInput.value = '1';
+      movementPricingModeInput.value = 'UNIT';
+      movementUnitCostInput.value = latestUnitCostForPart(part.id, part.costPrice);
+      movementTotalCostInput.value = '';
       movementNoteInput.value = '';
       if (type === 'IN') {
         movementTitle.textContent = `Add Stock - ${part.name}`;
@@ -241,6 +292,7 @@ export function AdminInventory() {
         movementNoteLabel.textContent = 'Destination note (required)';
         movementNoteInput.placeholder = 'Where did this reduction go?';
       }
+      updatePricingModeUI();
       movementOverlay.classList.remove('hidden');
       movementNoteInput.focus();
     };
@@ -329,7 +381,10 @@ export function AdminInventory() {
           body: {
             partId: part.id,
             type,
+            pricingMode: movementPricingModeInput.value,
             quantity: Number(movementQtyInput.value),
+            unitCost: movementPricingModeInput.value === 'UNIT' ? Number(movementUnitCostInput.value) : undefined,
+            totalCost: movementPricingModeInput.value === 'TOTAL' ? Number(movementTotalCostInput.value) : undefined,
             note,
             occurredAt: new Date().toISOString()
           }
@@ -344,6 +399,10 @@ export function AdminInventory() {
 
     document.getElementById('inventory-movement-cancel').addEventListener('click', closeMovementModal);
     document.getElementById('inventory-movement-close').addEventListener('click', closeMovementModal);
+    movementPricingModeInput.addEventListener('change', updatePricingModeUI);
+    movementQtyInput.addEventListener('input', updatePricingModeUI);
+    movementUnitCostInput.addEventListener('input', updatePricingModeUI);
+    movementTotalCostInput.addEventListener('input', updatePricingModeUI);
     addPartClose.addEventListener('click', () => closeAddPartModal(true));
     addPartCancel.addEventListener('click', () => closeAddPartModal(true));
     movementOverlay.addEventListener('click', (event) => {
@@ -419,10 +478,28 @@ export function AdminInventory() {
           </div>
           <form id="inventory-movement-form" class="p-5 space-y-4">
             <input id="inventory-movement-type" type="hidden">
-            <div>
-              <label class="block text-xs font-bold text-muted uppercase tracking-wider mb-1">Quantity</label>
-              <input id="inventory-movement-qty" type="number" min="1" required value="1" class="w-full px-3 py-2 rounded-lg border border-border bg-bg">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label class="block text-xs font-bold text-muted uppercase tracking-wider mb-1">Quantity</label>
+                <input id="inventory-movement-qty" type="number" min="1" required value="1" class="w-full px-3 py-2 rounded-lg border border-border bg-bg">
+              </div>
+              <div>
+                <label class="block text-xs font-bold text-muted uppercase tracking-wider mb-1">Pricing Mode</label>
+                <select id="inventory-movement-pricing-mode" class="w-full px-3 py-2 rounded-lg border border-border bg-bg">
+                  <option value="UNIT">UNIT</option>
+                  <option value="TOTAL">TOTAL</option>
+                </select>
+              </div>
             </div>
+            <div id="inventory-movement-unit-wrap">
+              <label class="block text-xs font-bold text-muted uppercase tracking-wider mb-1">Unit Cost (JOD)</label>
+              <input id="inventory-movement-unit-cost" type="number" min="0.001" step="0.001" class="w-full px-3 py-2 rounded-lg border border-border bg-bg" placeholder="0.000">
+            </div>
+            <div id="inventory-movement-total-wrap" class="hidden">
+              <label class="block text-xs font-bold text-muted uppercase tracking-wider mb-1">Total Cost (JOD)</label>
+              <input id="inventory-movement-total-cost" type="number" min="0.01" step="0.01" class="w-full px-3 py-2 rounded-lg border border-border bg-bg" placeholder="0.00">
+            </div>
+            <div id="inventory-movement-computed" class="text-xs text-muted">Computed Total: -</div>
             <div>
               <label id="inventory-movement-note-label" class="block text-xs font-bold text-muted uppercase tracking-wider mb-1">Note</label>
               <textarea id="inventory-movement-note" rows="3" required class="w-full px-3 py-2 rounded-lg border border-border bg-bg resize-none" placeholder="Required note"></textarea>

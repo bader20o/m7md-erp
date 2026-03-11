@@ -150,16 +150,16 @@ export function AdminTasks() {
 
         setTimeout(() => {
           const backdrop = document.querySelector(".fixed.inset-0.z-\\[100\\]");
-          backdrop?.addEventListener(
-            "click",
-            () => {
-              if (!settled) {
-                settled = true;
-                resolve(null);
-              }
-            },
-            { once: true }
-          );
+          if (!backdrop) return;
+          const handleBackdropClick = (event) => {
+            if (event.target !== backdrop) return;
+            if (!settled) {
+              settled = true;
+              resolve(null);
+            }
+            backdrop.removeEventListener("click", handleBackdropClick);
+          };
+          backdrop.addEventListener("click", handleBackdropClick);
         }, 0);
       });
     }

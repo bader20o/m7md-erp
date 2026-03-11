@@ -8,6 +8,9 @@ import { requireRoles } from "@/lib/rbac";
 const updateServiceSchema = z.object({
   nameEn: z.string().min(2).max(160).optional(),
   nameAr: z.string().min(2).max(160).optional(),
+  category: z.string().max(120).nullable().optional(),
+  basePrice: z.coerce.number().min(0).max(100000).nullable().optional(),
+  supportedCarTypes: z.string().max(200).nullable().optional(),
   imageUrl: z.string().max(1000).nullable().optional(),
   descriptionEn: z.string().max(1000).nullable().optional(),
   descriptionAr: z.string().max(1000).nullable().optional(),

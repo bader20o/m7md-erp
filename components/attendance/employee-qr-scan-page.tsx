@@ -3,6 +3,7 @@
 import { BrowserQRCodeReader, type IScannerControls } from "@zxing/browser";
 import { AttendanceType } from "@prisma/client";
 import { useEffect, useRef, useState } from "react";
+import { ResponsiveDataTable } from "@/components/ui/responsive-data-table";
 
 type ToastState =
   | {
@@ -308,7 +309,7 @@ export function EmployeeQrScanPage({
               ref={videoRef}
               muted
               playsInline
-              className="aspect-[4/3] w-full bg-slate-950 object-cover"
+              className="aspect-[4/3] min-h-[280px] w-full bg-slate-950 object-cover sm:min-h-0"
             />
           </div>
           <p className="mt-3 text-sm text-slate-400">{cameraMessage}</p>
@@ -324,7 +325,7 @@ export function EmployeeQrScanPage({
                 value={manualCode}
                 onChange={(event) => setManualCode(event.target.value)}
                 placeholder="Enter fixed QR code"
-                className="rounded-2xl border border-white/10 bg-slate-900 px-4 py-3 text-sm text-white placeholder:text-slate-500"
+                className="min-w-0 rounded-2xl border border-white/10 bg-slate-900 px-4 py-3 text-sm text-white placeholder:text-slate-500"
               />
               <button
                 type="submit"
@@ -380,45 +381,85 @@ export function EmployeeQrScanPage({
             No scan history yet.
           </div>
         ) : (
-          <div className="mt-5 overflow-x-auto">
-            <table className="min-w-full text-left text-sm">
-              <thead className="text-xs uppercase tracking-[0.2em] text-slate-500">
-                <tr>
-                  <th className="px-3 py-3">Date</th>
-                  <th className="px-3 py-3">Time</th>
-                  <th className="px-3 py-3">Type</th>
-                  <th className="px-3 py-3">Status</th>
-                  <th className="px-3 py-3">Message</th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.events.map((event) => (
-                  <tr key={event.id} className="border-t border-white/10">
-                    <td className="px-3 py-3 text-slate-300">{event.dayKey}</td>
-                    <td className="px-3 py-3 text-slate-300">
-                      {formatDateTime(event.occurredAt, locale, {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                        second: "2-digit",
-                        timeZone: timezone
-                      })}
-                    </td>
-                    <td className="px-3 py-3">
-                      <span className="rounded-full bg-slate-800 px-2.5 py-1 text-xs font-semibold text-slate-200">
-                        {EVENT_TYPE_LABELS[event.type]}
-                      </span>
-                    </td>
-                    <td className="px-3 py-3">
-                      <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${EVENT_STATUS_STYLES[event.status]}`}>
-                        {event.status}
-                      </span>
-                    </td>
-                    <td className="px-3 py-3 text-slate-300">{event.message}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <ResponsiveDataTable
+            items={data.events}
+            getKey={(event) => event.id}
+            emptyState="No scan history yet."
+            appearance="dark"
+            tableClassName="border border-white/10 bg-slate-950/20"
+            columns={[
+              {
+                key: "date",
+                header: "Date",
+                cell: (event) => <span className="text-slate-300">{event.dayKey}</span>
+              },
+              {
+                key: "time",
+                header: "Time",
+                cell: (event) => (
+                  <span className="text-slate-300">
+                    {formatDateTime(event.occurredAt, locale, {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                      second: "2-digit",
+                      timeZone: timezone
+                    })}
+                  </span>
+                )
+              },
+              {
+                key: "type",
+                header: "Type",
+                cell: (event) => (
+                  <span className="rounded-full bg-slate-800 px-2.5 py-1 text-xs font-semibold text-slate-200">
+                    {EVENT_TYPE_LABELS[event.type]}
+                  </span>
+                )
+              },
+              {
+                key: "status",
+                header: "Status",
+                cell: (event) => (
+                  <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${EVENT_STATUS_STYLES[event.status]}`}>
+                    {event.status}
+                  </span>
+                )
+              },
+              {
+                key: "message",
+                header: "Message",
+                cell: (event) => <span className="text-slate-300">{event.message}</span>
+              }
+            ]}
+            cardTitle={(event) => event.message}
+            cardBadge={(event) => (
+              <span className={`rounded-full px-3 py-1 text-xs font-semibold ${EVENT_STATUS_STYLES[event.status]}`}>
+                {event.status}
+              </span>
+            )}
+            cardSubtitle={(event) => `${event.dayKey} • ${formatDateTime(event.occurredAt, locale, {
+              hour: "2-digit",
+              minute: "2-digit",
+              second: "2-digit",
+              timeZone: timezone
+            })}`}
+            cardFields={[
+              {
+                key: "type",
+                label: "Type",
+                value: (event) => (
+                  <span className="rounded-full bg-slate-800 px-2.5 py-1 text-xs font-semibold text-slate-200">
+                    {EVENT_TYPE_LABELS[event.type]}
+                  </span>
+                )
+              },
+              {
+                key: "source",
+                label: "Source",
+                value: (event) => event.source
+              }
+            ]}
+          />
         )}
       </section>
 

@@ -4,10 +4,19 @@ import { TableRowSkeleton } from '../../components/ui/Skeleton.js';
 import { t } from '../../lib/i18n.js';
 import { uploadLocalFile } from '../../lib/uploads.js';
 
+const CAR_TYPE_OPTIONS = [
+  { value: '', label: 'All car types' },
+  { value: 'EV', label: 'EV' },
+  { value: 'HYBRID', label: 'HV (Hybrid)' },
+  { value: 'FUEL', label: 'Fuel' }
+];
+
 export function AdminServices() {
 
   window.onMount = async () => {
     const tbody = document.getElementById('services-tbody');
+    const createOverlay = document.getElementById('service-create-overlay');
+    const createForm = document.getElementById('service-form');
     const imageInput = document.getElementById('service-image-file');
     const imagePreview = document.getElementById('service-image-preview');
     const imageHint = document.getElementById('service-image-hint');
@@ -20,6 +29,26 @@ export function AdminServices() {
     const editImageUrlField = document.getElementById('service-edit-image-url');
     let allServices = [];
     let editingServiceId = null;
+
+    function getPrimaryCarType(value) {
+      if (!value) return '';
+      try {
+        const parsed = JSON.parse(value);
+        if (Array.isArray(parsed)) {
+          const first = parsed.map((item) => String(item).trim().toUpperCase()).find(Boolean);
+          return first || '';
+        }
+      } catch (_) {
+        // Fallback to comma-delimited values.
+      }
+
+      const first = String(value)
+        .split(',')
+        .map((item) => item.trim().toUpperCase())
+        .find(Boolean);
+
+      return first || '';
+    }
 
     function showImagePreview(previewNode, url, altText = 'Image') {
       if (!previewNode) return;
@@ -53,6 +82,13 @@ export function AdminServices() {
       if (imageInput) {
         imageInput.value = '';
       }
+    }
+
+    function closeCreateModal() {
+      if (!createOverlay) return;
+      createOverlay.classList.add('hidden');
+      createForm?.reset();
+      resetImagePicker();
     }
 
     function closeEditModal() {
@@ -151,6 +187,7 @@ export function AdminServices() {
       editForm.category.value = service.category || '';
       editForm.basePrice.value = service.basePrice ?? '';
       editForm.durationMinutes.value = service.durationMinutes || '';
+      editForm.supportedCarTypes.value = getPrimaryCarType(service.supportedCarTypes);
       editForm.descriptionEn.value = service.descriptionEn || '';
       editForm.descriptionAr.value = service.descriptionAr || '';
       editImageUrlField.value = service.imageUrl || '';
@@ -161,8 +198,7 @@ export function AdminServices() {
     };
 
     document.getElementById('create-btn').addEventListener('click', () => {
-      const formContainer = document.getElementById('creation-form-container');
-      formContainer.classList.toggle('hidden');
+      createOverlay?.classList.remove('hidden');
     });
 
     imageInput?.addEventListener('change', async (event) => {
@@ -223,6 +259,7 @@ export function AdminServices() {
         category: form.category.value || null,
         basePrice: form.basePrice.value || null,
         durationMinutes: parseInt(form.durationMinutes.value, 10),
+        supportedCarTypes: form.supportedCarTypes.value || null,
         imageUrl: form.imageUrl.value || undefined,
         descriptionEn: form.descriptionEn.value || null,
         descriptionAr: form.descriptionAr.value || null,
@@ -231,12 +268,18 @@ export function AdminServices() {
       try {
         await apiFetch('/services', { method: 'POST', body });
         window.toast('Service created successfully', 'success');
-        form.reset();
-        resetImagePicker();
-        document.getElementById('creation-form-container').classList.add('hidden');
+        closeCreateModal();
         load();
       } catch (err) {
         window.toast(err.message || 'Creation failed', 'error');
+      }
+    });
+
+    document.getElementById('service-create-close')?.addEventListener('click', closeCreateModal);
+    document.getElementById('service-create-cancel')?.addEventListener('click', closeCreateModal);
+    createOverlay?.addEventListener('click', (event) => {
+      if (event.target === createOverlay) {
+        closeCreateModal();
       }
     });
 
@@ -250,6 +293,7 @@ export function AdminServices() {
         category: editForm.category.value || null,
         basePrice: editForm.basePrice.value || null,
         durationMinutes: parseInt(editForm.durationMinutes.value, 10),
+        supportedCarTypes: editForm.supportedCarTypes.value || null,
         imageUrl: editForm.imageUrl.value || null,
         descriptionEn: editForm.descriptionEn.value || null,
         descriptionAr: editForm.descriptionAr.value || null
@@ -293,59 +337,70 @@ export function AdminServices() {
         </button>
       </div>
 
-      <!-- Creation Form -->
-      <div id="creation-form-container" class="hidden bg-surface border border-border rounded-xl p-6 shadow-sm">
-        <h3 class="font-heading font-bold text-lg mb-4 text-text">Add New Service</h3>
-        <form id="service-form" class="space-y-4">
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label class="block text-xs font-bold text-muted uppercase tracking-wider mb-1">Name (EN)</label>
-              <input type="text" name="nameEn" required class="w-full bg-bg border border-border rounded-lg px-3 py-2 focus:border-primary outline-none transition-colors text-text">
-            </div>
-            <div>
-              <label class="block text-xs font-bold text-muted uppercase tracking-wider mb-1">Name (AR)</label>
-              <input type="text" name="nameAr" required class="w-full bg-bg border border-border rounded-lg px-3 py-2 text-right focus:border-primary outline-none transition-colors text-text">
-            </div>
-            <div>
-              <label class="block text-xs font-bold text-muted uppercase tracking-wider mb-1">Category</label>
-              <input type="text" name="category" placeholder="e.g. Electrical, Mechanical" class="w-full bg-bg border border-border rounded-lg px-3 py-2 focus:border-primary outline-none transition-colors text-text">
-            </div>
-            <div>
-              <label class="block text-xs font-bold text-muted uppercase tracking-wider mb-1">Duration (Mins)</label>
-              <input type="number" name="durationMinutes" required min="1" class="w-full bg-bg border border-border rounded-lg px-3 py-2 focus:border-primary outline-none transition-colors text-text">
-            </div>
-            <div>
-              <label class="block text-xs font-bold text-muted uppercase tracking-wider mb-1">Base Price (JOD)</label>
-              <input type="number" step="0.01" name="basePrice" placeholder="Leave empty if variable" class="w-full bg-bg border border-border rounded-lg px-3 py-2 focus:border-primary outline-none transition-colors text-text">
-            </div>
+      <div id="service-create-overlay" class="fixed inset-0 z-[70] bg-black/55 backdrop-blur-sm hidden flex items-center justify-center p-4">
+        <div class="w-full max-w-4xl bg-surface border border-border rounded-2xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
+          <div class="flex items-center justify-between px-5 py-4 border-b border-border">
+            <h3 class="text-lg font-heading font-bold text-text">Add New Service</h3>
+            <button id="service-create-close" type="button" class="w-8 h-8 rounded-full border border-border text-muted hover:text-text hover:border-text transition-colors">&times;</button>
           </div>
+          <form id="service-form" class="p-5 space-y-4 overflow-y-auto">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label class="block text-xs font-bold text-muted uppercase tracking-wider mb-1">Name (EN)</label>
+                <input type="text" name="nameEn" required class="w-full bg-bg border border-border rounded-lg px-3 py-2 focus:border-primary outline-none transition-colors text-text">
+              </div>
+              <div>
+                <label class="block text-xs font-bold text-muted uppercase tracking-wider mb-1">Name (AR)</label>
+                <input type="text" name="nameAr" required class="w-full bg-bg border border-border rounded-lg px-3 py-2 text-right focus:border-primary outline-none transition-colors text-text">
+              </div>
+              <div>
+                <label class="block text-xs font-bold text-muted uppercase tracking-wider mb-1">Category</label>
+                <input type="text" name="category" placeholder="e.g. Electrical, Mechanical" class="w-full bg-bg border border-border rounded-lg px-3 py-2 focus:border-primary outline-none transition-colors text-text">
+              </div>
+              <div>
+                <label class="block text-xs font-bold text-muted uppercase tracking-wider mb-1">Duration (Mins)</label>
+                <input type="number" name="durationMinutes" required min="1" class="w-full bg-bg border border-border rounded-lg px-3 py-2 focus:border-primary outline-none transition-colors text-text">
+              </div>
+              <div>
+                <label class="block text-xs font-bold text-muted uppercase tracking-wider mb-1">Base Price (JOD)</label>
+                <input type="number" step="0.01" name="basePrice" placeholder="Leave empty if variable" class="w-full bg-bg border border-border rounded-lg px-3 py-2 focus:border-primary outline-none transition-colors text-text">
+              </div>
+              <div>
+                <label class="block text-xs font-bold text-muted uppercase tracking-wider mb-1">Car Type</label>
+                <select name="supportedCarTypes" class="w-full bg-bg border border-border rounded-lg px-3 py-2 focus:border-primary outline-none transition-colors text-text">
+                  ${CAR_TYPE_OPTIONS.map((option) => `<option value="${option.value}">${option.label}</option>`).join('')}
+                </select>
+              </div>
+            </div>
 
-          <div>
-            <label class="block text-xs font-bold text-muted uppercase tracking-wider mb-1">Service Image</label>
-            <input id="service-image-file" type="file" accept="image/*" class="hidden">
-            <input id="service-image-url" name="imageUrl" type="hidden">
-            <div class="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
-              <label for="service-image-file" class="inline-flex items-center px-4 py-2 rounded-lg border border-border text-sm font-semibold text-text hover:border-primary hover:text-primary cursor-pointer transition-colors">Choose File</label>
-              <div id="service-image-preview" class="w-24 h-24 rounded-lg border border-border bg-bg overflow-hidden"></div>
-              <div id="service-image-hint" class="text-xs text-muted">Choose image to crop and upload.</div>
-            </div>
-          </div>
-          
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label class="block text-xs font-bold text-muted uppercase tracking-wider mb-1">Desc (EN)</label>
-              <textarea name="descriptionEn" rows="2" class="w-full bg-bg border border-border rounded-lg px-3 py-2 focus:border-primary outline-none transition-colors text-text resize-none"></textarea>
+              <label class="block text-xs font-bold text-muted uppercase tracking-wider mb-1">Service Image</label>
+              <input id="service-image-file" type="file" accept="image/*" class="hidden">
+              <input id="service-image-url" name="imageUrl" type="hidden">
+              <div class="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
+                <label for="service-image-file" class="inline-flex items-center px-4 py-2 rounded-lg border border-border text-sm font-semibold text-text hover:border-primary hover:text-primary cursor-pointer transition-colors">Choose File</label>
+                <div id="service-image-preview" class="w-24 h-24 rounded-lg border border-border bg-bg overflow-hidden"></div>
+                <div id="service-image-hint" class="text-xs text-muted">Choose image to crop and upload.</div>
+              </div>
             </div>
-            <div>
-              <label class="block text-xs font-bold text-muted uppercase tracking-wider mb-1">Desc (AR)</label>
-              <textarea name="descriptionAr" rows="2" class="w-full bg-bg border border-border rounded-lg px-3 py-2 text-right focus:border-primary outline-none transition-colors text-text resize-none"></textarea>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label class="block text-xs font-bold text-muted uppercase tracking-wider mb-1">Desc (EN)</label>
+                <textarea name="descriptionEn" rows="2" class="w-full bg-bg border border-border rounded-lg px-3 py-2 focus:border-primary outline-none transition-colors text-text resize-none"></textarea>
+              </div>
+              <div>
+                <label class="block text-xs font-bold text-muted uppercase tracking-wider mb-1">Desc (AR)</label>
+                <textarea name="descriptionAr" rows="2" class="w-full bg-bg border border-border rounded-lg px-3 py-2 text-right focus:border-primary outline-none transition-colors text-text resize-none"></textarea>
+              </div>
             </div>
-          </div>
-          
-          <div class="flex justify-end pt-2">
-             <button type="submit" class="bg-success hover:bg-green-600 text-white px-8 py-2.5 rounded-lg font-bold text-sm transition-colors shadow-sm">Save Service</button>
-          </div>
-        </form>
+            
+            <div class="flex justify-end gap-3 pt-2">
+              <button id="service-create-cancel" type="button" class="px-4 py-2 rounded-lg border border-border text-text hover:border-text transition-colors">Cancel</button>
+              <button type="submit" class="bg-success hover:bg-green-600 text-white px-8 py-2.5 rounded-lg font-bold text-sm transition-colors shadow-sm">Save Service</button>
+            </div>
+          </form>
+        </div>
       </div>
 
       <div class="bg-surface border border-border rounded-xl overflow-hidden shadow-sm flex-1 flex flex-col min-h-0">
@@ -393,6 +448,12 @@ export function AdminServices() {
               <div>
                 <label class="block text-xs font-bold text-muted uppercase tracking-wider mb-1">Base Price (JOD)</label>
                 <input type="number" step="0.01" name="basePrice" class="w-full bg-bg border border-border rounded-lg px-3 py-2 focus:border-primary outline-none transition-colors text-text">
+              </div>
+              <div>
+                <label class="block text-xs font-bold text-muted uppercase tracking-wider mb-1">Car Type</label>
+                <select name="supportedCarTypes" class="w-full bg-bg border border-border rounded-lg px-3 py-2 focus:border-primary outline-none transition-colors text-text">
+                  ${CAR_TYPE_OPTIONS.map((option) => `<option value="${option.value}">${option.label}</option>`).join('')}
+                </select>
               </div>
             </div>
 

@@ -18,7 +18,7 @@ export function SimpleBarChart(data, options = {}) {
            <div class="w-full max-w-[32px] rounded-t-sm transition-all duration-500 ease-out" 
                 style="height: ${pct}%; background-color: ${color};"></div>
         </div>
-        <span class="text-[9px] font-bold text-muted uppercase tracking-wider truncate w-full text-center pt-2" title="${item.label}">${item.label}</span>
+        <span class="text-[9px] font-bold text-muted uppercase tracking-wider truncate w-full text-center pt-2">${item.label}</span>
       </div>
     `;
   }).join('');
@@ -84,18 +84,30 @@ export function SimpleDonutChart(data) {
 
 export function MultiBarChart(data, options = {}) {
   // data: [{ label: '01-Jan', income: 1000, expenses: 500, profit: 500 }, ...]
-  const maxVal = Math.max(...data.flatMap(d => [d.income, d.expenses]), 1);
+  if (!Array.isArray(data) || data.length === 0) {
+    return `
+      <div class="h-full w-full flex items-center justify-center text-sm text-muted">
+        No chart data for selected period.
+      </div>
+    `;
+  }
+
+  const rawMax = Math.max(...data.flatMap(d => [Number(d.income || 0), Number(d.expenses || 0)]), 0);
+  const safeMax = Math.max(rawMax, 100);
+  const scaledMax = safeMax * 1.1;
   const { height = '250px', format = val => val } = options;
 
   // Force all bars to render, no downsampling
   let visibleData = data;
 
   const bars = visibleData.map(item => {
-    const incomePct = Math.max((item.income / maxVal) * 100, 1);
-    const expensesPct = Math.max((item.expenses / maxVal) * 100, 1);
+    const incomeValue = Math.max(Number(item.income || 0), 0);
+    const expenseValue = Math.max(Number(item.expenses || 0), 0);
+    const incomePct = incomeValue > 0 ? Math.max((incomeValue / scaledMax) * 100, 4) : 0;
+    const expensesPct = expenseValue > 0 ? Math.max((expenseValue / scaledMax) * 100, 4) : 0;
 
     return `
-      <div class="flex flex-col items-center group flex-1 min-w-[20px] max-w-[40px]">
+      <div class="relative z-10 flex flex-col items-center group flex-1 min-w-[52px] max-w-[64px]">
         
         <!-- Tooltip Area -->
         <div class="relative w-full h-full flex items-end justify-center rounded-t-md hover:bg-white/5 transition-colors overflow-visible border-b border-white/10 group-hover:border-white/30 cursor-crosshair">
@@ -119,21 +131,21 @@ export function MultiBarChart(data, options = {}) {
 
            <!-- Dual Bars (Grouped) -->
            <div class="flex items-end gap-[1px] w-full h-full px-[2px]">
-              <div class="flex-1 rounded-t-sm transition-all duration-500 ease-out bg-success/80 group-hover:bg-success" 
-                   style="height: ${incomePct}%;"></div>
-              <div class="flex-1 rounded-t-sm transition-all duration-500 ease-out bg-danger/80 group-hover:bg-danger" 
-                   style="height: ${expensesPct}%;"></div>
+              <div class="flex-1 rounded-t-sm transition-all duration-500 ease-out group-hover:brightness-110" 
+                   style="height: ${incomePct}%; background-color: #22c55e; opacity: 1;"></div>
+              <div class="flex-1 rounded-t-sm transition-all duration-500 ease-out group-hover:brightness-110" 
+                   style="height: ${expensesPct}%; background-color: #ef4444; opacity: 1;"></div>
            </div>
         </div>
         
         <!-- X-Axis Label -->
-        <span class="text-[9px] font-bold text-muted uppercase tracking-wider truncate w-full text-center pt-2" title="${item.label}">${item.label}</span>
+        <span class="pt-3 text-[10px] font-bold text-muted tracking-wide whitespace-nowrap origin-top -rotate-40">${item.label}</span>
       </div>
     `;
   }).join('');
 
-  // Calculate total needed width: each day gets ~60px
-  const minWidth = visibleData.length * 60;
+  // Calculate total needed width: enough room for rotated date labels
+  const minWidth = visibleData.length * 72;
 
   return `
     <style>
@@ -151,8 +163,9 @@ export function MultiBarChart(data, options = {}) {
         background: rgba(255, 255, 255, 0.2);
       }
     </style>
-    <div class="w-full overflow-x-auto overflow-y-hidden saas-scrollbar-thin pb-2" style="height: ${height}; max-height: 250px;">
-      <div class="flex items-end justify-between gap-1 sm:gap-2 px-1 pt-8 h-full shrink-0 relative" style="min-width: ${minWidth}px;">
+    <div class="relative w-full overflow-x-auto overflow-y-hidden saas-scrollbar-thin pb-2" style="height: ${height}; max-height: 280px;">
+      <div class="absolute left-0 right-0 bottom-[52px] h-px bg-white/10 pointer-events-none"></div>
+      <div class="flex items-end justify-between gap-1 sm:gap-2 px-2 pt-8 pb-[58px] h-full shrink-0 relative" style="min-width: ${minWidth}px;">
         ${bars}
       </div>
     </div>

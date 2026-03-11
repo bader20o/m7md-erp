@@ -14,6 +14,8 @@ export const CUSTOMER_ROUTES = new Set([
   "/my-bookings",
   "/chat",
   "/membership",
+  "/rewards",
+  "/rewards/scan",
   "/profile"
 ]);
 
@@ -61,6 +63,10 @@ export const ADMIN_ROUTE_ACCESS = {
   "/admin/services": {
     roles: [ROLES.ADMIN, ROLES.EMPLOYEE],
     permission: PERMISSIONS.SERVICES
+  },
+  "/admin/rewards": {
+    roles: [ROLES.ADMIN, ROLES.EMPLOYEE],
+    permission: PERMISSIONS.MEMBERSHIPS
   },
   "/tasks": {
     roles: [ROLES.ADMIN, ROLES.EMPLOYEE]
@@ -111,6 +117,12 @@ export const CUSTOMER_NAV_ITEMS = [
     match: ["/membership"],
     label: "Membership",
     icon: '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/>'
+  },
+  {
+    path: "/rewards",
+    match: ["/rewards", "/rewards/scan"],
+    label: "My Rewards",
+    icon: '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11.049 2.927c.3-1.14 1.603-1.14 1.902 0a1 1 0 00.95.69 1 1 0 01.995 1.1l-.08.871a1 1 0 00.293.832l.617.618a1 1 0 001.117.21l.803-.34a1 1 0 011.273.583l.348.803a1 1 0 01-.211 1.117l-.617.617a1 1 0 00-.293.833l.08.87a1 1 0 01-.995 1.101 1 1 0 00-.95.69c-.3 1.139-1.603 1.139-1.902 0a1 1 0 00-.95-.69 1 1 0 01-.995-1.1l.08-.871a1 1 0 00-.293-.832l-.617-.618a1 1 0 00-1.117-.21l-.803.34a1 1 0 01-1.273-.583l-.348-.803a1 1 0 01.211-1.117l.617-.617a1 1 0 00.293-.833l-.08-.87a1 1 0 01.995-1.101 1 1 0 00.95-.69z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>'
   }
 ];
 
@@ -191,6 +203,14 @@ export const ADMIN_NAV_ITEMS = [
     roles: [ROLES.ADMIN, ROLES.EMPLOYEE],
     permission: PERMISSIONS.SERVICES,
     icon: '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>'
+  },
+  {
+    path: "/admin/rewards",
+    match: ["/admin/rewards"],
+    label: "Rewards",
+    roles: [ROLES.ADMIN, ROLES.EMPLOYEE],
+    permission: PERMISSIONS.MEMBERSHIPS,
+    icon: '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11.049 2.927c.3-1.14 1.603-1.14 1.902 0a1 1 0 00.95.69 1 1 0 01.995 1.1l-.08.871a1 1 0 00.293.832l.617.618a1 1 0 001.117.21l.803-.34a1 1 0 011.273.583l.348.803a1 1 0 01-.211 1.117l-.617.617a1 1 0 00-.293.833l.08.87a1 1 0 01-.995 1.101 1 1 0 00-.95.69c-.3 1.139-1.603 1.139-1.902 0a1 1 0 00-.95-.69 1 1 0 01-.995-1.1l.08-.871a1 1 0 00-.293-.832l-.617-.618a1 1 0 00-1.117-.21l-.803.34a1 1 0 01-1.273-.583l-.348-.803a1 1 0 01.211-1.117l.617-.617a1 1 0 00.293-.833l-.08-.87a1 1 0 01.995-1.101 1 1 0 00.95-.69z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>'
   },
   {
     path: "/employee/qr-scan",

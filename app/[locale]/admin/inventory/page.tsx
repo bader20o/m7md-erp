@@ -39,7 +39,10 @@ export default async function AdminInventoryPage({ params }: Props): Promise<Rea
 
   const serializedMovements = movements.map((movement) => ({
     ...movement,
-    type: movement.type as unknown as "IN" | "OUT" | "ADJUST",
+    type: movement.type as unknown as "IN" | "OUT" | "ADJUST" | "SALE",
+    pricingMode: movement.pricingMode as "UNIT" | "TOTAL" | null,
+    unitCost: movement.unitCost == null ? null : Number(movement.unitCost),
+    totalCost: movement.totalCost == null ? null : Number(movement.totalCost),
     occurredAt: movement.occurredAt.toISOString()
   }));
 

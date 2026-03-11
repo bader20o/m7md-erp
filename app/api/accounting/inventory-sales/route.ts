@@ -1,7 +1,14 @@
-import { IncomeSource, Role, StockMovementType, TransactionType } from "@prisma/client";
+import {
+  IncomeSource,
+  InventoryPricingMode,
+  Role,
+  StockMovementType,
+  TransactionType
+} from "@prisma/client";
 import { ApiError, fail, ok, parseJsonBody } from "@/lib/api";
 import { getSession } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
+import { createInventoryMovement } from "@/lib/inventory-movements";
 import { prisma } from "@/lib/prisma";
 import { requireRoles } from "@/lib/rbac";
 import { inventorySaleSchema } from "@/lib/validators/accounting";
@@ -74,15 +81,16 @@ export async function POST(request: Request): Promise<Response> {
         }
       });
 
-      const movement = await tx.stockMovement.create({
-        data: {
-          partId: part.id,
-          type: StockMovementType.OUT,
-          quantity: body.quantity,
-          occurredAt,
-          note: body.note || "Sold via accounting",
-          createdById: actor.sub
-        }
+      const movement = await createInventoryMovement(tx, {
+        partId: part.id,
+        type: StockMovementType.SALE,
+        pricingMode: InventoryPricingMode.UNIT,
+        quantity: body.quantity,
+        unitCost: unitPrice,
+        totalCost: amount,
+        occurredAt,
+        note: body.note || "Sold via accounting",
+        createdById: actor.sub
       });
 
       return { part, transaction, movement };

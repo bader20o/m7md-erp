@@ -1,0 +1,3 @@
+ALTER TABLE "RewardRule"
+ADD COLUMN IF NOT EXISTS "periodDays" INTEGER;
+

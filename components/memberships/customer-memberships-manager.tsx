@@ -328,7 +328,7 @@ export function CustomerMembershipsManager({
 
       <section className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-[0_24px_70px_-44px_rgba(15,23,42,0.28)] md:p-6">
         <h2 className="text-xl font-semibold text-slate-950">{copy.availableTitle}</h2>
-        <div className="mt-5 grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
+        <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {plans.map((plan) => {
             const isCurrentPlan = currentPlanId === plan.id;
             const isSubmitting = buyLoadingId === plan.id;

@@ -53,7 +53,10 @@ type AnalyticsPayload = {
     }>;
   };
   breakdowns: {
-    expenseByCategory: Array<{ category: "SUPPLIER" | "GENERAL" | "SALARY"; amount: number }>;
+    expenseByCategory: Array<{
+      category: "SUPPLIER" | "GENERAL" | "SALARY" | "INVENTORY_PURCHASE" | "INVENTORY_ADJUSTMENT";
+      amount: number;
+    }>;
     incomeBySource: Array<{
       source: "BOOKING" | "WALK_IN" | "MEMBERSHIP" | "INVENTORY_SALE";
       amount: number;
@@ -245,6 +248,8 @@ export function AnalyticsDashboard({ locale, dir, dict }: Props): React.ReactEle
     if (value === "SUPPLIER") return dict.analyticsCategorySupplier;
     if (value === "GENERAL") return dict.analyticsCategoryGeneral;
     if (value === "SALARY") return dict.analyticsCategorySalary;
+    if (value === "INVENTORY_PURCHASE") return "Inventory Purchase";
+    if (value === "INVENTORY_ADJUSTMENT") return "Inventory Adjustment";
     return dict.analyticsUnknown;
   }
 

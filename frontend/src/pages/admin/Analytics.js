@@ -7,6 +7,17 @@ function formatJod(value) {
   return `${Number(value || 0).toFixed(2)} JOD`;
 }
 
+function expenseCategoryLabel(value) {
+  const labels = {
+    SUPPLIER: 'Supplier',
+    GENERAL: 'General',
+    SALARY: 'Salary',
+    INVENTORY_PURCHASE: 'Inventory Purchase',
+    INVENTORY_ADJUSTMENT: 'Inventory Adjustment'
+  };
+  return labels[value] || value;
+}
+
 function toLocalDateInputValue(value) {
   const year = value.getFullYear();
   const month = String(value.getMonth() + 1).padStart(2, '0');
@@ -33,6 +44,23 @@ function openAdminPath(path) {
     return;
   }
   window.location.href = path;
+}
+
+function formatBucketLabel(bucketStart, groupBy) {
+  const date = new Date(bucketStart);
+  if (Number.isNaN(date.getTime())) {
+    return String(bucketStart || '');
+  }
+
+  if (groupBy === 'day') {
+    return `${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+  }
+
+  if (groupBy === 'week') {
+    return `${String(date.getMonth() + 1).padStart(2, '0')}/${String(date.getDate()).padStart(2, '0')}`;
+  }
+
+  return date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
 }
 
 export function AdminAnalytics() {
@@ -477,20 +505,11 @@ export function AdminAnalytics() {
         ? absentAlerts.map((item) => `<div class="text-xs text-text py-1 border-b border-white/5 last:border-0">${item.name}</div>`).join('')
         : '<div class="text-xs text-muted">No absent employees.</div>';
 
-      if (timeseries && timeseries.length) {
+      if (Array.isArray(timeseries) && timeseries.length > 0) {
         document.getElementById('chart-timeseries').innerHTML = MultiBarChart(
           timeseries.map(t => {
-            // For daily, just show MM-DD
-            let lbl = t.bucketStart;
-            if (currentGroupBy === 'day') {
-              const d = new Date(t.bucketStart);
-              lbl = `${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-            } else {
-              lbl = t.bucketStart.substring(5);
-            }
-
             return {
-              label: lbl,
+              label: formatBucketLabel(t.bucketStart, currentGroupBy),
               income: t.income,
               expenses: t.expenses,
               profit: t.income - t.expenses
@@ -498,12 +517,32 @@ export function AdminAnalytics() {
           }),
           { height: '250px', format: v => `${v.toFixed(0)} JOD` }
         );
+      } else {
+        document.getElementById('chart-timeseries').innerHTML =
+          '<div class="h-[250px] flex items-center justify-center text-sm text-muted">No chart data for selected period.</div>';
       }
 
       if (breakdowns?.expensesByCategory && document.getElementById('chart-donuts')) {
-        const colors = ['var(--danger)', 'var(--amber-500)', 'var(--primary)'];
+        const colorByCategory = {
+          SUPPLIER: 'var(--danger)',
+          GENERAL: 'var(--amber-500)',
+          SALARY: 'var(--primary)',
+          INVENTORY_PURCHASE: '#06b6d4',
+          INVENTORY_ADJUSTMENT: '#a78bfa'
+        };
+
+        const donutItems = (breakdowns.expensesByCategory || [])
+          .filter((c) => Number(c.amount || 0) > 0)
+          .map((c) => ({
+            label: expenseCategoryLabel(c.category),
+            value: Number(c.amount || 0),
+            color: colorByCategory[c.category] || 'var(--muted)'
+          }));
+
         document.getElementById('chart-donuts').innerHTML = SimpleDonutChart(
-          breakdowns.expensesByCategory.map((c, i) => ({ label: c.category, value: c.amount, color: colors[i % colors.length] }))
+          donutItems.length
+            ? donutItems
+            : [{ label: 'No Expenses', value: 1, color: 'var(--border)' }]
         );
       }
 

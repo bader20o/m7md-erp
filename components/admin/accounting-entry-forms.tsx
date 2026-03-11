@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { ResponsiveDataTable } from "@/components/ui/responsive-data-table";
 
 type SupplierOption = {
   id: string;
@@ -294,13 +295,13 @@ export function AccountingEntryForms({
           <input
             value={saleSearch}
             onChange={(event) => setSaleSearch(event.target.value)}
-            className="rounded-md border border-slate-300 px-3 py-2 md:col-span-2"
+            className="min-w-0 rounded-xl border border-slate-300 px-3 py-3 md:col-span-2"
             placeholder="Search item by name/SKU/model/category"
           />
           <select
             value={salePartId}
             onChange={(event) => setSalePartId(event.target.value)}
-            className="rounded-md border border-slate-300 px-3 py-2 md:col-span-2"
+            className="min-w-0 rounded-xl border border-slate-300 px-3 py-3 md:col-span-2"
           >
             <option value="">Select inventory item</option>
             {filteredSaleParts.map((part) => (
@@ -314,66 +315,75 @@ export function AccountingEntryForms({
           <button
             type="button"
             onClick={openAddToCartModal}
-            className="rounded-md bg-brand-700 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-800 md:col-span-2"
+            className="rounded-xl bg-brand-700 px-4 py-3 text-sm font-semibold text-white hover:bg-brand-800 md:col-span-2"
           >
             Add To Cart
           </button>
           <input
             value={saleDate}
             onChange={(event) => setSaleDate(event.target.value)}
-            className="rounded-md border border-slate-300 px-3 py-2 md:col-span-2"
+            className="min-w-0 rounded-xl border border-slate-300 px-3 py-3 md:col-span-2"
             type="datetime-local"
             placeholder="Sale date"
           />
         </div>
 
-        <div className="mt-4 overflow-x-auto rounded-lg border border-slate-200">
-          <table className="w-full text-sm">
-            <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-600">
-              <tr>
-                <th className="px-3 py-2">Item</th>
-                <th className="px-3 py-2">Category</th>
-                <th className="px-3 py-2">Car Model</th>
-                <th className="px-3 py-2">Qty</th>
-                <th className="px-3 py-2">Unit Price</th>
-                <th className="px-3 py-2">Line Total</th>
-                <th className="px-3 py-2">Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {saleCart.map((line, index) => (
-                <tr key={`${line.partId}-${index}`} className="border-t border-slate-100">
-                  <td className="px-3 py-2">{line.partName}</td>
-                  <td className="px-3 py-2">{line.vehicleCategory}</td>
-                  <td className="px-3 py-2">{line.carModel}</td>
-                  <td className="px-3 py-2">{line.quantity}</td>
-                  <td className="px-3 py-2">{line.unitPrice.toFixed(2)}</td>
-                  <td className="px-3 py-2 font-medium">
-                    {(line.quantity * line.unitPrice).toFixed(2)}
-                  </td>
-                  <td className="px-3 py-2">
-                    <button
-                      type="button"
-                      onClick={() => removeCartLine(index)}
-                      className="rounded-md border border-red-200 px-2 py-1 text-xs font-semibold text-red-700"
-                    >
-                      Remove
-                    </button>
-                  </td>
-                </tr>
-              ))}
-              {saleCart.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="px-3 py-3 text-center text-slate-500">
-                    Cart is empty.
-                  </td>
-                </tr>
-              ) : null}
-            </tbody>
-          </table>
+        <div className="mt-4">
+          <ResponsiveDataTable
+            items={saleCart}
+            getKey={(line) => `${line.partId}-${line.quantity}-${line.unitPrice}-${line.note}`}
+            emptyState="Cart is empty."
+            tableClassName="border border-slate-200 bg-white"
+            columns={[
+              { key: "item", header: "Item", cell: (line) => line.partName },
+              { key: "category", header: "Category", cell: (line) => line.vehicleCategory },
+              { key: "model", header: "Car Model", cell: (line) => line.carModel },
+              { key: "qty", header: "Qty", cell: (line) => line.quantity },
+              { key: "unit", header: "Unit Price", cell: (line) => line.unitPrice.toFixed(2) },
+              {
+                key: "total",
+                header: "Line Total",
+                cell: (line) => <span className="font-medium">{(line.quantity * line.unitPrice).toFixed(2)}</span>
+              },
+              {
+                key: "action",
+                header: "Action",
+                cell: (line) => (
+                  <button
+                    type="button"
+                    onClick={() => removeCartLine(saleCart.indexOf(line))}
+                    className="rounded-xl border border-red-200 px-3 py-2 text-sm font-semibold text-red-700"
+                  >
+                    Remove
+                  </button>
+                )
+              }
+            ]}
+            cardTitle={(line) => line.partName}
+            cardBadge={(line) => (
+              <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
+                {(line.quantity * line.unitPrice).toFixed(2)}
+              </span>
+            )}
+            cardSubtitle={(line) => `${line.vehicleCategory} • ${line.carModel}`}
+            cardFields={[
+              { key: "qty", label: "Qty", value: (line) => line.quantity },
+              { key: "unit", label: "Unit Price", value: (line) => line.unitPrice.toFixed(2) },
+              { key: "note", label: "Note", value: (line) => line.note || "-" }
+            ]}
+            cardActions={(line) => (
+              <button
+                type="button"
+                onClick={() => removeCartLine(saleCart.indexOf(line))}
+                className="w-full rounded-xl border border-red-200 px-4 py-3 text-sm font-semibold text-red-700"
+              >
+                Remove
+              </button>
+            )}
+          />
         </div>
 
-        <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+        <div className="sticky bottom-0 mt-4 flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white/95 p-3 backdrop-blur sm:flex-row sm:items-center sm:justify-between">
           <p className="text-sm font-semibold text-slate-800">Cart Total: {cartTotal.toFixed(2)}</p>
           <button
             type="button"
@@ -381,7 +391,7 @@ export function AccountingEntryForms({
             onClick={() => {
               void checkoutCart();
             }}
-            className="rounded-md bg-emerald-700 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-800 disabled:opacity-70"
+            className="w-full rounded-xl bg-emerald-700 px-4 py-3 text-sm font-semibold text-white hover:bg-emerald-800 disabled:opacity-70 sm:w-auto"
           >
             {loadingCartCheckout ? "Processing..." : "Confirm Cart Sale"}
           </button>
@@ -390,12 +400,24 @@ export function AccountingEntryForms({
 
       {modalOpen && selectedSalePart ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-lg rounded-xl bg-white p-4 shadow-xl">
-            <h3 className="text-lg font-semibold">Item Details</h3>
-            <p className="mt-1 text-sm text-slate-600">
-              Review details and edit default price before adding to cart.
-            </p>
-            <div className="mt-3 grid gap-3 md:grid-cols-2">
+          <div className="flex max-h-[85vh] w-full max-w-lg flex-col overflow-hidden rounded-[24px] bg-white shadow-xl">
+            <div className="flex items-start justify-between gap-3 border-b border-slate-200 px-4 py-4">
+              <div>
+                <h3 className="text-lg font-semibold">Item Details</h3>
+                <p className="mt-1 text-sm text-slate-600">
+                  Review details and edit default price before adding to cart.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setModalOpen(false)}
+                className="rounded-xl border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700"
+              >
+                Close
+              </button>
+            </div>
+            <div className="overflow-y-auto px-4 py-4">
+              <div className="grid gap-3 md:grid-cols-2">
               <input value={selectedSalePart.name} className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2" readOnly />
               <input value={selectedSalePart.vehicleType ?? ""} className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2" readOnly />
               <input value={selectedSalePart.vehicleModel ?? ""} className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2" readOnly />
@@ -430,18 +452,19 @@ export function AccountingEntryForms({
                 placeholder="Note (optional)"
               />
             </div>
-            <div className="mt-4 flex justify-end gap-2">
+            </div>
+            <div className="sticky bottom-0 flex justify-end gap-2 border-t border-slate-200 bg-white px-4 py-4">
               <button
                 type="button"
                 onClick={() => setModalOpen(false)}
-                className="rounded-md border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700"
+                className="rounded-xl border border-slate-300 px-4 py-3 text-sm font-semibold text-slate-700"
               >
                 Cancel
               </button>
               <button
                 type="button"
                 onClick={confirmAddToCart}
-                className="rounded-md bg-brand-700 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-800"
+                className="rounded-xl bg-brand-700 px-4 py-3 text-sm font-semibold text-white hover:bg-brand-800"
               >
                 Confirm Add To Cart
               </button>

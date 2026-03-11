@@ -254,14 +254,17 @@ export async function GET(request: Request): Promise<Response> {
     const expenseByCategoryTotals: Record<ExpenseCategory, number> = {
       SUPPLIER: 0,
       GENERAL: 0,
-      SALARY: 0
+      SALARY: 0,
+      INVENTORY_PURCHASE: 0,
+      INVENTORY_ADJUSTMENT: 0
     };
 
     let totalIncome = 0;
     let totalExpenses = 0;
 
     for (const row of ledgerRows) {
-      const amount = toNumber(row.amount);
+      const amount =
+        row.type === TransactionType.EXPENSE ? Math.abs(toNumber(row.amount)) : toNumber(row.amount);
       const dateKey = toDayKey(row.recordedAt);
       const point = dailyMap.get(dateKey);
 
@@ -331,7 +334,15 @@ export async function GET(request: Request): Promise<Response> {
         expenseByCategory: [
           { category: ExpenseCategory.SUPPLIER, amount: roundCurrency(expenseByCategoryTotals.SUPPLIER) },
           { category: ExpenseCategory.GENERAL, amount: roundCurrency(expenseByCategoryTotals.GENERAL) },
-          { category: ExpenseCategory.SALARY, amount: roundCurrency(expenseByCategoryTotals.SALARY) }
+          { category: ExpenseCategory.SALARY, amount: roundCurrency(expenseByCategoryTotals.SALARY) },
+          {
+            category: ExpenseCategory.INVENTORY_PURCHASE,
+            amount: roundCurrency(expenseByCategoryTotals.INVENTORY_PURCHASE)
+          },
+          {
+            category: ExpenseCategory.INVENTORY_ADJUSTMENT,
+            amount: roundCurrency(expenseByCategoryTotals.INVENTORY_ADJUSTMENT)
+          }
         ],
         incomeBySource: [
           { source: IncomeSource.BOOKING, amount: roundCurrency(incomeBySourceTotals.BOOKING) },

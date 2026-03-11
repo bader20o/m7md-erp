@@ -109,6 +109,8 @@ enum ExpenseCategory {
   SUPPLIER
   GENERAL
   SALARY
+  INVENTORY_PURCHASE
+  INVENTORY_ADJUSTMENT
 }
 
 enum ReviewStatus {
@@ -190,6 +192,46 @@ enum StockMovementType {
   SALE
 }
 
+enum InventoryPricingMode {
+  UNIT
+  TOTAL
+}
+
+enum RewardTriggerType {
+  VISIT_COUNT
+  COMPLETED_BOOKING_COUNT
+}
+
+enum RewardType {
+  FREE_SERVICE
+  DISCOUNT_PERCENTAGE
+  FIXED_AMOUNT_DISCOUNT
+  CUSTOM_GIFT
+}
+
+enum CustomerRewardStatus {
+  AVAILABLE
+  REDEEMED
+  EXPIRED
+  CANCELLED
+}
+
+enum CheckInMethod {
+  QR
+  MANUAL
+}
+
+enum RewardSourceType {
+  VISIT
+  BOOKING_COMPLETION
+}
+
+enum BookingPricingMode {
+  NORMAL
+  MANUAL
+  REWARD
+}
+
 model User {
   id                          String                      @id @default(cuid())
   phone                       String                      @unique
@@ -269,6 +311,10 @@ model User {
   ledgerEntriesCreated        CustomerAccountEntry[]      @relation("LedgerEntriesCreatedByAdmin")
   tasksCreated                Task[]                      @relation("TaskCreatedByAdmin")
   tasksAssigned               Task[]                      @relation("TaskAssignedToUser")
+  visits                      CustomerVisit[]
+  rewardProgress              CustomerRewardProgress[]
+  rewardsEarned               CustomerReward[]
+  rewardEvents                RewardEvent[]
 }
 
 model Service {
@@ -294,6 +340,8 @@ model Service {
   offerLinks             OfferService[]
   assignments            BookingServiceAssignment[]
   invoiceLines           InvoiceLine[]
+  rewardRules            RewardRule[]
+  rewardsIssued          CustomerReward[]
 }
 
 model Booking {
@@ -311,6 +359,8 @@ model Booking {
   cancelReason             String?
   cancelledByUserId        String?
   finalPrice               Decimal?                   @db.Decimal(12, 2)
+  originalPrice            Decimal?                   @db.Decimal(12, 2)
+  pricingMode              BookingPricingMode         @default(NORMAL)
   internalNote             String?
   performedByEmployeeId    String?
   serviceNameSnapshotEn    String
@@ -319,6 +369,7 @@ model Booking {
   serviceBasePriceSnapshot Decimal?                   @db.Decimal(12, 2)
   priceTypeSnapshot        PriceType                  @default(FIXED)
   completedAt              DateTime?
+  rewardId                 String?                    @unique
   createdAt                DateTime                   @default(now())
   updatedAt                DateTime                   @updatedAt
   customer                 User                       @relation("CustomerBookings", fields: [customerId], references: [id], onDelete: Restrict)
@@ -331,6 +382,7 @@ model Booking {
   review                   Review?
   membershipUsages         MembershipUsage[]
   stockMovements           StockMovement[]
+  redeemedReward           CustomerReward?            @relation("RewardRedeemedBooking", fields: [rewardId], references: [id], onDelete: SetNull)
 
   @@index([customerId, appointmentAt])
   @@index([serviceId, appointmentAt])
@@ -374,6 +426,12 @@ model Transaction {
   expenseCategory       ExpenseCategory?
   referenceType         String?
   referenceId           String?
+  stockMovementId       String?          @unique
+  partIdSnapshot        String?
+  movementQuantity      Int?
+  movementUnitCost      Decimal?         @db.Decimal(12, 3)
+  movementTotalCost     Decimal?         @db.Decimal(12, 2)
+  supplierNameSnapshot  String?
   occurredAt            DateTime         @default(now())
   recordedAt            DateTime         @default(now())
   createdById           String?
@@ -525,22 +583,26 @@ model Part {
 }
 
 model StockMovement {
-  id          String            @id @default(cuid())
-  partId      String
-  type        StockMovementType
-  quantity    Int
-  occurredAt  DateTime          @default(now())
-  note        String?
-  createdById String
-  bookingId   String?
-  supplierId  String?
-  invoiceId   String?
-  createdAt   DateTime          @default(now())
-  part        Part              @relation(fields: [partId], references: [id], onDelete: Restrict)
-  createdBy   User              @relation("StockMovementCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
-  booking     Booking?          @relation(fields: [bookingId], references: [id], onDelete: SetNull)
-  supplier    Supplier?         @relation(fields: [supplierId], references: [id], onDelete: SetNull)
-  invoice     Invoice?          @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
+  id                   String               @id @default(cuid())
+  partId               String
+  type                 StockMovementType
+  pricingMode          InventoryPricingMode?
+  quantity             Int
+  unitCost             Decimal?             @db.Decimal(12, 3)
+  totalCost            Decimal?             @db.Decimal(12, 2)
+  occurredAt           DateTime             @default(now())
+  note                 String?
+  supplierNameSnapshot String?
+  createdById          String
+  bookingId            String?
+  supplierId           String?
+  invoiceId            String?
+  createdAt            DateTime             @default(now())
+  part                 Part                 @relation(fields: [partId], references: [id], onDelete: Restrict)
+  createdBy            User                 @relation("StockMovementCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  booking              Booking?             @relation(fields: [bookingId], references: [id], onDelete: SetNull)
+  supplier             Supplier?            @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  invoice              Invoice?             @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
 
   @@index([partId, occurredAt])
   @@index([createdById, occurredAt])
@@ -950,6 +1012,13 @@ model SystemSetting {
   businessName            String   @default("Hybrid & Electric Car Service Center")
   businessPhone           String?
   businessAddress         String?
+  email                   String?
+  whatsapp                String?
+  website                 String?
+  instagram               String?
+  facebook                String?
+  tiktok                  String?
+  youtube                 String?
   workingHours            Json?
   holidays                Json?
   currency                String   @default("JOD")
@@ -1143,4 +1212,104 @@ model Task {
   @@index([assignedToId])
   @@index([status])
   @@index([dueAt])
+}
+
+model CustomerVisit {
+  id           String        @id @default(cuid())
+  customerId   String
+  checkedInAt  DateTime      @default(now())
+  visitDate    DateTime
+  checkInMethod CheckInMethod @default(QR)
+  qrRotationId String?
+  branchId     String?
+  notes        String?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  customer     User          @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@unique([customerId, visitDate])
+  @@index([visitDate])
+}
+
+model RewardRule {
+  id                 String                   @id @default(cuid())
+  code               String                   @unique
+  title              String
+  description        String?
+  triggerType        RewardTriggerType
+  triggerValue       Int
+  rewardType         RewardType
+  rewardServiceId    String?
+  rewardLabel        String?
+  discountPercentage Decimal?                 @db.Decimal(5, 2)
+  fixedAmount        Decimal?                 @db.Decimal(12, 2)
+  customGiftText     String?
+  currency           String?
+  periodDays         Int?
+  isActive           Boolean                  @default(true)
+  sortOrder          Int                      @default(0)
+  startsAt           DateTime?
+  endsAt             DateTime?
+  createdAt          DateTime                 @default(now())
+  updatedAt          DateTime                 @updatedAt
+  rewardService      Service?                 @relation(fields: [rewardServiceId], references: [id], onDelete: SetNull)
+  progress           CustomerRewardProgress[]
+  rewards            CustomerReward[]
+  events             RewardEvent[]
+
+  @@index([isActive, sortOrder])
+  @@index([triggerType, isActive])
+}
+
+model CustomerRewardProgress {
+  id              String     @id @default(cuid())
+  customerId      String
+  rewardRuleId    String
+  progressValue   Int        @default(0)
+  completedCycles Int        @default(0)
+  updatedAt       DateTime   @updatedAt
+  customer        User       @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  rewardRule      RewardRule @relation(fields: [rewardRuleId], references: [id], onDelete: Cascade)
+
+  @@unique([customerId, rewardRuleId])
+}
+
+model CustomerReward {
+  id                 String               @id @default(cuid())
+  customerId         String
+  rewardRuleId       String
+  rewardType         RewardType
+  rewardServiceId    String?
+  rewardLabel        String?
+  discountPercentage Decimal?             @db.Decimal(5, 2)
+  fixedAmount        Decimal?             @db.Decimal(12, 2)
+  customGiftText     String?
+  status             CustomerRewardStatus @default(AVAILABLE)
+  issuedAt           DateTime             @default(now())
+  redeemedAt         DateTime?
+  redeemedBookingId  String?
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+  customer           User                 @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  rewardRule         RewardRule           @relation(fields: [rewardRuleId], references: [id], onDelete: Restrict)
+  rewardService      Service?             @relation(fields: [rewardServiceId], references: [id], onDelete: SetNull)
+  redeemedBooking    Booking?             @relation("RewardRedeemedBooking")
+
+  @@index([customerId, status, issuedAt])
+  @@index([rewardRuleId, status])
+}
+
+model RewardEvent {
+  id            String           @id @default(cuid())
+  customerId    String
+  rewardRuleId  String
+  sourceType    RewardSourceType
+  sourceId      String
+  progressDelta Int              @default(1)
+  createdAt     DateTime         @default(now())
+  customer      User             @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  rewardRule    RewardRule       @relation(fields: [rewardRuleId], references: [id], onDelete: Cascade)
+
+  @@unique([rewardRuleId, sourceType, sourceId, customerId])
+  @@index([customerId, createdAt])
 }

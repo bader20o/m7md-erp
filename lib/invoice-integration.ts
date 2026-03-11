@@ -13,6 +13,7 @@
 import {
     CustomerAccountEntryType,
     IncomeSource,
+    InventoryPricingMode,
     InvoiceLineType,
     InvoiceStatus,
     InvoiceType,
@@ -23,6 +24,7 @@ import {
 } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { ApiError } from "@/lib/api";
+import { createInventoryMovement } from "@/lib/inventory-movements";
 
 // ── Types ──────────────────────────────────────────────────────────────
 
@@ -263,16 +265,17 @@ export async function createSaleInvoice(
                     );
                 }
 
-                await tx.stockMovement.create({
-                    data: {
-                        partId: line.partId,
-                        type: StockMovementType.SALE,
-                        quantity: line.quantity,
-                        occurredAt: invoice.issueDate,
-                        note: `Sale invoice ${invoice.number}`,
-                        createdById: actorId,
-                        invoiceId: invoice.id,
-                    },
+                await createInventoryMovement(tx, {
+                    partId: line.partId,
+                    type: StockMovementType.SALE,
+                    pricingMode: InventoryPricingMode.UNIT,
+                    quantity: line.quantity,
+                    unitCost: Number(line.unitAmount),
+                    totalCost: Number((line.unitAmount * line.quantity).toFixed(2)),
+                    occurredAt: invoice.issueDate,
+                    note: `Sale invoice ${invoice.number}`,
+                    createdById: actorId,
+                    invoiceId: invoice.id,
                 });
             }
         }
@@ -600,16 +603,17 @@ export async function updateSaleInvoice(
                     );
                 }
 
-                await tx.stockMovement.create({
-                    data: {
-                        partId: line.partId,
-                        type: StockMovementType.SALE,
-                        quantity: line.quantity,
-                        occurredAt: existing.issueDate,
-                        note: `Sale invoice ${existing.number} (updated)`,
-                        createdById: actorId,
-                        invoiceId,
-                    },
+                await createInventoryMovement(tx, {
+                    partId: line.partId,
+                    type: StockMovementType.SALE,
+                    pricingMode: InventoryPricingMode.UNIT,
+                    quantity: line.quantity,
+                    unitCost: Number(line.unitAmount),
+                    totalCost: Number((line.unitAmount * line.quantity).toFixed(2)),
+                    occurredAt: existing.issueDate,
+                    note: `Sale invoice ${existing.number} (updated)`,
+                    createdById: actorId,
+                    invoiceId,
                 });
             }
         }

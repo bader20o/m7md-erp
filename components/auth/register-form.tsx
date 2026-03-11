@@ -35,13 +35,13 @@ export function RegisterForm({ locale }: { locale: string }): React.ReactElement
   }
 
   return (
-    <form onSubmit={onSubmit} className="grid gap-4 rounded-xl border border-brand-100 bg-white p-6">
+    <form onSubmit={onSubmit} className="grid gap-4 rounded-2xl border border-brand-100 bg-white p-4 shadow-[0_20px_60px_-36px_rgba(12,100,74,0.28)] sm:p-6">
       <label className="grid gap-2">
         <span className="text-sm font-medium">Full Name</span>
         <input
           value={fullName}
           onChange={(event) => setFullName(event.target.value)}
-          className="rounded-md border border-slate-300 px-3 py-2"
+          className="rounded-xl border border-slate-300 px-3 py-3"
           placeholder="John Doe"
           required
         />
@@ -52,7 +52,7 @@ export function RegisterForm({ locale }: { locale: string }): React.ReactElement
         <input
           value={phone}
           onChange={(event) => setPhone(event.target.value)}
-          className="rounded-md border border-slate-300 px-3 py-2"
+          className="rounded-xl border border-slate-300 px-3 py-3"
           placeholder="+15550000000"
           required
         />
@@ -64,7 +64,7 @@ export function RegisterForm({ locale }: { locale: string }): React.ReactElement
           value={password}
           onChange={(event) => setPassword(event.target.value)}
           type="password"
-          className="rounded-md border border-slate-300 px-3 py-2"
+          className="rounded-xl border border-slate-300 px-3 py-3"
           minLength={8}
           required
         />
@@ -75,11 +75,10 @@ export function RegisterForm({ locale }: { locale: string }): React.ReactElement
       <button
         type="submit"
         disabled={loading}
-        className="rounded-md bg-brand-700 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-800 disabled:opacity-70"
+        className="w-full rounded-xl bg-brand-700 px-4 py-3 text-sm font-semibold text-white hover:bg-brand-800 disabled:opacity-70"
       >
         {loading ? "Creating..." : "Create Account"}
       </button>
     </form>
   );
 }
-

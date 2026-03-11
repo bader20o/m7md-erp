@@ -1,12 +1,12 @@
-import { Prisma, Role, StockMovementType } from "@prisma/client";
+import { InventoryPricingMode, Prisma, Role, StockMovementType } from "@prisma/client";
 import { ApiError, fail, ok, parseJsonBody } from "@/lib/api";
 import { getSession } from "@/lib/auth";
+import { canOverrideNegativeStock, isStockChangeAllowed, resolveStockDelta } from "@/lib/inventory";
 import {
-  canOverrideNegativeStock,
-  computeStockQty,
-  isStockChangeAllowed,
-  resolveStockDelta
-} from "@/lib/inventory";
+  createInventoryMovement,
+  createLedgerEntryFromMovement,
+  resolveMovementPricing
+} from "@/lib/inventory-movements";
 import { prisma } from "@/lib/prisma";
 import { requireRoles } from "@/lib/rbac";
 import { createMovementSchema, listMovementsQuerySchema } from "@/lib/validators/inventory";
@@ -64,7 +64,7 @@ export async function POST(request: Request): Promise<Response> {
         ? prisma.booking.findUnique({ where: { id: body.bookingId }, select: { id: true } })
         : Promise.resolve(null),
       body.supplierId
-        ? prisma.supplier.findUnique({ where: { id: body.supplierId }, select: { id: true } })
+        ? prisma.supplier.findUnique({ where: { id: body.supplierId }, select: { id: true, name: true } })
         : Promise.resolve(null),
       body.invoiceId
         ? prisma.invoice.findUnique({ where: { id: body.invoiceId }, select: { id: true } })
@@ -86,11 +86,17 @@ export async function POST(request: Request): Promise<Response> {
       body.quantity,
       body.adjustDirection
     );
+    const pricing = resolveMovementPricing({
+      quantity: body.quantity,
+      pricingMode: body.pricingMode as InventoryPricingMode,
+      unitCost: body.unitCost,
+      totalCost: body.totalCost
+    });
 
     const item = await prisma.$transaction(async (tx) => {
       const currentPart = await tx.part.findUnique({
         where: { id: body.partId },
-        select: { id: true, isActive: true, stockQty: true }
+        select: { id: true, name: true, isActive: true, stockQty: true }
       });
       if (!currentPart) {
         throw new ApiError(404, "PART_NOT_FOUND", "Part not found.");
@@ -98,8 +104,6 @@ export async function POST(request: Request): Promise<Response> {
       if (!currentPart.isActive) {
         throw new ApiError(400, "PART_INACTIVE", "Part is inactive.");
       }
-
-      const nextQty = computeStockQty(currentPart.stockQty, delta);
       if (!isStockChangeAllowed(currentPart.stockQty, delta, actor.role)) {
         throw new ApiError(400, "NEGATIVE_STOCK_NOT_ALLOWED", "Stock cannot become negative.");
       }
@@ -127,20 +131,40 @@ export async function POST(request: Request): Promise<Response> {
       const note =
         body.type === "ADJUST"
           ? `[${body.adjustDirection}]${body.note ? ` ${body.note}` : ""}`
-          : body.note;
+          : body.note ?? "";
 
-      return tx.stockMovement.create({
-        data: {
-          partId: body.partId,
-          type: body.type,
-          quantity: body.quantity,
-          occurredAt: body.occurredAt,
-          note,
-          createdById: actor.sub,
-          bookingId: body.bookingId,
-          supplierId: body.supplierId,
-          invoiceId: body.invoiceId
-        },
+      const movement = await createInventoryMovement(tx, {
+        partId: body.partId,
+        type: body.type as StockMovementType,
+        pricingMode: pricing.pricingMode,
+        quantity: body.quantity,
+        unitCost: pricing.unitCost,
+        totalCost: pricing.totalCost,
+        occurredAt: body.occurredAt,
+        note,
+        createdById: actor.sub,
+        bookingId: body.bookingId,
+        supplierId: body.supplierId,
+        supplierNameSnapshot: supplier?.name ?? null,
+        invoiceId: body.invoiceId
+      });
+
+      await createLedgerEntryFromMovement(tx, {
+        movementId: movement.id,
+        partId: currentPart.id,
+        partName: currentPart.name,
+        type: movement.type,
+        quantity: movement.quantity,
+        unitCost: pricing.unitCost,
+        totalCost: pricing.totalCost,
+        occurredAt: movement.occurredAt,
+        note,
+        createdById: actor.sub,
+        supplierNameSnapshot: supplier?.name ?? null
+      });
+
+      return tx.stockMovement.findUniqueOrThrow({
+        where: { id: movement.id },
         include: {
           part: true,
           createdBy: { select: { id: true, fullName: true, phone: true, role: true } },
@@ -159,4 +183,3 @@ export async function POST(request: Request): Promise<Response> {
     return fail(error);
   }
 }
-

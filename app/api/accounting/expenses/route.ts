@@ -1,4 +1,4 @@
-import { Role, StockMovementType, TransactionType } from "@prisma/client";
+import { InventoryPricingMode, Role, StockMovementType, TransactionType } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { ApiError, fail, ok, parseJsonBody } from "@/lib/api";
 import { getSession } from "@/lib/auth";
@@ -8,6 +8,7 @@ import {
   finalizeIdempotencyFailure,
   finalizeIdempotencySuccess
 } from "@/lib/idempotency";
+import { createInventoryMovement } from "@/lib/inventory-movements";
 import { prisma } from "@/lib/prisma";
 import { requireRoles } from "@/lib/rbac";
 import { createExpenseSchema } from "@/lib/validators/accounting";
@@ -58,11 +59,19 @@ export async function POST(request: Request): Promise<Response> {
     }
 
     let supplierId = body.supplierId;
+    let supplierNameSnapshot = body.supplierName?.trim() || null;
     if (!supplierId && body.supplierName) {
       const supplier = await prisma.supplier.create({
         data: { name: body.supplierName }
       });
       supplierId = supplier.id;
+      supplierNameSnapshot = supplier.name;
+    } else if (supplierId) {
+      const supplier = await prisma.supplier.findUnique({
+        where: { id: supplierId },
+        select: { name: true }
+      });
+      supplierNameSnapshot = supplier?.name ?? supplierNameSnapshot;
     }
 
     const part = body.partId
@@ -128,17 +137,19 @@ export async function POST(request: Request): Promise<Response> {
           data: { stockQty: { increment: quantity } }
         });
 
-        await tx.stockMovement.create({
-          data: {
-            partId: part.id,
-            type: StockMovementType.IN,
-            quantity,
-            occurredAt,
-            note: body.note || `Purchased via expense ${expense.id}`,
-            createdById: actor.sub,
-            supplierId,
-            invoiceId: body.invoiceId
-          }
+        await createInventoryMovement(tx, {
+          partId: part.id,
+          type: StockMovementType.IN,
+          pricingMode: InventoryPricingMode.UNIT,
+          quantity,
+          unitCost: unitPrice,
+          totalCost: amount,
+          occurredAt,
+          note: body.note || `Purchased via expense ${expense.id}`,
+          createdById: actor.sub,
+          supplierId,
+          supplierNameSnapshot,
+          invoiceId: body.invoiceId
         });
       }
 

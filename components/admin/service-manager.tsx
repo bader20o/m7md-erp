@@ -10,6 +10,7 @@ type ServiceItem = {
   descriptionEn: string | null;
   descriptionAr: string | null;
   durationMinutes: number;
+  supportedCarTypes: string | null;
   isActive: boolean;
 };
 
@@ -34,6 +35,7 @@ export function ServiceManager({ locale, services }: Props): React.ReactElement 
   const [descriptionEn, setDescriptionEn] = useState("");
   const [descriptionAr, setDescriptionAr] = useState("");
   const [durationMinutes, setDurationMinutes] = useState("60");
+  const [supportedCarType, setSupportedCarType] = useState<"" | "EV" | "HYBRID" | "FUEL">("");
   const [loading, setLoading] = useState(false);
   const [loadingId, setLoadingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -50,6 +52,7 @@ export function ServiceManager({ locale, services }: Props): React.ReactElement 
       nameAr,
       durationMinutes: Number(durationMinutes)
     };
+    if (supportedCarType) payload.supportedCarTypes = supportedCarType;
     if (descriptionEn.trim()) payload.descriptionEn = descriptionEn.trim();
     if (descriptionAr.trim()) payload.descriptionAr = descriptionAr.trim();
 
@@ -71,6 +74,7 @@ export function ServiceManager({ locale, services }: Props): React.ReactElement 
     setDescriptionEn("");
     setDescriptionAr("");
     setDurationMinutes("60");
+    setSupportedCarType("");
     setSuccess("Service created.");
     router.refresh();
   }
@@ -125,6 +129,16 @@ export function ServiceManager({ locale, services }: Props): React.ReactElement 
             min="15"
             required
           />
+          <select
+            value={supportedCarType}
+            onChange={(event) => setSupportedCarType(event.target.value as "" | "EV" | "HYBRID" | "FUEL")}
+            className="rounded-md border border-slate-300 px-3 py-2"
+          >
+            <option value="">Car Type (All)</option>
+            <option value="EV">EV</option>
+            <option value="HYBRID">HV (Hybrid)</option>
+            <option value="FUEL">Fuel</option>
+          </select>
           <textarea
             value={descriptionEn}
             onChange={(event) => setDescriptionEn(event.target.value)}
@@ -162,6 +176,7 @@ export function ServiceManager({ locale, services }: Props): React.ReactElement 
                     <span className="ml-2 text-xs text-slate-500">{service.id}</span>
                   </h3>
                   <p className="text-sm text-slate-600">{service.durationMinutes} min</p>
+                  <p className="text-xs text-slate-500">Car Type: {service.supportedCarTypes || "All"}</p>
                   <p className="text-xs text-slate-500">
                     {locale === "ar" ? service.descriptionAr : service.descriptionEn}
                   </p>

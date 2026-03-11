@@ -303,7 +303,7 @@ export function MembershipPlanManager({ locale, initialPlans }: Props): React.Re
           </div>
         </div>
 
-        <div className="mt-5 grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
+        <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {plans.map((plan) => (
             <PlanCard
               key={plan.id}
@@ -320,8 +320,8 @@ export function MembershipPlanManager({ locale, initialPlans }: Props): React.Re
 
       {form ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4">
-          <div className="max-h-[92vh] w-full max-w-6xl overflow-y-auto rounded-[28px] border border-slate-200 bg-white shadow-2xl">
-            <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
+          <div className="flex max-h-[85vh] w-full max-w-6xl flex-col overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-2xl">
+            <div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-200 bg-white px-4 py-4 md:px-6">
               <div>
                 <div className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
                   Plan Editor
@@ -333,13 +333,14 @@ export function MembershipPlanManager({ locale, initialPlans }: Props): React.Re
               <button
                 type="button"
                 onClick={closeEditor}
-                className="rounded-full border border-slate-200 px-3 py-1 text-sm font-semibold text-slate-600 transition hover:bg-slate-50"
+                className="rounded-full border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-50"
               >
                 Close
               </button>
             </div>
 
-            <form onSubmit={onSave} className="grid gap-6 p-6 xl:grid-cols-[minmax(0,1.15fr)_360px]">
+            <form onSubmit={onSave} className="flex min-h-0 flex-1 flex-col overflow-hidden">
+              <div className="grid min-h-0 flex-1 gap-6 overflow-y-auto p-4 md:p-6 xl:grid-cols-[minmax(0,1.15fr)_360px]">
               <div className="space-y-6">
                 <section className="grid gap-4 md:grid-cols-2">
                   <label className="grid gap-2 md:col-span-2">
@@ -610,7 +611,7 @@ export function MembershipPlanManager({ locale, initialPlans }: Props): React.Re
                   </div>
                 </section>
 
-                <div className="flex justify-end gap-3">
+                <div className="hidden justify-end gap-3 xl:flex">
                   <button
                     type="button"
                     onClick={closeEditor}
@@ -643,6 +644,23 @@ export function MembershipPlanManager({ locale, initialPlans }: Props): React.Re
                   variant="preview"
                   highlighted={(editingPlan?.isActive ?? true) !== false}
                 />
+              </div>
+              </div>
+              <div className="sticky bottom-0 flex justify-end gap-3 border-t border-slate-200 bg-white px-4 py-4 md:px-6">
+                <button
+                  type="button"
+                  onClick={closeEditor}
+                  className="rounded-2xl border border-slate-200 px-5 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={saving}
+                  className="rounded-2xl bg-slate-950 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+                >
+                  {saving ? "Saving..." : isCreateMode ? "Create plan" : "Save changes"}
+                </button>
               </div>
             </form>
           </div>

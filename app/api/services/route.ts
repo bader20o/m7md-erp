@@ -8,6 +8,9 @@ import { prisma } from "@/lib/prisma";
 const createServiceSchema = z.object({
   nameEn: z.string().min(2).max(160),
   nameAr: z.string().min(2).max(160),
+  category: z.string().max(120).nullable().optional(),
+  basePrice: z.coerce.number().min(0).max(100000).nullable().optional(),
+  supportedCarTypes: z.string().max(200).nullable().optional(),
   imageUrl: z.string().max(1000).optional(),
   descriptionEn: z.string().max(1000).optional(),
   descriptionAr: z.string().max(1000).optional(),

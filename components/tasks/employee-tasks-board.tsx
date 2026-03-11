@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 
 type TaskStatus = "TODO" | "IN_PROGRESS" | "DONE" | "BLOCKED";
+type EmployeeSubmitStatus = "DONE" | "BLOCKED";
 type TaskPriority = "LOW" | "MEDIUM" | "HIGH";
 
 type TaskItem = {
@@ -32,6 +33,10 @@ const tabs: Array<{ key: "ALL" | TaskStatus; label: string }> = [
   { key: "BLOCKED", label: "Blocked" }
 ];
 
+function toEmployeeSubmitStatus(status: TaskStatus): EmployeeSubmitStatus {
+  return status === "BLOCKED" ? "BLOCKED" : "DONE";
+}
+
 const statusClasses: Record<TaskStatus, string> = {
   TODO: "bg-amber-500/15 text-amber-300 ring-1 ring-amber-400/30",
   IN_PROGRESS: "bg-sky-500/15 text-sky-300 ring-1 ring-sky-400/30",
@@ -55,7 +60,7 @@ export function EmployeeTasksBoard({ locale }: { locale: string }): React.ReactE
   const [loading, setLoading] = useState(true);
   const [savingId, setSavingId] = useState<string | null>(null);
   const [toast, setToast] = useState<ToastState>(null);
-  const [drafts, setDrafts] = useState<Record<string, { status: TaskStatus; employeeNote: string }>>({});
+  const [drafts, setDrafts] = useState<Record<string, { status: EmployeeSubmitStatus; employeeNote: string }>>({});
 
   useEffect(() => {
     let active = true;
@@ -84,7 +89,7 @@ export function EmployeeTasksBoard({ locale }: { locale: string }): React.ReactE
             nextTasks.map((task) => [
               task.id,
               {
-                status: task.status,
+                status: toEmployeeSubmitStatus(task.status),
                 employeeNote: task.employeeNote ?? ""
               }
             ])
@@ -126,6 +131,10 @@ export function EmployeeTasksBoard({ locale }: { locale: string }): React.ReactE
     if (!draft) {
       return;
     }
+    if (!draft.employeeNote.trim()) {
+      setToast({ tone: "error", message: "A note is required when submitting a task update." });
+      return;
+    }
 
     const optimisticTasks = tasks.map((task) =>
       task.id === taskId
@@ -161,7 +170,7 @@ export function EmployeeTasksBoard({ locale }: { locale: string }): React.ReactE
       setDrafts((current) => ({
         ...current,
         [taskId]: {
-          status: json.data!.item!.status,
+          status: toEmployeeSubmitStatus(json.data!.item!.status),
           employeeNote: json.data!.item!.employeeNote ?? ""
         }
       }));
@@ -218,8 +227,10 @@ export function EmployeeTasksBoard({ locale }: { locale: string }): React.ReactE
       ) : (
         <div className="grid gap-4">
           {filteredTasks.map((task) => {
-            const draft = drafts[task.id] ?? { status: task.status, employeeNote: task.employeeNote ?? "" };
+            const draft = drafts[task.id] ?? { status: toEmployeeSubmitStatus(task.status), employeeNote: task.employeeNote ?? "" };
             const isSaving = savingId === task.id;
+            const isTerminal = task.status === "DONE" || task.status === "BLOCKED";
+            const hasValidNote = draft.employeeNote.trim().length > 0;
 
             return (
               <article
@@ -249,13 +260,12 @@ export function EmployeeTasksBoard({ locale }: { locale: string }): React.ReactE
                     onChange={(event) =>
                       setDrafts((current) => ({
                         ...current,
-                        [task.id]: { ...draft, status: event.target.value as TaskStatus }
+                        [task.id]: { ...draft, status: event.target.value as EmployeeSubmitStatus }
                       }))
                     }
+                    disabled={isTerminal}
                     className="rounded-2xl border border-white/10 bg-slate-900 px-4 py-3 text-sm text-white"
                   >
-                    <option value="TODO">Todo</option>
-                    <option value="IN_PROGRESS">In Progress</option>
                     <option value="DONE">Done</option>
                     <option value="BLOCKED">Blocked</option>
                   </select>
@@ -269,15 +279,16 @@ export function EmployeeTasksBoard({ locale }: { locale: string }): React.ReactE
                     }
                     placeholder="Update / Note"
                     rows={4}
+                    disabled={isTerminal}
                     className="min-h-28 rounded-2xl border border-white/10 bg-slate-900 px-4 py-3 text-sm text-white placeholder:text-slate-500"
                   />
                   <button
                     type="button"
-                    disabled={isSaving}
+                    disabled={isSaving || isTerminal || !hasValidNote}
                     onClick={() => void saveTask(task.id)}
                     className="rounded-2xl bg-sky-500 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-sky-400 disabled:cursor-not-allowed disabled:opacity-60"
                   >
-                    {isSaving ? "Saving..." : "Save"}
+                    {isTerminal ? "Locked" : isSaving ? "Saving..." : "Save"}
                   </button>
                 </div>
               </article>

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { ResponsiveDataTable } from "@/components/ui/responsive-data-table";
 
 type UserRole = "CUSTOMER" | "EMPLOYEE" | "ADMIN";
 
@@ -47,6 +48,33 @@ export function UserRoleManager({ users, locale, canEditRoles }: Props): React.R
     return acc;
   }, {} as Record<UserRole, number>);
 
+  function renderRoleSelect(user: UserRow, compact = false): React.ReactNode {
+    const selectedRole = draftRoles[user.id] ?? user.role;
+
+    if (!canEditRoles) {
+      return user.role;
+    }
+
+    return (
+      <select
+        value={selectedRole}
+        onChange={(event) =>
+          setDraftRoles((prev) => ({
+            ...prev,
+            [user.id]: event.target.value as UserRole
+          }))
+        }
+        className={`min-w-0 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm ${compact ? "w-full" : ""}`.trim()}
+      >
+        {ROLES.map((role) => (
+          <option key={role} value={role}>
+            {role}
+          </option>
+        ))}
+      </select>
+    );
+  }
+
   async function onSave(userId: string): Promise<void> {
     const nextRole = draftRoles[userId];
     const user = rows.find((row) => row.id === userId);
@@ -88,11 +116,32 @@ export function UserRoleManager({ users, locale, canEditRoles }: Props): React.R
     router.refresh();
   }
 
+  function renderSaveAction(user: UserRow, fullWidth = false): React.ReactNode {
+    const selectedRole = draftRoles[user.id] ?? user.role;
+    const changed = selectedRole !== user.role;
+    const isSaving = savingId === user.id;
+
+    if (!canEditRoles) {
+      return <span className="text-xs text-slate-500">Read only</span>;
+    }
+
+    return (
+      <button
+        type="button"
+        onClick={() => void onSave(user.id)}
+        disabled={!changed || isSaving}
+        className={`rounded-xl bg-brand-700 px-4 py-3 text-sm font-semibold text-white hover:bg-brand-800 disabled:cursor-not-allowed disabled:opacity-50 ${fullWidth ? "w-full" : ""}`.trim()}
+      >
+        {isSaving ? "Saving..." : "Save Role"}
+      </button>
+    );
+  }
+
   return (
     <section className="space-y-4">
-      <h1 className="text-2xl font-semibold">{locale === "ar" ? "المستخدمون" : "Users"}</h1>
+      <h1 className="text-2xl font-semibold">{locale === "ar" ? "Ø§Ù„Ù…Ø³ØªØ®Ø¯Ù…ÙˆÙ†" : "Users"}</h1>
 
-      <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-6">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
         {ROLES.map((role) => (
           <article key={role} className="rounded-xl border border-slate-200 bg-white p-3">
             <h2 className="text-xs font-semibold text-slate-500">{role}</h2>
@@ -104,74 +153,79 @@ export function UserRoleManager({ users, locale, canEditRoles }: Props): React.R
       {error ? <p className="text-sm text-red-700">{error}</p> : null}
       {success ? <p className="text-sm text-green-700">{success}</p> : null}
 
-      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
-        <table className="w-full text-sm">
-          <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-600">
-            <tr>
-              <th className="px-3 py-2">Name</th>
-              <th className="px-3 py-2">Phone</th>
-              <th className="px-3 py-2">Role</th>
-              <th className="px-3 py-2">Locale</th>
-              <th className="px-3 py-2">Active</th>
-              <th className="px-3 py-2">Created</th>
-              <th className="px-3 py-2">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((user) => {
-              const selectedRole = draftRoles[user.id] ?? user.role;
-              const changed = selectedRole !== user.role;
-              const isSaving = savingId === user.id;
-
-              return (
-                <tr key={user.id} className="border-t border-slate-100">
-                  <td className="px-3 py-2">{user.fullName || "-"}</td>
-                  <td className="px-3 py-2">{user.phone}</td>
-                  <td className="px-3 py-2">
-                    {canEditRoles ? (
-                      <select
-                        value={selectedRole}
-                        onChange={(event) =>
-                          setDraftRoles((prev) => ({
-                            ...prev,
-                            [user.id]: event.target.value as UserRole
-                          }))
-                        }
-                        className="rounded-md border border-slate-300 px-2 py-1 text-xs"
-                      >
-                        {ROLES.map((role) => (
-                          <option key={role} value={role}>
-                            {role}
-                          </option>
-                        ))}
-                      </select>
-                    ) : (
-                      user.role
-                    )}
-                  </td>
-                  <td className="px-3 py-2">{user.locale}</td>
-                  <td className="px-3 py-2">{user.isActive ? "Yes" : "No"}</td>
-                  <td className="px-3 py-2">{new Date(user.createdAt).toLocaleString()}</td>
-                  <td className="px-3 py-2">
-                    {canEditRoles ? (
-                      <button
-                        type="button"
-                        onClick={() => void onSave(user.id)}
-                        disabled={!changed || isSaving}
-                        className="rounded-md bg-brand-700 px-3 py-1 text-xs font-semibold text-white hover:bg-brand-800 disabled:cursor-not-allowed disabled:opacity-50"
-                      >
-                        {isSaving ? "Saving..." : "Save"}
-                      </button>
-                    ) : (
-                      <span className="text-xs text-slate-500">Read only</span>
-                    )}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
+      <ResponsiveDataTable
+        items={rows}
+        getKey={(user) => user.id}
+        emptyState="No users found."
+        tableClassName="border border-slate-200 bg-white"
+        columns={[
+          {
+            key: "name",
+            header: "Name",
+            cell: (user) => user.fullName || "-"
+          },
+          {
+            key: "phone",
+            header: "Phone",
+            cell: (user) => user.phone
+          },
+          {
+            key: "role",
+            header: "Role",
+            cell: (user) => renderRoleSelect(user)
+          },
+          {
+            key: "locale",
+            header: "Locale",
+            cell: (user) => user.locale
+          },
+          {
+            key: "active",
+            header: "Active",
+            cell: (user) => (user.isActive ? "Yes" : "No")
+          },
+          {
+            key: "created",
+            header: "Created",
+            cell: (user) => new Date(user.createdAt).toLocaleString()
+          },
+          {
+            key: "actions",
+            header: "Actions",
+            cell: (user) => renderSaveAction(user)
+          }
+        ]}
+        cardTitle={(user) => user.fullName || user.phone}
+        cardBadge={(user) => (
+          <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
+            {draftRoles[user.id] ?? user.role}
+          </span>
+        )}
+        cardSubtitle={(user) => user.phone}
+        cardFields={[
+          {
+            key: "locale",
+            label: "Locale",
+            value: (user) => user.locale
+          },
+          {
+            key: "active",
+            label: "Active",
+            value: (user) => (user.isActive ? "Yes" : "No")
+          },
+          {
+            key: "created",
+            label: "Created",
+            value: (user) => new Date(user.createdAt).toLocaleString()
+          },
+          {
+            key: "role-edit",
+            label: "Role",
+            value: (user) => renderRoleSelect(user, true)
+          }
+        ]}
+        cardActions={(user) => renderSaveAction(user, true)}
+      />
     </section>
   );
 }

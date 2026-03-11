@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { sanitizeServiceText } from "@/lib/sanitize-service-text";
 
 type PartItem = {
   id: string;
@@ -22,10 +23,14 @@ type PartItem = {
 type MovementItem = {
   id: string;
   partId: string;
-  type: "IN" | "OUT" | "ADJUST";
+  type: "IN" | "OUT" | "ADJUST" | "SALE";
+  pricingMode: "UNIT" | "TOTAL" | null;
   quantity: number;
+  unitCost: number | null;
+  totalCost: number | null;
   occurredAt: string;
   note: string | null;
+  supplierNameSnapshot: string | null;
   bookingId: string | null;
   supplierId: string | null;
   invoiceId: string | null;
@@ -79,6 +84,20 @@ function toLocalDateTimeInput(value: Date): string {
   return new Date(value.getTime() - value.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
 }
 
+function round(value: number, decimals: number): number {
+  const factor = 10 ** decimals;
+  return Math.round((value + Number.EPSILON) * factor) / factor;
+}
+
+function formatMoney(value: number | null | undefined, decimals = 2): string {
+  if (value == null || Number.isNaN(value)) return "-";
+  return `${Number(value).toFixed(decimals)} JOD`;
+}
+
+function sanitizeUiText(value: string | null | undefined): string {
+  return sanitizeServiceText(value) || "";
+}
+
 function parseAdjustDirection(note: string | null): "IN" | "OUT" | null {
   if (!note) {
     return null;
@@ -120,6 +139,11 @@ export function InventoryManager({
   const [movementType, setMovementType] = useState<"IN" | "OUT" | "ADJUST">("IN");
   const [adjustDirection, setAdjustDirection] = useState<"IN" | "OUT">("IN");
   const [movementQuantity, setMovementQuantity] = useState("1");
+  const [movementPricingMode, setMovementPricingMode] = useState<"UNIT" | "TOTAL">("UNIT");
+  const [movementUnitCost, setMovementUnitCost] = useState(
+    parts[0]?.costPrice != null ? Number(parts[0].costPrice).toFixed(3) : ""
+  );
+  const [movementTotalCost, setMovementTotalCost] = useState("");
   const [movementOccurredAt, setMovementOccurredAt] = useState(toLocalDateTimeInput(new Date()));
   const [movementNote, setMovementNote] = useState("");
   const [movementSupplierId, setMovementSupplierId] = useState("");
@@ -166,6 +190,47 @@ export function InventoryManager({
       return true;
     });
   }, [movementFilterFrom, movementFilterPartId, movementFilterTo, movements]);
+
+  const latestKnownUnitCost = useMemo(() => {
+    const latestPricedMovement = movements.find(
+      (movement) => movement.partId === movementPartId && movement.unitCost != null && movement.unitCost > 0
+    );
+    if (latestPricedMovement?.unitCost != null) {
+      return Number(latestPricedMovement.unitCost);
+    }
+
+    const selectedPart = parts.find((part) => part.id === movementPartId);
+    return selectedPart?.costPrice ?? null;
+  }, [movementPartId, movements, parts]);
+
+  const computedMovementValues = useMemo(() => {
+    const quantity = Number(movementQuantity);
+    if (!Number.isFinite(quantity) || quantity <= 0) {
+      return { unitCost: null as number | null, totalCost: null as number | null };
+    }
+
+    if (movementPricingMode === "UNIT") {
+      const unitCost = Number(movementUnitCost);
+      if (!Number.isFinite(unitCost) || unitCost <= 0) {
+        return { unitCost: null, totalCost: null };
+      }
+      const roundedUnitCost = round(unitCost, 3);
+      return {
+        unitCost: roundedUnitCost,
+        totalCost: round(roundedUnitCost * quantity, 2)
+      };
+    }
+
+    const totalCost = Number(movementTotalCost);
+    if (!Number.isFinite(totalCost) || totalCost <= 0) {
+      return { unitCost: null, totalCost: null };
+    }
+    const roundedTotalCost = round(totalCost, 2);
+    return {
+      unitCost: round(roundedTotalCost / quantity, 3),
+      totalCost: roundedTotalCost
+    };
+  }, [movementPricingMode, movementQuantity, movementTotalCost, movementUnitCost]);
 
   async function submitPart(event: React.FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
@@ -229,9 +294,15 @@ export function InventoryManager({
     const payload: Record<string, unknown> = {
       partId: movementPartId,
       type: movementType,
+      pricingMode: movementPricingMode,
       quantity: Number(movementQuantity),
       occurredAt: new Date(movementOccurredAt).toISOString()
     };
+    if (movementPricingMode === "UNIT") {
+      payload.unitCost = Number(movementUnitCost);
+    } else {
+      payload.totalCost = Number(movementTotalCost);
+    }
 
     if (movementType === "ADJUST") {
       payload.adjustDirection = adjustDirection;
@@ -255,6 +326,9 @@ export function InventoryManager({
     }
 
     setMovementQuantity("1");
+    setMovementPricingMode("UNIT");
+    setMovementUnitCost(latestKnownUnitCost != null ? latestKnownUnitCost.toFixed(3) : "");
+    setMovementTotalCost("");
     setMovementOccurredAt(toLocalDateTimeInput(new Date()));
     setMovementNote("");
     setMovementSupplierId("");
@@ -280,6 +354,9 @@ export function InventoryManager({
   }
 
   function movementQtyLabel(movement: MovementItem): string {
+    if (movement.type === "SALE") {
+      return `-${movement.quantity}`;
+    }
     if (movement.type === "IN") {
       return `+${movement.quantity}`;
     }
@@ -385,7 +462,21 @@ export function InventoryManager({
       <section className="rounded-xl border border-slate-200 bg-white p-4">
         <h2 className="text-lg font-semibold">{isArabic ? "حركة المخزون" : "Stock Movement"}</h2>
         <form onSubmit={submitMovement} className="mt-3 grid gap-3 md:grid-cols-2">
-          <select value={movementPartId} onChange={(event) => setMovementPartId(event.target.value)} className="rounded-md border border-slate-300 px-3 py-2" required>
+          <select
+            value={movementPartId}
+            onChange={(event) => {
+              const nextPartId = event.target.value;
+              setMovementPartId(nextPartId);
+              const part = parts.find((item) => item.id === nextPartId);
+              const nextUnitCost =
+                movements.find(
+                  (movement) => movement.partId === nextPartId && movement.unitCost != null && movement.unitCost > 0
+                )?.unitCost ?? part?.costPrice ?? null;
+              setMovementUnitCost(nextUnitCost != null ? Number(nextUnitCost).toFixed(3) : "");
+            }}
+            className="rounded-md border border-slate-300 px-3 py-2"
+            required
+          >
             <option value="">{isArabic ? "اختر قطعة" : "Select Part"}</option>
             {parts.map((part) => (
               <option key={part.id} value={part.id}>
@@ -393,7 +484,18 @@ export function InventoryManager({
               </option>
             ))}
           </select>
-          <select value={movementType} onChange={(event) => setMovementType(event.target.value as "IN" | "OUT" | "ADJUST")} className="rounded-md border border-slate-300 px-3 py-2" required>
+          <select
+            value={movementType}
+            onChange={(event) => {
+              const nextType = event.target.value as "IN" | "OUT" | "ADJUST";
+              setMovementType(nextType);
+              if (nextType === "OUT" || nextType === "ADJUST") {
+                setMovementUnitCost(latestKnownUnitCost != null ? latestKnownUnitCost.toFixed(3) : "");
+              }
+            }}
+            className="rounded-md border border-slate-300 px-3 py-2"
+            required
+          >
             <option value="IN">IN</option>
             <option value="OUT">OUT</option>
             <option value="ADJUST">ADJUST</option>
@@ -405,6 +507,41 @@ export function InventoryManager({
             </select>
           ) : null}
           <input value={movementQuantity} onChange={(event) => setMovementQuantity(event.target.value)} className="rounded-md border border-slate-300 px-3 py-2" type="number" min="1" required placeholder={isArabic ? "الكمية" : "Quantity"} />
+          <div className="rounded-xl border border-slate-200 bg-slate-50 p-1 md:col-span-2">
+            <div className="grid grid-cols-2 gap-1">
+              {(["UNIT", "TOTAL"] as const).map((mode) => (
+                <button
+                  key={mode}
+                  type="button"
+                  onClick={() => setMovementPricingMode(mode)}
+                  className={`rounded-lg px-3 py-2 text-sm font-semibold transition ${movementPricingMode === mode ? "bg-slate-900 text-white" : "text-slate-600"}`}
+                >
+                  {mode === "UNIT" ? (isArabic ? "Ø³Ø¹Ø± Ø§Ù„Ø­Ø¨Ø©" : "Unit Cost") : isArabic ? "Ø§Ù„Ø³Ø¹Ø± Ø§Ù„ÙƒØ§Ù…Ù„" : "Total Cost"}
+                </button>
+              ))}
+            </div>
+          </div>
+          {movementPricingMode === "UNIT" ? (
+            <label className="grid gap-2">
+              <span className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                {isArabic ? "Ø³Ø¹Ø± Ø§Ù„Ø­Ø¨Ø©" : "Unit Cost"}
+              </span>
+              <input value={movementUnitCost} onChange={(event) => setMovementUnitCost(event.target.value)} className="rounded-md border border-slate-300 px-3 py-2" type="number" min="0.001" step="0.001" required placeholder="0.000" />
+              <span className="text-xs text-slate-500">
+                {isArabic ? "Ø§Ù„Ø¥Ø¬Ù…Ø§Ù„ÙŠ Ø§Ù„Ù…Ø­ØªØ³Ø¨" : "Computed Total"}: {formatMoney(computedMovementValues.totalCost, 2)}
+              </span>
+            </label>
+          ) : (
+            <label className="grid gap-2">
+              <span className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                {isArabic ? "Ø§Ù„Ø³Ø¹Ø± Ø§Ù„ÙƒØ§Ù…Ù„" : "Total Cost"}
+              </span>
+              <input value={movementTotalCost} onChange={(event) => setMovementTotalCost(event.target.value)} className="rounded-md border border-slate-300 px-3 py-2" type="number" min="0.01" step="0.01" required placeholder="0.00" />
+              <span className="text-xs text-slate-500">
+                {isArabic ? "Ø³Ø¹Ø± Ø§Ù„Ø­Ø¨Ø© Ø§Ù„Ù…Ø­ØªØ³Ø¨" : "Computed Unit"}: {formatMoney(computedMovementValues.unitCost, 3)}
+              </span>
+            </label>
+          )}
           <input value={movementOccurredAt} onChange={(event) => setMovementOccurredAt(event.target.value)} className="rounded-md border border-slate-300 px-3 py-2" type="datetime-local" required />
           <select value={movementSupplierId} onChange={(event) => setMovementSupplierId(event.target.value)} className="rounded-md border border-slate-300 px-3 py-2">
             <option value="">{isArabic ? "بدون مورد" : "No supplier"}</option>
@@ -435,8 +572,8 @@ export function InventoryManager({
 
       <section className="rounded-xl border border-slate-200 bg-white p-4">
         <h2 className="text-lg font-semibold">{isArabic ? "القطع" : "Parts"}</h2>
-        <input value={search} onChange={(event) => setSearch(event.target.value)} className="mt-3 w-full rounded-md border border-slate-300 px-3 py-2" placeholder={isArabic ? "بحث بالاسم أو SKU" : "Search by name or SKU"} />
-        <div className="mt-3 overflow-x-auto">
+        <input value={search} onChange={(event) => setSearch(event.target.value)} className="mt-3 w-full rounded-xl border border-slate-300 px-3 py-3" placeholder={isArabic ? "بحث بالاسم أو SKU" : "Search by name or SKU"} />
+        <div className="mt-3 hidden overflow-hidden rounded-xl border border-slate-200 md:block">
           <table className="w-full text-sm">
             <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-600">
               <tr>
@@ -482,12 +619,52 @@ export function InventoryManager({
             </tbody>
           </table>
         </div>
+        <div className="mt-3 space-y-3 md:hidden">
+          {filteredParts.map((part) => (
+            <article key={part.id} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_18px_40px_-30px_rgba(15,23,42,0.2)]">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold text-slate-900">{part.name}</p>
+                  <p className="mt-1 text-sm text-slate-500">{[part.vehicleModel, part.category].filter(Boolean).join(" • ") || (part.sku || "-")}</p>
+                </div>
+                <span className={`rounded-full px-3 py-1 text-xs font-semibold ${part.lowStock ? "bg-amber-100 text-amber-800" : "bg-slate-100 text-slate-700"}`}>
+                  {part.lowStock ? "Low stock" : part.vehicleType || "-"}
+                </span>
+              </div>
+              <dl className="mt-4 space-y-2 text-sm">
+                <div className="flex items-start justify-between gap-3">
+                  <dt className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">SKU</dt>
+                  <dd className="text-right text-slate-700">{part.sku || "-"}</dd>
+                </div>
+                <div className="flex items-start justify-between gap-3">
+                  <dt className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Stock</dt>
+                  <dd className="text-right text-slate-700">{part.stockQty} {part.unit}</dd>
+                </div>
+                <div className="flex items-start justify-between gap-3">
+                  <dt className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Threshold</dt>
+                  <dd className="text-right text-slate-700">{part.lowStockThreshold}</dd>
+                </div>
+                <div className="flex items-start justify-between gap-3">
+                  <dt className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Status</dt>
+                  <dd className="text-right text-slate-700">{part.isActive ? "Active" : "Inactive"}</dd>
+                </div>
+              </dl>
+              <button
+                type="button"
+                onClick={() => startEdit(part)}
+                className="mt-4 w-full rounded-xl border border-slate-300 px-4 py-3 text-sm font-semibold text-slate-700"
+              >
+                {isArabic ? "تعديل" : "Edit"}
+              </button>
+            </article>
+          ))}
+        </div>
       </section>
 
       <section className="rounded-xl border border-slate-200 bg-white p-4">
         <h2 className="text-lg font-semibold">{isArabic ? "سجل الحركات" : "Movements History"}</h2>
         <div className="mt-3 grid gap-2 md:grid-cols-3">
-          <select value={movementFilterPartId} onChange={(event) => setMovementFilterPartId(event.target.value)} className="rounded-md border border-slate-300 px-3 py-2">
+          <select value={movementFilterPartId} onChange={(event) => setMovementFilterPartId(event.target.value)} className="rounded-xl border border-slate-300 px-3 py-3">
             <option value="">{isArabic ? "كل القطع" : "All parts"}</option>
             {parts.map((part) => (
               <option key={part.id} value={part.id}>
@@ -495,10 +672,10 @@ export function InventoryManager({
               </option>
             ))}
           </select>
-          <input value={movementFilterFrom} onChange={(event) => setMovementFilterFrom(event.target.value)} type="datetime-local" className="rounded-md border border-slate-300 px-3 py-2" />
-          <input value={movementFilterTo} onChange={(event) => setMovementFilterTo(event.target.value)} type="datetime-local" className="rounded-md border border-slate-300 px-3 py-2" />
+          <input value={movementFilterFrom} onChange={(event) => setMovementFilterFrom(event.target.value)} type="datetime-local" className="rounded-xl border border-slate-300 px-3 py-3" />
+          <input value={movementFilterTo} onChange={(event) => setMovementFilterTo(event.target.value)} type="datetime-local" className="rounded-xl border border-slate-300 px-3 py-3" />
         </div>
-        <div className="mt-3 overflow-x-auto">
+        <div className="mt-3 hidden overflow-hidden rounded-xl border border-slate-200 md:block">
           <table className="w-full text-sm">
             <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-600">
               <tr>
@@ -530,6 +707,43 @@ export function InventoryManager({
               ))}
             </tbody>
           </table>
+        </div>
+        <div className="mt-3 space-y-3 md:hidden">
+          {filteredMovements.map((movement) => {
+            const refs = [
+              movement.booking ? `B:${movement.booking.id}` : "",
+              movement.supplier ? `S:${movement.supplier.name}` : "",
+              movement.invoice ? `I:${movement.invoice.number}` : ""
+            ].filter(Boolean);
+
+            return (
+              <article key={movement.id} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_18px_40px_-30px_rgba(15,23,42,0.2)]">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-semibold text-slate-900">{movement.part.name}</p>
+                    <p className="mt-1 text-sm text-slate-500">{movement.type} • {new Date(movement.occurredAt).toLocaleString(locale)}</p>
+                  </div>
+                  <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
+                    {movementQtyLabel(movement)}
+                  </span>
+                </div>
+                <dl className="mt-4 space-y-2 text-sm">
+                  <div className="flex items-start justify-between gap-3">
+                    <dt className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">By</dt>
+                    <dd className="text-right text-slate-700">{movement.createdBy.fullName || movement.createdBy.phone}</dd>
+                  </div>
+                  <div className="flex items-start justify-between gap-3">
+                    <dt className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Refs</dt>
+                    <dd className="text-right text-slate-700">{refs.length ? refs.join(" ") : "-"}</dd>
+                  </div>
+                  <div className="flex items-start justify-between gap-3">
+                    <dt className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Note</dt>
+                    <dd className="text-right text-slate-700">{movement.note || "-"}</dd>
+                  </div>
+                </dl>
+              </article>
+            );
+          })}
         </div>
       </section>
     </div>

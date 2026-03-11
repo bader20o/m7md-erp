@@ -81,7 +81,7 @@ export function AdminBookings() {
       let b = allBookings.find(x => x.id === id);
       const m = document.getElementById('manage-modal');
       const mo = document.getElementById('manage-overlay');
-      const selectedPrice = Number(b.finalPrice || 0);
+      let customerRewards = [];
 
       mo.classList.remove('hidden');
       m.innerHTML = `<div class="p-12 flex justify-center"><div class="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin"></div></div>`;
@@ -95,6 +95,8 @@ export function AdminBookings() {
         if (detailRes && detailRes.item) {
           b = detailRes.item; // includes auditLogs
         }
+        const rewardsRes = await apiFetch(`/admin/customers/${b.customerId}/rewards`);
+        customerRewards = rewardsRes?.availableRewards || [];
       } catch (e) {
         window.toast('Failed to load booking details', 'error');
         window.closeManage();
@@ -110,6 +112,22 @@ export function AdminBookings() {
         if (b.status === 'APPROVED') {
           const priceType = b.service?.priceType || b.priceTypeSnapshot || 'FIXED';
           const servicePrice = b.finalPrice || b.service?.basePrice || b.serviceBasePriceSnapshot || '';
+          const rewardOptions = ['<option value=\"\">No reward</option>']
+            .concat(
+              customerRewards.map((reward) => {
+                const title = reward.rewardRule?.title || reward.rewardLabel || reward.rewardType;
+                const detail =
+                  reward.rewardType === 'DISCOUNT_PERCENTAGE'
+                    ? `${Number(reward.discountPercentage || 0)}%`
+                    : reward.rewardType === 'FIXED_AMOUNT_DISCOUNT'
+                      ? `${Number(reward.fixedAmount || 0).toFixed(2)} JOD`
+                      : reward.rewardType === 'FREE_SERVICE'
+                        ? (reward.rewardService?.nameEn || 'Free service')
+                        : (reward.customGiftText || 'Custom gift');
+                return `<option value=\"${reward.id}\" data-type=\"${reward.rewardType}\" data-discount=\"${reward.discountPercentage || ''}\" data-fixed=\"${reward.fixedAmount || ''}\">${title} (${detail})</option>`;
+              })
+            )
+            .join('');
           return `
             <div id="complete-form-area" class="space-y-3">
               ${priceType === 'AFTER_INSPECTION' ? `
@@ -121,6 +139,10 @@ export function AdminBookings() {
               ` : `
                 <input id="complete-price" type="number" step="0.01" min="0.01" value="${servicePrice}" class="w-full bg-bg border border-border text-sm rounded-lg px-3 py-2 text-text focus:outline-none focus:border-primary transition-colors" placeholder="Final price (JOD)" />
               `}
+              <select id="complete-reward" class="w-full bg-bg border border-border text-sm rounded-lg px-3 py-2 text-text focus:outline-none focus:border-primary transition-colors">
+                ${rewardOptions}
+              </select>
+              <p class="text-xs text-muted">Optional: apply an available customer reward during completion.</p>
               <textarea id="complete-note" placeholder="Admin note (optional)" class="w-full bg-bg border border-border text-sm rounded-lg px-3 py-2 text-text focus:outline-none focus:border-primary transition-colors" rows="2"></textarea>
               <button onclick="window.completeBooking('${b.id}')" class="w-full py-2.5 bg-green-500 hover:bg-green-600 text-white rounded-lg font-bold transition-colors shadow-sm">Mark Completed</button>
             </div>
@@ -184,9 +206,11 @@ export function AdminBookings() {
     // Complete a booking via dedicated /complete endpoint
     window.completeBooking = async (id) => {
       const priceEl = document.getElementById('complete-price');
+      const rewardEl = document.getElementById('complete-reward');
       const noteEl = document.getElementById('complete-note');
       const price = Number(priceEl?.value);
       const note = noteEl?.value?.trim() || undefined;
+      const rewardId = rewardEl?.value || undefined;
 
       if (!price || price <= 0) {
         window.toast('Please enter a valid final price.', 'error');
@@ -199,7 +223,12 @@ export function AdminBookings() {
 
         await apiFetch(`/admin/bookings/${id}/complete`, {
           method: 'POST',
-          body: { finalPrice: price, internalNote: note }
+          body: {
+            finalPrice: price,
+            originalPrice: rewardId ? price : undefined,
+            rewardId,
+            internalNote: note
+          }
         });
 
         window.toast('Booking completed successfully.', 'success');

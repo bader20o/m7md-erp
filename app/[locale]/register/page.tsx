@@ -9,7 +9,7 @@ export default async function RegisterPage({ params }: Props): Promise<React.Rea
   const dict = getDictionary(locale);
 
   return (
-    <div className="mx-auto max-w-md space-y-4">
+    <div className="mx-auto w-full max-w-md space-y-4 px-1 sm:px-0">
       <h1 className="text-2xl font-semibold">{dict.authRegisterTitle}</h1>
       <RegisterForm locale={locale} />
       <p className="text-sm text-slate-600">
@@ -21,4 +21,3 @@ export default async function RegisterPage({ params }: Props): Promise<React.Rea
     </div>
   );
 }
-

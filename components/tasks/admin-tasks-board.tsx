@@ -256,6 +256,17 @@ export function AdminTasksBoard({ locale }: { locale: string }): React.ReactElem
 
     setSaving(true);
     try {
+      let adminPassword: string | undefined;
+      const isTerminal = selectedTask.status === "DONE" || selectedTask.status === "BLOCKED";
+      if (isTerminal) {
+        const input = window.prompt("This task is locked. Enter admin password to apply changes:");
+        if (!input) {
+          setSaving(false);
+          return;
+        }
+        adminPassword = input;
+      }
+
       const response = await fetch(`/api/tasks/${selectedTask.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -266,7 +277,8 @@ export function AdminTasksBoard({ locale }: { locale: string }): React.ReactElem
           status: detailForm.status,
           dueAt: detailForm.dueAt ? new Date(detailForm.dueAt).toISOString() : null,
           assignedToId: detailForm.assignedToId,
-          adminNote: detailForm.adminNote || null
+          adminNote: detailForm.adminNote || null,
+          adminPassword
         })
       });
 

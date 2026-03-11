@@ -21,6 +21,10 @@ function dateKey(date: Date): string {
   return date.toISOString().slice(0, 10);
 }
 
+function expenseMagnitude(item: { amount: unknown }): number {
+  return Math.abs(Number(item.amount));
+}
+
 export async function GET(request: Request): Promise<Response> {
   try {
     requireRoles(await getSession(), [Role.ADMIN]);
@@ -111,7 +115,7 @@ export async function GET(request: Request): Promise<Response> {
       0
     );
     const totalExpenses = items.reduce(
-      (sum, item) => (item.type === TransactionType.EXPENSE ? sum + Number(item.amount) : sum),
+      (sum, item) => (item.type === TransactionType.EXPENSE ? sum + expenseMagnitude(item) : sum),
       0
     );
     const netProfit = totalIncome - totalExpenses;
@@ -132,7 +136,7 @@ export async function GET(request: Request): Promise<Response> {
       if (item.type === TransactionType.INCOME) {
         existing.income += Number(item.amount);
       } else {
-        existing.expenses += Number(item.amount);
+        existing.expenses += expenseMagnitude(item);
       }
       existing.net = existing.income - existing.expenses;
       summaryByDay.set(key, existing);

@@ -1,4 +1,4 @@
-import { CustomerAccountEntryType, Role, UserStatus } from "@prisma/client";
+import { CustomerAccountEntryType, CustomerRewardStatus, Role, UserStatus } from "@prisma/client";
 import { z } from "zod";
 import { ApiError, fail, ok, parseJsonBody } from "@/lib/api";
 import { logAudit } from "@/lib/audit";
@@ -133,12 +133,90 @@ export async function GET(_: Request, context: Params): Promise<Response> {
 
     const balanceDue = computeBalanceDue(customer.customerLedgerEntries);
 
+    const [totalValidVisits, completedServicesCount, progressRows, availableRewards, rewardHistory] = await Promise.all([
+      prisma.customerVisit.count({ where: { customerId: customer.id } }),
+      prisma.booking.count({ where: { customerId: customer.id, status: "COMPLETED" } }),
+      prisma.customerRewardProgress.findMany({
+        where: { customerId: customer.id },
+        include: {
+          rewardRule: {
+            select: {
+              id: true,
+              title: true,
+              triggerType: true,
+              triggerValue: true,
+              rewardType: true
+            }
+          }
+        },
+        orderBy: { updatedAt: "desc" }
+      }),
+      prisma.customerReward.findMany({
+        where: { customerId: customer.id, status: CustomerRewardStatus.AVAILABLE },
+        include: {
+          rewardRule: { select: { id: true, title: true, rewardType: true } },
+          rewardService: { select: { id: true, nameEn: true, nameAr: true } }
+        },
+        orderBy: { issuedAt: "desc" },
+        take: 30
+      }),
+      prisma.customerReward.findMany({
+        where: {
+          customerId: customer.id,
+          status: { in: [CustomerRewardStatus.REDEEMED, CustomerRewardStatus.EXPIRED, CustomerRewardStatus.CANCELLED] }
+        },
+        include: {
+          rewardRule: { select: { id: true, title: true, rewardType: true } },
+          rewardService: { select: { id: true, nameEn: true, nameAr: true } }
+        },
+        orderBy: { updatedAt: "desc" },
+        take: 40
+      })
+    ]);
+
     return ok({
       item: {
         ...customer,
         joinedAt: customer.createdAt,
         status: customer.status.toLowerCase(),
-        balanceDue
+        balanceDue,
+        loyalty: {
+          totalValidVisits,
+          completedServicesCount,
+          progress: progressRows.map((row) => ({
+            id: row.id,
+            progressValue: row.progressValue,
+            completedCycles: row.completedCycles,
+            updatedAt: row.updatedAt,
+            rewardRule: row.rewardRule
+          })),
+          availableRewards: availableRewards.map((row) => ({
+            id: row.id,
+            rewardType: row.rewardType,
+            rewardLabel: row.rewardLabel,
+            discountPercentage: row.discountPercentage == null ? null : Number(row.discountPercentage),
+            fixedAmount: row.fixedAmount == null ? null : Number(row.fixedAmount),
+            customGiftText: row.customGiftText,
+            issuedAt: row.issuedAt,
+            status: row.status,
+            rewardRule: row.rewardRule,
+            rewardService: row.rewardService
+          })),
+          rewardHistory: rewardHistory.map((row) => ({
+            id: row.id,
+            rewardType: row.rewardType,
+            rewardLabel: row.rewardLabel,
+            discountPercentage: row.discountPercentage == null ? null : Number(row.discountPercentage),
+            fixedAmount: row.fixedAmount == null ? null : Number(row.fixedAmount),
+            customGiftText: row.customGiftText,
+            issuedAt: row.issuedAt,
+            redeemedAt: row.redeemedAt,
+            status: row.status,
+            redeemedBookingId: row.redeemedBookingId,
+            rewardRule: row.rewardRule,
+            rewardService: row.rewardService
+          }))
+        }
       }
     });
   } catch (error) {
@@ -274,4 +352,3 @@ export async function PATCH(request: Request, context: Params): Promise<Response
     return fail(error);
   }
 }
-
