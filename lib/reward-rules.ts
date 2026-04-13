@@ -10,6 +10,7 @@ export type RewardRuleWriteInput = {
   rewardType: "FREE_SERVICE" | "DISCOUNT_PERCENTAGE" | "FIXED_AMOUNT_DISCOUNT" | "CUSTOM_GIFT";
   rewardServiceId?: string | null;
   rewardLabel?: string | null;
+  rewardIconUrl?: string | null;
   discountPercentage?: number | null;
   fixedAmount?: number | null;
   customGiftText?: string | null;
@@ -31,6 +32,7 @@ export function normalizeRewardRuleData(input: RewardRuleWriteInput): Prisma.Rew
     rewardType: input.rewardType,
     rewardServiceId: input.rewardServiceId?.trim() || null,
     rewardLabel: normalizeOptionalText(input.rewardLabel),
+    rewardIconUrl: normalizeOptionalText(input.rewardIconUrl),
     discountPercentage: input.discountPercentage ?? null,
     fixedAmount: input.fixedAmount ?? null,
     customGiftText: normalizeOptionalText(input.customGiftText),
@@ -54,6 +56,7 @@ export function assertValidRewardRule(data: {
   rewardType: RewardType | string;
   rewardServiceId?: string | null;
   rewardLabel?: string | null;
+  rewardIconUrl?: string | null;
   discountPercentage?: number | null;
   fixedAmount?: number | null;
   customGiftText?: string | null;
@@ -71,6 +74,10 @@ export function assertValidRewardRule(data: {
 
   if (data.periodDays != null && (!Number.isInteger(data.periodDays) || data.periodDays <= 0)) {
     throw new ApiError(400, "INVALID_PERIOD_DAYS", "periodDays must be a positive integer when provided.");
+  }
+
+  if (data.rewardIconUrl && data.rewardIconUrl.length > 1200) {
+    throw new ApiError(400, "INVALID_REWARD_ICON_URL", "rewardIconUrl is too long.");
   }
 
   if (data.rewardType === RewardType.FREE_SERVICE) {

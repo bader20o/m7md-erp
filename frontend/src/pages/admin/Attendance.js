@@ -45,16 +45,20 @@ function resultBadge(value) {
 }
 
 function typeBadge(value) {
-  return value === "CHECK_OUT"
-    ? badge("OUT", "border-amber-500/30 bg-amber-500/10 text-amber-400")
-    : badge("IN", "border-sky-500/30 bg-sky-500/10 text-sky-300");
+  if (value === "CHECK_OUT") {
+    return `<span class="inline-flex items-center gap-1.5 rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1 text-[11px] font-semibold tracking-wide text-amber-400"><span aria-hidden="true">↗</span><span>OUT</span></span>`;
+  }
+  return `<span class="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 text-[11px] font-semibold tracking-wide text-emerald-400"><span aria-hidden="true">↘</span><span>IN</span></span>`;
 }
 
-function summaryCard(label, value, tone = "text-text") {
+function summaryCard(label, value, icon, tone = "text-text") {
   return `
-    <div class="rounded-[24px] border border-border bg-surface px-5 py-5">
-      <div class="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted">${label}</div>
-      <div class="mt-3 text-3xl font-bold ${tone}">${esc(String(value ?? 0))}</div>
+    <div class="rounded-xl border border-white/10 bg-surface px-5 py-5 h-full">
+      <div class="flex items-center justify-between gap-2">
+        <div class="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted">${label}</div>
+        <div class="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-white/10 bg-bg/40 text-sm">${icon}</div>
+      </div>
+      <div class="mt-3 text-4xl font-bold leading-none tabular-nums ${tone}">${esc(String(value ?? 0))}</div>
     </div>
   `;
 }
@@ -206,24 +210,30 @@ export function AdminAttendance() {
       ]
         .map(
           (item) => `
-            <div class="rounded-[28px] border ${item.tone} px-6 py-6">
+            <div class="rounded-xl border ${item.tone} px-6 py-6">
               <div class="flex items-start justify-between gap-4">
                 <div>
                   <div class="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted">${item.title}</div>
                   <p class="mt-2 text-sm text-muted">${securityNote}</p>
                   <p class="mt-2 text-xs font-semibold uppercase tracking-[0.16em] text-primary">Rotates every ${esc(String(qrData.refreshEverySeconds || 5))} seconds</p>
                 </div>
-                <div class="rounded-xl border border-border bg-bg px-4 py-2 text-right">
-                  <div class="text-[10px] uppercase tracking-[0.16em] text-muted">Expires In</div>
-                  <div data-qr-countdown="${item.key}" class="mt-1 text-sm font-semibold text-text">${esc(formatSecondsRemaining(qrData[item.key].expiresAt))}</div>
+                <div class="rounded-xl border border-white/10 bg-bg px-4 py-2 text-right">
+                  <div class="text-[10px] uppercase tracking-[0.16em] text-muted">Next Refresh</div>
+                  <div data-qr-countdown="${item.key}" class="mt-1 inline-flex rounded-full border border-white/10 bg-slate-800/50 px-2 py-0.5 text-sm font-semibold text-text">${esc(formatSecondsRemaining(qrData[item.key].expiresAt))}</div>
                 </div>
               </div>
-              <div class="mt-5 flex flex-col items-center gap-4 lg:flex-row lg:items-center">
-                <img src="${qrData[item.key].imageDataUrl}" alt="${item.title}" class="h-64 w-64 shrink-0 rounded-2xl border border-border bg-white p-3 xl:h-72 xl:w-72" />
-                <div class="w-full rounded-2xl border border-border bg-bg px-4 py-4 text-sm text-text">
+              <div class="mt-5 grid grid-cols-1 gap-4 lg:grid-cols-[300px_1fr]">
+                <div class="flex justify-center lg:justify-start">
+                  <img src="${qrData[item.key].imageDataUrl}" alt="${item.title}" class="h-64 w-64 shrink-0 rounded-xl border border-white/10 bg-white p-3 xl:h-72 xl:w-72" />
+                </div>
+                <div class="w-full rounded-xl border border-white/10 bg-bg px-4 py-4 text-sm text-text">
                   <div class="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted">Security</div>
-                  <div class="mt-3 text-sm text-muted">This QR is live, short-lived, and invalid after the countdown ends. Use it only on the in-center attendance screen.</div>
-                  <div class="mt-4 text-[11px] font-semibold uppercase tracking-[0.16em] text-primary">Screenshots and old photos will expire automatically.</div>
+                  <ul class="mt-3 space-y-2 text-sm text-muted">
+                    <li>&bull; Live QR code (short-lived)</li>
+                    <li>&bull; Screenshots expire automatically</li>
+                    <li>&bull; Valid only on center network</li>
+                  </ul>
+                  <div class="mt-4 text-xs text-muted">Next refresh in: <span data-qr-countdown-inline="${item.key}" class="font-semibold text-text">${esc(formatSecondsRemaining(qrData[item.key].expiresAt))}</span></div>
                 </div>
               </div>
             </div>
@@ -239,6 +249,11 @@ export function AdminAttendance() {
         if (!key || !state.qrData[key]) return;
         node.textContent = formatSecondsRemaining(state.qrData[key].expiresAt);
       });
+      qrGrid.querySelectorAll("[data-qr-countdown-inline]").forEach((node) => {
+        const key = node.getAttribute("data-qr-countdown-inline");
+        if (!key || !state.qrData[key]) return;
+        node.textContent = formatSecondsRemaining(state.qrData[key].expiresAt);
+      });
     }
 
     async function loadQrCodes() {
@@ -251,10 +266,17 @@ export function AdminAttendance() {
     }
 
     function renderSummary(summary) {
+      const lateArrivals =
+        summary?.lateArrivalsToday ??
+        summary?.lateArrivalsCount ??
+        summary?.lateCount ??
+        summary?.lateCheckInCount ??
+        0;
       summaryGrid.innerHTML = [
-        summaryCard("Checked In Today", summary?.checkedInCount || 0, "text-emerald-400"),
-        summaryCard("Checked Out Today", summary?.checkedOutCount || 0, "text-amber-400"),
-        summaryCard("Missing Check-Out", summary?.missingCheckOutCount || 0, "text-danger")
+        summaryCard("Checked In Today", summary?.checkedInCount || 0, '<span class="text-emerald-400">↘</span>', "text-emerald-400"),
+        summaryCard("Checked Out Today", summary?.checkedOutCount || 0, '<span class="text-amber-400">↗</span>', "text-amber-400"),
+        summaryCard("Missing Check-Out", summary?.missingCheckOutCount || 0, '<span class="text-danger">!</span>', "text-danger"),
+        summaryCard("Late Arrivals Today", lateArrivals, '<span class="text-amber-400">◷</span>', "text-amber-400")
       ].join("");
     }
 
@@ -263,17 +285,17 @@ export function AdminAttendance() {
         ? events
             .map(
               (event) => `
-                <tr class="border-t border-border">
-                  <td class="px-4 py-3 text-sm text-text">
+                <tr class="border-t border-border hover:bg-slate-800/40 transition-colors">
+                  <td class="px-5 py-3.5 text-sm text-text">
                     <div class="font-semibold">${esc(event.employeeName)}</div>
                     <div class="text-xs text-muted">${esc(event.employeePhone)}</div>
                   </td>
-                  <td class="px-4 py-3 text-sm">${typeBadge(event.type)}</td>
-                  <td class="px-4 py-3 text-sm text-text">${esc(formatDateTime(event.timestamp))}</td>
-                  <td class="px-4 py-3 text-sm">${resultBadge(event.result)}</td>
-                  <td class="px-4 py-3 text-sm text-muted">${esc(event.source || "QR")}</td>
-                  <td class="px-4 py-3 text-sm text-muted">${esc(event.message || "-")}</td>
-                  <td class="px-4 py-3 text-sm">
+                  <td class="px-5 py-3.5 text-sm">${typeBadge(event.type)}</td>
+                  <td class="px-5 py-3.5 text-sm text-text">${esc(formatDateTime(event.timestamp))}</td>
+                  <td class="px-5 py-3.5 text-sm">${resultBadge(event.result)}</td>
+                  <td class="px-5 py-3.5 text-sm text-muted">${esc(event.source || "QR")}</td>
+                  <td class="px-5 py-3.5 text-sm text-muted">${esc(event.message || "-")}</td>
+                  <td class="px-5 py-3.5 text-sm">
                     <button type="button" data-open-employee="${event.employeeId}" class="font-semibold text-primary">View</button>
                   </td>
                 </tr>
@@ -361,16 +383,16 @@ export function AdminAttendance() {
 
   return `
     <div class="flex w-full flex-col gap-6">
-      <div class="rounded-[28px] border border-border bg-surface px-6 py-6">
+      <div class="rounded-xl border border-white/10 bg-surface px-6 py-6">
         <h1 class="text-3xl font-heading font-bold text-text">Attendance</h1>
         <p class="mt-2 text-sm text-muted">Global attendance logs, rotating QR codes, and per-employee day summaries.</p>
       </div>
 
-      <div id="attendance-summary-grid" class="grid grid-cols-1 gap-4 md:grid-cols-3"></div>
+      <div id="attendance-summary-grid" class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4"></div>
 
       <div id="attendance-fixed-qr" class="grid grid-cols-1 gap-6 xl:grid-cols-2"></div>
 
-      <form id="attendance-filter-form" class="grid grid-cols-1 gap-3 rounded-[28px] border border-border bg-surface px-6 py-6 lg:grid-cols-[1fr_180px_180px_180px_auto]">
+      <form id="attendance-filter-form" class="grid grid-cols-1 gap-3 rounded-xl border border-white/10 bg-surface px-6 py-6 lg:grid-cols-[1fr_170px_170px_180px_auto] lg:items-end">
         <input name="employeeQuery" placeholder="Search employee name or phone" class="rounded-xl border border-border bg-bg px-4 py-3 text-sm text-text" />
         <input name="from" type="date" class="rounded-xl border border-border bg-bg px-4 py-3 text-sm text-text" />
         <input name="to" type="date" class="rounded-xl border border-border bg-bg px-4 py-3 text-sm text-text" />
@@ -385,7 +407,7 @@ export function AdminAttendance() {
         </div>
       </form>
 
-      <div class="overflow-hidden rounded-[28px] border border-border bg-surface">
+      <div class="overflow-hidden rounded-xl border border-white/10 bg-surface">
         <div class="border-b border-border px-6 py-5">
           <h2 class="text-xl font-bold text-text">Attendance Logs</h2>
           <p class="mt-1 text-sm text-muted">Append-only accepted and rejected scan attempts.</p>
@@ -394,13 +416,13 @@ export function AdminAttendance() {
           <table class="min-w-[1120px] w-full text-left">
             <thead class="bg-bg">
               <tr>
-                <th class="px-4 py-3 text-xs uppercase tracking-wide text-muted">Employee</th>
-                <th class="px-4 py-3 text-xs uppercase tracking-wide text-muted">Type</th>
-                <th class="px-4 py-3 text-xs uppercase tracking-wide text-muted">Timestamp</th>
-                <th class="px-4 py-3 text-xs uppercase tracking-wide text-muted">Result</th>
-                <th class="px-4 py-3 text-xs uppercase tracking-wide text-muted">Source</th>
-                <th class="px-4 py-3 text-xs uppercase tracking-wide text-muted">Message</th>
-                <th class="px-4 py-3 text-xs uppercase tracking-wide text-muted">Action</th>
+                <th class="px-5 py-3.5 text-xs uppercase tracking-wide text-muted">Employee</th>
+                <th class="px-5 py-3.5 text-xs uppercase tracking-wide text-muted">Type</th>
+                <th class="px-5 py-3.5 text-xs uppercase tracking-wide text-muted">Timestamp</th>
+                <th class="px-5 py-3.5 text-xs uppercase tracking-wide text-muted">Result</th>
+                <th class="px-5 py-3.5 text-xs uppercase tracking-wide text-muted">Source</th>
+                <th class="px-5 py-3.5 text-xs uppercase tracking-wide text-muted">Message</th>
+                <th class="px-5 py-3.5 text-xs uppercase tracking-wide text-muted">Action</th>
               </tr>
             </thead>
             <tbody id="attendance-events-body"></tbody>

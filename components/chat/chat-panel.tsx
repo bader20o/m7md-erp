@@ -65,6 +65,7 @@ type CustomerProfile = {
   } | null;
 };
 type RecordedVoice = { blob: Blob; url: string; durationSec: number; waveform: number[]; mimeType: string };
+type RecorderStatus = "idle" | "requesting" | "recording" | "preview";
 
 function err(payload: unknown, fallback: string): string {
   return (payload as { error?: { message?: string } })?.error?.message ?? fallback;
@@ -176,12 +177,16 @@ export function ChatPanel({ locale, labels }: Props): React.ReactElement {
   const [recordingSeconds, setRecordingSeconds] = useState(0);
   const [waveform, setWaveform] = useState<number[]>([]);
   const [voice, setVoice] = useState<RecordedVoice | null>(null);
+  const [recorderStatus, setRecorderStatus] = useState<RecorderStatus>("idle");
 
   const mediaRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const startRef = useRef<number | null>(null);
   const timerRef = useRef<number | null>(null);
   const rafRef = useRef<number | null>(null);
+  const chunksRef = useRef<BlobPart[]>([]);
+  const waveformRef = useRef<number[]>([]);
+  const discardVoiceRef = useRef(false);
 
   const supportConversations = useMemo(() => threads.filter((t) => t.type === "SUPPORT"), [threads]);
   const centerConversation = useMemo(() => threads.find((t) => t.type === "CENTER") ?? null, [threads]);
@@ -286,68 +291,158 @@ export function ChatPanel({ locale, labels }: Props): React.ReactElement {
     return () => source.close();
   }, [activeConversationId, currentUser, fetchMessages, fetchThreads, fetchCenterParticipants]);
 
-  const stopRecording = useCallback((): void => {
+  useEffect(() => {
+    return () => {
+      discardVoiceRef.current = true;
+      try {
+        if (mediaRef.current?.state === "recording") {
+          mediaRef.current.stop();
+        }
+      } catch {
+      }
+      streamRef.current?.getTracks().forEach((track) => track.stop());
+      if (timerRef.current) window.clearInterval(timerRef.current);
+      if (rafRef.current) window.cancelAnimationFrame(rafRef.current);
+    };
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (voice?.url) URL.revokeObjectURL(voice.url);
+    };
+  }, [voice?.url]);
+
+  const stopTracks = useCallback((): void => {
+    streamRef.current?.getTracks().forEach((track) => track.stop());
+    streamRef.current = null;
+  }, []);
+
+  const clearRecorder = useCallback((): void => {
     if (timerRef.current) window.clearInterval(timerRef.current);
     if (rafRef.current) window.cancelAnimationFrame(rafRef.current);
     timerRef.current = null;
     rafRef.current = null;
-    mediaRef.current?.stop();
-  }, []);
-
-  const clearRecorder = useCallback((): void => {
-    streamRef.current?.getTracks().forEach((track) => track.stop());
-    streamRef.current = null;
     mediaRef.current = null;
     startRef.current = null;
+    chunksRef.current = [];
+    waveformRef.current = [];
     setRecording(false);
     setRecordingSeconds(0);
+    setWaveform([]);
+  }, []);
+
+  const recorderMimeType = useCallback((): string => {
+    if (typeof window === "undefined" || typeof MediaRecorder === "undefined") return "";
+    const preferred = [
+      "audio/webm;codecs=opus",
+      "audio/webm",
+      "audio/ogg;codecs=opus",
+      "audio/mp4",
+      "audio/mpeg"
+    ];
+    const found = preferred.find((mime) => MediaRecorder.isTypeSupported(mime));
+    return found ?? "";
   }, []);
 
   const startRecording = useCallback(async (): Promise<void> => {
-    if (recording || !navigator.mediaDevices?.getUserMedia) return;
+    if (recorderStatus === "recording" || recorderStatus === "requesting") return;
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setError("Microphone recording is not supported in this browser.");
+      return;
+    }
+    if (typeof MediaRecorder === "undefined") {
+      setError("MediaRecorder is not available in this browser.");
+      return;
+    }
+
+    setRecorderStatus("requesting");
+    setError(null);
     try {
       if (voice?.url) URL.revokeObjectURL(voice.url);
       setVoice(null);
       setFile(null);
+      discardVoiceRef.current = false;
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      if (!stream.getAudioTracks().length) {
+        throw new Error("No microphone input device was found.");
+      }
       streamRef.current = stream;
-      const mimeType = MediaRecorder.isTypeSupported("audio/webm") ? "audio/webm" : "audio/mp4";
-      const recorder = new MediaRecorder(stream, { mimeType });
+      const mimeType = recorderMimeType();
+      const recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
       mediaRef.current = recorder;
       startRef.current = Date.now();
       setRecording(true);
+      setRecorderStatus("recording");
       setWaveform([]);
-      const chunks: BlobPart[] = [];
+      setRecordingSeconds(0);
+      chunksRef.current = [];
+      waveformRef.current = [];
       recorder.ondataavailable = (event) => {
-        if (event.data.size) chunks.push(event.data);
+        if (event.data.size) chunksRef.current.push(event.data);
       };
       recorder.onstop = () => {
         const durationSec = startRef.current ? Math.max(1, Math.round((Date.now() - startRef.current) / 1000)) : 1;
-        if (chunks.length) {
-          const blob = new Blob(chunks, { type: recorder.mimeType || mimeType });
+        if (!discardVoiceRef.current && chunksRef.current.length) {
+          const finalMime = recorder.mimeType || mimeType || "audio/webm";
+          const blob = new Blob(chunksRef.current, { type: finalMime });
           const url = URL.createObjectURL(blob);
-          setVoice({ blob, url, durationSec, waveform: waveform.length ? waveform : [30, 45, 55, 35, 60], mimeType: recorder.mimeType || mimeType });
+          const graph = waveformRef.current.length ? waveformRef.current : [30, 45, 55, 35, 60];
+          setVoice({ blob, url, durationSec, waveform: graph, mimeType: finalMime });
+          setRecorderStatus("preview");
+        } else {
+          setRecorderStatus("idle");
         }
+        stopTracks();
         clearRecorder();
       };
-      timerRef.current = window.setInterval(() => setRecordingSeconds((s) => s + 1), 1000);
+      timerRef.current = window.setInterval(() => {
+        if (!startRef.current) return;
+        setRecordingSeconds(Math.max(0, Math.floor((Date.now() - startRef.current) / 1000)));
+      }, 250);
       const tick = (): void => {
-        setWaveform((prev) => [...prev.slice(-31), Math.floor(Math.random() * 65) + 20]);
+        const next = [...waveformRef.current.slice(-31), Math.floor(Math.random() * 65) + 20];
+        waveformRef.current = next;
+        setWaveform(next);
         rafRef.current = window.requestAnimationFrame(tick);
       };
       tick();
-      recorder.start();
-    } catch {
-      setError("Voice recording is not available on this device.");
+      recorder.start(250);
+    } catch (e) {
+      const name = e instanceof DOMException ? e.name : "";
+      if (name === "NotAllowedError" || name === "PermissionDeniedError") {
+        setError("Microphone access is required to record a voice message.");
+      } else if (name === "NotFoundError" || name === "DevicesNotFoundError") {
+        setError("No microphone device was found.");
+      } else if (name === "NotReadableError" || name === "TrackStartError") {
+        setError("Microphone is unavailable right now. Please try again.");
+      } else {
+        setError(e instanceof Error ? e.message : "Voice recording is not available on this device.");
+      }
+      stopTracks();
       clearRecorder();
+      setRecorderStatus("idle");
     }
-  }, [clearRecorder, recording, voice?.url, waveform]);
+  }, [clearRecorder, recorderMimeType, recorderStatus, stopTracks, voice?.url]);
+
+  const stopRecording = useCallback((): void => {
+    const recorder = mediaRef.current;
+    if (!recorder || recorder.state !== "recording") return;
+    recorder.stop();
+  }, []);
 
   const cancelVoice = useCallback((): void => {
+    discardVoiceRef.current = true;
+    const recorder = mediaRef.current;
+    if (recorder && recorder.state === "recording") {
+      recorder.stop();
+    } else {
+      stopTracks();
+      clearRecorder();
+      setRecorderStatus("idle");
+    }
     if (voice?.url) URL.revokeObjectURL(voice.url);
     setVoice(null);
-    clearRecorder();
-  }, [clearRecorder, voice]);
+  }, [clearRecorder, stopTracks, voice]);
 
   const uploadFile = useCallback(async (upload: File): Promise<string> => {
     const form = new FormData();
@@ -384,6 +479,7 @@ export function ChatPanel({ locale, labels }: Props): React.ReactElement {
       if (voice?.url) URL.revokeObjectURL(voice.url);
       setVoice(null);
       setWaveform([]);
+      setRecorderStatus("idle");
       await fetchThreads(false);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to send.");
@@ -391,13 +487,6 @@ export function ChatPanel({ locale, labels }: Props): React.ReactElement {
       setSending(false);
     }
   }, [activeConversationId, draft, fetchThreads, file, uploadFile, voice]);
-
-  const deleteMessage = useCallback(async (id: string): Promise<void> => {
-    const response = await fetch(`/api/chat/messages/${id}`, { method: "DELETE" });
-    if (!response.ok) return;
-    await fetchThreads(true);
-    if (activeConversationId) await fetchMessages(activeConversationId);
-  }, [activeConversationId, fetchMessages, fetchThreads]);
 
   const canSend = Boolean(draft.trim() || file || voice);
   const isAdmin = currentUser?.role === "ADMIN";
@@ -591,7 +680,6 @@ export function ChatPanel({ locale, labels }: Props): React.ReactElement {
                           {!message.deletedAt && message.type === "VOICE" && message.fileUrl ? <VoicePlayer url={message.fileUrl} /> : null}
                           <div className="mt-2 flex items-center justify-between gap-2">
                             <p className="text-[10px] opacity-80">{new Date(message.createdAt).toLocaleString(locale)}</p>
-                            {!message.deletedAt && (own || isAdmin) ? <button type="button" onClick={() => { void deleteMessage(message.id); }} className="text-[10px] underline opacity-80">Delete</button> : null}
                           </div>
                         </article>
                       </div>
@@ -611,18 +699,21 @@ export function ChatPanel({ locale, labels }: Props): React.ReactElement {
                 {file ? <div className="mb-3 flex items-center justify-between rounded-2xl border border-sky-100 bg-sky-50/70 p-3 text-sm text-slate-700"><span className="truncate">{file.name}</span><button type="button" onClick={() => setFile(null)} className="rounded-full border border-slate-200 px-3 py-1 text-xs">Remove</button></div> : null}
                 {voice ? (
                   <div className="mb-3 grid gap-3 rounded-2xl border border-sky-100 bg-sky-50/70 p-3">
-                    <div className="flex items-center justify-between gap-3"><p className="text-sm font-semibold text-slate-900">Voice preview</p><button type="button" onClick={cancelVoice} className="rounded-full border border-slate-200 px-3 py-1 text-xs">Cancel</button></div>
+                    <div className="flex items-center justify-between gap-3"><p className="text-sm font-semibold text-slate-900">Voice preview ({fmtDuration(voice.durationSec)})</p><button type="button" onClick={cancelVoice} className="rounded-full border border-slate-200 px-3 py-1 text-xs">Delete recording</button></div>
                     <div className="flex h-12 items-end gap-1 rounded-xl bg-white px-3 py-2">{voice.waveform.map((point, index) => <span key={`${point}-${index}`} className="w-1 rounded-full bg-sky-500" style={{ height: `${Math.max(10, point)}%` }} />)}</div>
                     <VoicePlayer url={voice.url} />
+                    <div className="flex justify-end">
+                      <button type="button" disabled={sending} onClick={() => { if (!sending) void sendMessage(); }} className="inline-flex h-10 items-center justify-center rounded-xl bg-sky-700 px-4 text-xs font-semibold text-white transition duration-200 hover:bg-sky-800 disabled:opacity-70">Send audio</button>
+                    </div>
                   </div>
                 ) : null}
-                {recording ? <div className="mb-3 rounded-2xl border border-red-200 bg-red-50 p-3"><div className="flex items-center justify-between gap-3"><div className="flex items-center gap-3"><span className="h-3 w-3 animate-pulse rounded-full bg-red-500" /><p className="text-sm font-semibold text-red-700">Recording {fmtDuration(recordingSeconds)}</p></div><button type="button" onClick={cancelVoice} className="rounded-full border border-red-200 bg-white px-3 py-1 text-xs text-red-700">Cancel</button></div><div className="mt-3 flex h-12 items-end gap-1 rounded-xl bg-white px-3 py-2">{(waveform.length ? waveform : [24, 35, 18, 42, 28]).map((point, index) => <span key={`${point}-${index}`} className="w-1 rounded-full bg-red-400" style={{ height: `${Math.max(10, point)}%` }} />)}</div></div> : null}
+                {recording ? <div className="mb-3 rounded-2xl border border-red-200 bg-red-50 p-3"><div className="flex items-center justify-between gap-3"><div className="flex items-center gap-3"><span className="h-3 w-3 animate-pulse rounded-full bg-red-500" /><p className="text-sm font-semibold text-red-700">Recording... {fmtDuration(recordingSeconds)}</p></div><div className="flex items-center gap-2"><button type="button" onClick={stopRecording} className="rounded-full border border-red-200 bg-white px-3 py-1 text-xs text-red-700">Stop</button><button type="button" onClick={cancelVoice} className="rounded-full border border-red-200 bg-white px-3 py-1 text-xs text-red-700">Cancel</button></div></div><div className="mt-3 flex h-12 items-end gap-1 rounded-xl bg-white px-3 py-2">{(waveform.length ? waveform : [24, 35, 18, 42, 28]).map((point, index) => <span key={`${point}-${index}`} className="w-1 rounded-full bg-red-400" style={{ height: `${Math.max(10, point)}%` }} />)}</div></div> : null}
                 <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto]">
-                  <input value={draft} onChange={(e) => setDraft(e.target.value)} placeholder={labels.messagePlaceholder} maxLength={2000} className="h-12 w-full rounded-2xl border border-slate-200 px-4 text-sm text-slate-900 outline-none transition duration-200 focus:border-sky-300" />
+                  <input disabled={recording} value={draft} onChange={(e) => setDraft(e.target.value)} placeholder={labels.messagePlaceholder} maxLength={2000} className="h-12 w-full rounded-2xl border border-slate-200 px-4 text-sm text-slate-900 outline-none transition duration-200 focus:border-sky-300 disabled:cursor-not-allowed disabled:opacity-60" />
                   <div className="flex items-center justify-end gap-2">
-                    <label className="inline-flex h-12 cursor-pointer items-center justify-center rounded-2xl border border-slate-200 bg-slate-50 px-4 text-xs font-semibold text-slate-700 transition duration-200 hover:bg-slate-100">Media<input type="file" accept="image/*,video/*" onChange={(e) => { setVoice(null); setFile(e.target.files?.[0] ?? null); }} className="hidden" /></label>
-                    <button type="button" onMouseDown={() => { void startRecording(); }} onMouseUp={stopRecording} onMouseLeave={() => { if (recording) stopRecording(); }} onTouchStart={() => { void startRecording(); }} onTouchEnd={stopRecording} onClick={() => { if (!recording) void startRecording(); else stopRecording(); }} className={`inline-flex h-12 items-center justify-center rounded-2xl px-4 text-xs font-semibold transition duration-200 ${recording ? "bg-red-100 text-red-700" : "border border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100"}`}>Record</button>
-                    <button type="submit" disabled={!canSend || sending} className="inline-flex h-12 items-center justify-center rounded-2xl bg-sky-700 px-5 text-xs font-semibold text-white transition duration-200 hover:bg-sky-800 disabled:opacity-70">{sending ? labels.sending : labels.send}</button>
+                    <label className="inline-flex h-12 cursor-pointer items-center justify-center rounded-2xl border border-slate-200 bg-slate-50 px-4 text-xs font-semibold text-slate-700 transition duration-200 hover:bg-slate-100">Media<input type="file" accept="image/*,video/*" onChange={(e) => { if (voice?.url) URL.revokeObjectURL(voice.url); setVoice(null); setRecorderStatus("idle"); setFile(e.target.files?.[0] ?? null); }} className="hidden" /></label>
+                    {!recording ? <button type="button" disabled={sending || recorderStatus === "requesting"} onClick={() => { void startRecording(); }} className="inline-flex h-12 items-center justify-center rounded-2xl border border-slate-200 bg-slate-50 px-4 text-xs font-semibold text-slate-700 transition duration-200 hover:bg-slate-100 disabled:opacity-60">{recorderStatus === "requesting" ? "Starting..." : "Voice"}</button> : null}
+                    <button type="submit" disabled={!canSend || sending || recording} className="inline-flex h-12 items-center justify-center rounded-2xl bg-sky-700 px-5 text-xs font-semibold text-white transition duration-200 hover:bg-sky-800 disabled:opacity-70">{sending ? labels.sending : labels.send}</button>
                   </div>
                 </div>
               </form>

@@ -1,8 +1,10 @@
 import { apiFetch } from '../../lib/api.js';
 import { PERMISSIONS } from '../../lib/roles.js';
 import { TableRowSkeleton } from '../../components/ui/Skeleton.js';
+import { ProfitLineChart, SimpleDonutChart } from '../../components/ui/ChartWrapper.js';
 import { store } from '../../lib/store.js';
 import { DateInput } from '../../components/ui/DateInput.js';
+import { applyProfitTrendRangeToSeries, filterTransactionsByState } from './accounting.logic.js';
 
 export function AdminAccounting() {
 
@@ -14,6 +16,7 @@ export function AdminAccounting() {
     const incomeItemSearch = document.getElementById('income-item-search');
     const incomeItemResults = document.getElementById('income-item-results');
     const saleCustomerSelect = document.getElementById('sale-customer-select');
+    const saleCustomerList = document.getElementById('sale-customer-list');
     const saleCustomerTypeSelect = document.getElementById('sale-customer-type');
     const existingCustomerFields = document.getElementById('existing-customer-fields');
     const quickCustomerFields = document.getElementById('quick-customer-fields');
@@ -26,11 +29,38 @@ export function AdminAccounting() {
     const expenseItemSelect = document.getElementById('expense-item-select');
     const walkinOverlay = document.getElementById('walkin-overlay');
     const expenseOverlay = document.getElementById('expense-overlay');
+    const txSearchInput = document.getElementById('tx-search');
+    const txTypeFilter = document.getElementById('tx-filter-type');
+    const txSellingTypeFilter = document.getElementById('tx-filter-selling-type');
+    const txFromDate = document.getElementById('tx-filter-from-date');
+    const txToDate = document.getElementById('tx-filter-to-date');
+    const txSortFilter = document.getElementById('tx-filter-sort');
+    const txClearFilters = document.getElementById('tx-clear-filters');
+    const txSummary = document.getElementById('tx-results-summary');
+    const saleCustomerSearch = document.getElementById('sale-customer-search');
+    const todayRevenueEl = document.getElementById('today-revenue-val');
+    const todayExpensesEl = document.getElementById('today-expenses-val');
+    const todayNetEl = document.getElementById('today-net-val');
+    const todayRevenueMetaEl = document.getElementById('today-revenue-meta');
+    const todayExpensesMetaEl = document.getElementById('today-expenses-meta');
+    const todayNetMetaEl = document.getElementById('today-net-meta');
+    const profitTrendEl = document.getElementById('chart-profit-trend-ledger');
+    const profitTrendRangeFilterEl = document.getElementById('profit-trend-range-filter');
+    const expenseBreakdownEl = document.getElementById('chart-expense-breakdown-ledger');
     let parts = [];
     let customers = [];
     let saleCart = [];
     let incomeItemLookup = new Map();
     let activeIncomeResultIndex = -1;
+    let txFilterState = {
+      q: '',
+      type: 'ALL',
+      sellingType: 'ALL',
+      fromDate: '',
+      toDate: '',
+      sort: 'NEWEST'
+    };
+    let profitTrendRange = 'ALL';
     const canEditSaleUnitPrice = store.isAdmin() || store.hasPermission(PERMISSIONS.ACCOUNTING);
     const escapeAttr = (value) =>
       String(value)
@@ -38,6 +68,398 @@ export function AdminAccounting() {
         .replaceAll('"', '&quot;')
         .replaceAll('<', '&lt;')
         .replaceAll('>', '&gt;');
+    const normalizeText = (value) => String(value || '').toLowerCase();
+    const EXPENSE_CATEGORY_TO_API = {
+      Utilities: 'GENERAL',
+      Equipment: 'SUPPLIER',
+      Tools: 'SUPPLIER',
+      Maintenance: 'GENERAL',
+      Rent: 'GENERAL',
+      Salary: 'SALARY',
+      Supplies: 'SUPPLIER',
+      Other: 'GENERAL'
+    };
+    const SEED_DEBUG_PATTERNS = ['[seed-full-test-data]', 'seed service', 'seed'];
+    const vmDateFormatter = new Intl.DateTimeFormat('en-US', {
+      month: 'short',
+      day: '2-digit',
+      year: 'numeric'
+    });
+    const vmShortDateFormatter = new Intl.DateTimeFormat('en-US', {
+      month: 'short',
+      day: 'numeric'
+    });
+    const vmTimeFormatter = new Intl.DateTimeFormat('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true
+    });
+
+    function sanitizeDebugText(rawValue) {
+      let text = String(rawValue || '');
+      for (const pattern of SEED_DEBUG_PATTERNS) {
+        text = text.replace(new RegExp(pattern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'), ' ');
+      }
+      text = text.replace(/\s+/g, ' ').trim();
+      return text;
+    }
+
+    function getSellingTypeBucket(tx) {
+      const src = normalizeText(tx.incomeSource || tx.expenseCategory || '');
+      if (tx.type === 'EXPENSE') return 'EXPENSE';
+      if (
+        src.includes('inventory_sale') ||
+        src.includes('cart_checkout') ||
+        src.includes('invoice')
+      ) {
+        return 'INVENTORY';
+      }
+      if (src.includes('walk') || src.includes('cash')) return 'WALK_IN';
+      if (src.includes('booking') || src.includes('appointment')) return 'BOOKING';
+      return 'GENERAL';
+    }
+
+    function getTransactionViewModel(tx) {
+      const color = tx.type === 'INCOME' ? 'text-success' : 'text-danger';
+      const date = new Date(tx.occurredAt);
+      let sellingType = tx.incomeSource || tx.expenseCategory || '-';
+      let itemTitle = tx.itemName || '-';
+      let hasDetails = false;
+
+      if (tx.incomeSource === 'INVOICE' || tx.incomeSource === 'INVENTORY_SALE') {
+        itemTitle = 'Inventory Cart Sale';
+        sellingType = 'CART_CHECKOUT';
+        if (tx.invoice && tx.invoice.invoiceLines) hasDetails = true;
+      }
+
+      const cleanedNote = sanitizeDebugText(tx.note || tx.description || '');
+      const note = cleanedNote || '-';
+      const noteShort = note.length > 30 ? `${note.substring(0, 30)}...` : note;
+      const sellingBucket = getSellingTypeBucket(tx);
+      const sellingTypeLabel = sellingBucket === 'WALK_IN'
+        ? 'Walk-in'
+        : sellingBucket === 'BOOKING'
+          ? 'Booking'
+          : sellingBucket === 'INVENTORY'
+            ? 'Inventory'
+            : sellingBucket === 'EXPENSE'
+              ? 'Expense'
+              : 'General';
+      const dateLabel = vmDateFormatter.format(date);
+      const timeLabel = vmTimeFormatter.format(date);
+      const baseQty = Number(tx.quantity || 0);
+      const baseUnitPrice = Number(tx.unitPrice || 0);
+      let displayQuantity = Number.isFinite(baseQty) && baseQty > 0 ? baseQty : 1;
+      let displayUnitPrice = Number.isFinite(baseUnitPrice) && baseUnitPrice >= 0 ? baseUnitPrice : 0;
+
+      const movementQty = Number(tx.movementQuantity || 0);
+      const movementUnitCost = Number(tx.movementUnitCost || 0);
+      if (Number.isFinite(movementQty) && movementQty > 0) displayQuantity = movementQty;
+      if (Number.isFinite(movementUnitCost) && movementUnitCost > 0) displayUnitPrice = movementUnitCost;
+
+      if (tx.invoice?.invoiceLines?.length) {
+        const invoiceQty = tx.invoice.invoiceLines.reduce((sum, line) => sum + Number(line.quantity || 0), 0);
+        const invoiceTotal = tx.invoice.invoiceLines.reduce((sum, line) => {
+          const lineTotal = Number(line.lineTotal ?? Number(line.quantity || 0) * Number(line.unitAmount || 0));
+          return sum + (Number.isFinite(lineTotal) ? lineTotal : 0);
+        }, 0);
+        if (invoiceQty > 0) {
+          displayQuantity = invoiceQty;
+          displayUnitPrice = invoiceTotal > 0 ? invoiceTotal / invoiceQty : displayUnitPrice;
+        }
+      }
+
+      if ((!Number.isFinite(displayUnitPrice) || displayUnitPrice <= 0) && displayQuantity > 0) {
+        const amountAbs = Math.abs(Number(tx.amount || 0));
+        if (amountAbs > 0) displayUnitPrice = amountAbs / displayQuantity;
+      }
+
+      return {
+        tx,
+        color,
+        date,
+        sellingType,
+        itemTitle,
+        hasDetails,
+        note,
+        noteShort,
+        sellingBucket,
+        sellingTypeLabel,
+        dateLabel,
+        timeLabel,
+        displayQuantity,
+        displayUnitPrice
+      };
+    }
+
+    function getDateRangeOnlyTransactions(all) {
+      const fromDate = txFilterState.fromDate ? new Date(`${txFilterState.fromDate}T00:00:00`) : null;
+      const toDate = txFilterState.toDate ? new Date(`${txFilterState.toDate}T23:59:59.999`) : null;
+      return all.filter((t) => {
+        const date = new Date(t.occurredAt);
+        if (fromDate && date < fromDate) return false;
+        if (toDate && date > toDate) return false;
+        return true;
+      });
+    }
+
+    function getExpenseUiCategory(tx) {
+      const category = normalizeText(tx.expenseCategory || '');
+      const sourceText = normalizeText(`${tx.itemName || ''} ${tx.note || ''} ${tx.description || ''}`);
+      if (category === 'salary' || sourceText.includes('salary') || sourceText.includes('payroll')) return 'Salary';
+      if (sourceText.includes('utility') || sourceText.includes('electric') || sourceText.includes('water') || sourceText.includes('internet')) return 'Utilities';
+      if (sourceText.includes('equipment')) return 'Equipment';
+      if (sourceText.includes('tool')) return 'Tools';
+      if (sourceText.includes('maintenance') || sourceText.includes('repair')) return 'Maintenance';
+      if (sourceText.includes('rent')) return 'Rent';
+      if (category === 'supplier' || sourceText.includes('supply') || sourceText.includes('part')) return 'Supplies';
+      return 'Other';
+    }
+
+    function formatPctDelta(todayValue, yesterdayValue) {
+      if (yesterdayValue <= 0) {
+        return todayValue > 0 ? '+100%' : '0%';
+      }
+      const delta = ((todayValue - yesterdayValue) / yesterdayValue) * 100;
+      const sign = delta > 0 ? '+' : '';
+      return `${sign}${delta.toFixed(0)}%`;
+    }
+
+    function renderTopSummary(transactions) {
+      const totalIncome = transactions
+        .filter((item) => item.type === 'INCOME')
+        .reduce((sum, item) => sum + Math.abs(Number(item.amount || 0)), 0);
+      const totalExpenses = transactions
+        .filter((item) => item.type === 'EXPENSE')
+        .reduce((sum, item) => sum + Math.abs(Number(item.amount || 0)), 0);
+      const totalNet = totalIncome - totalExpenses;
+
+      document.getElementById('total-income-val').innerHTML = `${totalIncome.toFixed(2)} JOD`;
+      document.getElementById('total-expense-val').innerHTML = `${totalExpenses.toFixed(2)} JOD`;
+      document.getElementById('net-profit-val').innerHTML = `${totalNet < 0 ? '-' : ''}${Math.abs(totalNet).toFixed(2)} JOD`;
+      document.getElementById('net-profit-val').className = `mt-3 text-3xl font-bold leading-none tabular-nums ${totalNet > 0 ? 'text-success' : totalNet < 0 ? 'text-danger' : 'text-text'}`;
+    }
+
+    function renderLedgerInsights(filteredTransactions, allTransactionsForToday = filteredTransactions) {
+      const dateScoped = getDateRangeOnlyTransactions(filteredTransactions);
+      const now = new Date();
+      const todayKey = now.toISOString().slice(0, 10);
+      const y = new Date(now);
+      y.setDate(y.getDate() - 1);
+      const yesterdayKey = y.toISOString().slice(0, 10);
+
+      let todayIncome = 0;
+      let todayExpenses = 0;
+      let yesterdayIncome = 0;
+      let yesterdayExpenses = 0;
+      let todayExpenseRecords = 0;
+      const dailyMap = new Map();
+      const expenseCategoryTotals = new Map();
+
+      for (const tx of allTransactionsForToday) {
+        const amount = Math.abs(Number(tx.amount || 0));
+        const dayKey = new Date(tx.occurredAt).toISOString().slice(0, 10);
+        if (tx.type === 'INCOME') {
+          if (dayKey === todayKey) todayIncome += amount;
+          if (dayKey === yesterdayKey) yesterdayIncome += amount;
+        } else {
+          if (dayKey === todayKey) {
+            todayExpenses += amount;
+            todayExpenseRecords += 1;
+          }
+          if (dayKey === yesterdayKey) yesterdayExpenses += amount;
+        }
+      }
+
+      for (const tx of dateScoped) {
+        const amount = Math.abs(Number(tx.amount || 0));
+        const dayKey = new Date(tx.occurredAt).toISOString().slice(0, 10);
+        const bucket = dailyMap.get(dayKey) || { income: 0, expenses: 0 };
+        if (tx.type === 'INCOME') {
+          bucket.income += amount;
+        } else {
+          bucket.expenses += amount;
+
+          const uiCategory = getExpenseUiCategory(tx);
+          expenseCategoryTotals.set(uiCategory, (expenseCategoryTotals.get(uiCategory) || 0) + amount);
+        }
+        dailyMap.set(dayKey, bucket);
+      }
+
+      const todayNet = todayIncome - todayExpenses;
+      if (todayRevenueEl) todayRevenueEl.textContent = `${todayIncome.toFixed(2)} JOD`;
+      if (todayExpensesEl) todayExpensesEl.textContent = `${todayExpenses.toFixed(2)} JOD`;
+      if (todayNetEl) {
+        todayNetEl.textContent = `${todayNet < 0 ? '-' : ''}${Math.abs(todayNet).toFixed(2)} JOD`;
+        todayNetEl.className = `mt-3 text-3xl font-bold leading-none tabular-nums ${todayNet > 0 ? 'text-success' : todayNet < 0 ? 'text-danger' : 'text-text'}`;
+      }
+      if (todayRevenueMetaEl) todayRevenueMetaEl.textContent = `Compared to yesterday: ${formatPctDelta(todayIncome, yesterdayIncome)}`;
+      if (todayExpensesMetaEl) todayExpensesMetaEl.textContent = `${todayExpenseRecords} expense records today`;
+      if (todayNetMetaEl) todayNetMetaEl.textContent = todayNet >= 0 ? 'Positive day' : 'Negative day';
+
+      const dailySeriesRaw = Array.from(dailyMap.entries())
+        .sort((a, b) => a[0].localeCompare(b[0]))
+        .map(([date, value]) => ({
+          label: vmDateFormatter.format(new Date(date)),
+          shortLabel: vmShortDateFormatter.format(new Date(date)),
+          income: Number(value.income.toFixed(2)),
+          expenses: Number(value.expenses.toFixed(2)),
+          profit: Number((value.income - value.expenses).toFixed(2))
+        }));
+      const labelStep = dailySeriesRaw.length > 12 ? Math.ceil(dailySeriesRaw.length / 8) : 1;
+      const dailySeries = dailySeriesRaw.map((item, index) => ({
+        ...item,
+        shortLabel:
+          index % labelStep === 0 || index === dailySeriesRaw.length - 1 ? item.shortLabel : ' '
+      }));
+      const trendSeries = applyProfitTrendRangeToSeries(dailySeries, profitTrendRange);
+
+      if (profitTrendEl) {
+        profitTrendEl.innerHTML = trendSeries.length
+          ? ProfitLineChart(trendSeries, {
+              height: '250px',
+              format: (value) => `${Number(value || 0).toFixed(2)} JOD`
+            })
+          : '<div class="h-[250px] flex items-center justify-center text-sm text-muted">No profit data for the selected range.</div>';
+      }
+
+      const categoryPalette = {
+        Utilities: '#ef4444',
+        Equipment: '#f97316',
+        Tools: '#f59e0b',
+        Maintenance: '#06b6d4',
+        Rent: '#8b5cf6',
+        Salary: '#ec4899',
+        Supplies: '#22c55e',
+        Other: '#64748b'
+      };
+      const expenseItems = Array.from(expenseCategoryTotals.entries())
+        .map(([label, value]) => ({
+          label,
+          value: Number(value.toFixed(2)),
+          color: categoryPalette[label] || '#64748b'
+        }))
+        .sort((a, b) => b.value - a.value);
+      const expenseTotal = expenseItems.reduce((sum, item) => sum + item.value, 0);
+
+      if (expenseBreakdownEl) {
+        expenseBreakdownEl.innerHTML = expenseItems.length
+          ? SimpleDonutChart(expenseItems, {
+              size: 180,
+              cutout: '28%',
+              centerLabel: 'Expenses',
+              centerValue: `${expenseTotal.toFixed(2)} JOD`,
+              legendValueFormatter: (item) => {
+                const pct = expenseTotal > 0 ? (Number(item.value || 0) / expenseTotal) * 100 : 0;
+                return `${Number(item.value || 0).toFixed(2)} JOD (${pct.toFixed(0)}%)`;
+              }
+            })
+          : '<div class="h-[250px] flex items-center justify-center text-sm text-muted">No expense category data available.</div>';
+      }
+    }
+
+    function renderTransactions(transactions) {
+      if (!transactions.length) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="10" class="text-center py-10">
+              <p class="text-sm font-semibold text-text">No transactions found</p>
+              <p class="text-xs text-muted mt-1">Try adjusting filters</p>
+              <button type="button" id="tx-empty-clear" class="mt-4 px-4 py-2 rounded-lg border border-border text-sm font-semibold text-text hover:bg-bg transition-colors">Clear Filters</button>
+            </td>
+          </tr>
+        `;
+        const emptyClearBtn = document.getElementById('tx-empty-clear');
+        if (emptyClearBtn) {
+          emptyClearBtn.onclick = () => {
+            resetTransactionFilters();
+            applyTransactionFilters();
+          };
+        }
+        return;
+      }
+
+      tbody.innerHTML = transactions.map((t) => {
+        const vm = getTransactionViewModel(t);
+        const sourceBadgeClass = vm.sellingBucket === 'WALK_IN'
+          ? 'bg-success/15 text-success border border-success/20'
+          : vm.sellingBucket === 'BOOKING'
+            ? 'bg-primary/15 text-primary border border-primary/20'
+            : vm.sellingBucket === 'INVENTORY'
+              ? 'bg-primary/15 text-primary border border-primary/20'
+              : vm.sellingBucket === 'EXPENSE'
+                ? 'bg-danger/15 text-danger border border-danger/20'
+                : 'bg-bg text-muted border border-border';
+        const createdBy = t.createdBy?.fullName || t.createdBy?.phone || '-';
+        return `
+          <tr class="group border-b border-border bg-surface hover:bg-bg transition-colors ${t.type === 'INCOME' ? 'border-l-4 border-l-success/60' : 'border-l-4 border-l-danger/60'}">
+            <td class="px-5 py-4 whitespace-nowrap text-xs font-mono text-muted">${vm.dateLabel}<br>${vm.timeLabel}</td>
+            <td class="px-5 py-4 whitespace-nowrap"><span class="px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider ${t.type === 'INCOME' ? 'bg-success/15 text-success' : 'bg-danger/15 text-danger'}">${t.type}</span></td>
+            <td class="px-5 py-4 whitespace-nowrap text-xs font-semibold tracking-wider"><span class="inline-flex rounded-full px-2 py-1 ${sourceBadgeClass}">${vm.sellingTypeLabel}</span></td>
+            <td class="px-5 py-4 whitespace-nowrap text-sm font-bold text-text truncate max-w-[150px]">${vm.itemTitle}</td>
+            <td class="px-5 py-4 whitespace-nowrap text-xs text-muted truncate max-w-[150px]">${vm.noteShort}</td>
+            <td class="px-5 py-4 whitespace-nowrap text-right text-sm font-bold text-text">${vm.displayQuantity}</td>
+            <td class="px-5 py-4 whitespace-nowrap text-right text-sm font-bold text-text">${Number(vm.displayUnitPrice || 0).toFixed(2)} JOD</td>
+            <td class="px-5 py-4 whitespace-nowrap text-right font-bold font-mono ${vm.color}">${Math.abs(Number(t.amount)).toFixed(2)} JOD</td>
+            <td class="px-5 py-4 whitespace-nowrap text-xs text-muted">${createdBy}</td>
+            <td class="px-5 py-4 whitespace-nowrap text-right">
+              ${vm.hasDetails ? `<button onclick="window.viewTransactionDetails('${t.id}')" class="text-xs font-bold text-primary border border-primary/30 px-3 py-1.5 rounded-md hover:bg-primary hover:text-white transition-colors">View Details</button>` : '<span class="text-xs text-muted">-</span>'}
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function updateTransactionSummary(transactions) {
+      if (!txSummary) return;
+      const incomeCount = transactions.filter((t) => t.type === 'INCOME').length;
+      const expenseCount = transactions.filter((t) => t.type === 'EXPENSE').length;
+      txSummary.textContent = `${transactions.length} transactions | ${incomeCount} income | ${expenseCount} expenses`;
+    }
+
+    function resetTransactionFilters() {
+      txFilterState = {
+        q: '',
+        type: 'ALL',
+        sellingType: 'ALL',
+        fromDate: '',
+        toDate: '',
+        sort: 'NEWEST'
+      };
+      if (txSearchInput) txSearchInput.value = '';
+      if (txTypeFilter) txTypeFilter.value = 'ALL';
+      if (txSellingTypeFilter) txSellingTypeFilter.value = 'ALL';
+      if (txFromDate) txFromDate.value = '';
+      if (txToDate) txToDate.value = '';
+      if (txSortFilter) txSortFilter.value = 'NEWEST';
+    }
+
+    function applyTransactionFilters() {
+      const all = Array.isArray(window.allTransactions) ? window.allTransactions.slice() : [];
+
+      const filtered = filterTransactionsByState(all, txFilterState, {
+        getSellingBucket: (tx) => getTransactionViewModel(tx).sellingBucket,
+        buildSearchBlob: (tx) => {
+          const vm = getTransactionViewModel(tx);
+          return normalizeText([
+            vm.itemTitle,
+            vm.note,
+            tx.type,
+            vm.sellingTypeLabel,
+            vm.sellingType,
+            tx.createdBy?.fullName || '',
+            tx.createdBy?.phone || '',
+            tx.booking?.customerName || '',
+            tx.booking?.customerPhone || ''
+          ].join(' '));
+        }
+      });
+
+      updateTransactionSummary(filtered);
+      renderTransactions(filtered);
+      renderTopSummary(filtered);
+      renderLedgerInsights(filtered, all);
+    }
 
     function closeWalkinOverlay() {
       walkinOverlay.classList.add('hidden');
@@ -182,7 +604,7 @@ export function AdminAccounting() {
             >
               <span class="min-w-0">
                 <span class="block truncate text-sm font-semibold">${escapeAttr(item.name)}</span>
-                <span class="block truncate text-xs text-muted">${escapeAttr(`${item.sku || 'No SKU'}${item.vehicleModel ? ` • ${item.vehicleModel}` : ''}${item.vehicleType ? ` • ${item.vehicleType}` : ''}`)}</span>
+                <span class="block truncate text-xs text-muted">${escapeAttr(`${item.sku || 'No SKU'}${item.vehicleModel ? ` | ${item.vehicleModel}` : ''}${item.vehicleType ? ` | ${item.vehicleType}` : ''}`)}</span>
               </span>
               <span class="shrink-0 text-xs text-muted">${Number(item.stockQty || 0)} in stock</span>
             </button>
@@ -237,15 +659,54 @@ export function AdminAccounting() {
       renderIncomeComboboxResults('');
     }
 
+    function getCustomerLabel(customer) {
+      return customer.fullName ? `${customer.fullName} (${customer.phone})` : customer.phone;
+    }
+
     function renderCustomersSelect() {
       saleCustomerSelect.innerHTML = [
         '<option value=\"\">Select customer...</option>',
-        ...customers.map((item) => `<option value=\"${item.id}\">${item.fullName || item.phone} (${item.phone})</option>`)
+        ...customers.map((item) => `<option value=\"${item.id}\">${getCustomerLabel(item)}</option>`)
       ].join('');
+      if (saleCustomerList) {
+        saleCustomerList.innerHTML = customers
+          .map((item) => `<option value=\"${escapeAttr(getCustomerLabel(item))}\"></option>`)
+          .join('');
+      }
+    }
+
+    function resolveCustomerId(rawValue) {
+      const query = normalizeText(rawValue);
+      if (!query) return '';
+
+      const exact = customers.find((item) => {
+        const nameOnly = normalizeText(item.fullName || '');
+        const phoneOnly = normalizeText(item.phone || '');
+        const fullLabel = normalizeText(getCustomerLabel(item));
+        return nameOnly === query || phoneOnly === query || fullLabel === query;
+      });
+      if (exact) return exact.id;
+
+      const partial = customers.find((item) => {
+        const label = normalizeText(`${item.fullName || ''} ${item.phone || ''} ${getCustomerLabel(item)}`);
+        return label.includes(query);
+      });
+      return partial?.id || '';
+    }
+
+    function syncSaleCustomerSelectFromSearch() {
+      saleCustomerSelect.value = resolveCustomerId(saleCustomerSearch?.value || '');
+    }
+
+    function syncSaleCustomerSearchFromSelect() {
+      if (!saleCustomerSearch) return;
+      const selected = customers.find((item) => item.id === saleCustomerSelect.value);
+      saleCustomerSearch.value = selected ? getCustomerLabel(selected) : '';
     }
 
     function resetSaleCustomerFields() {
       saleCustomerSelect.value = '';
+      if (saleCustomerSearch) saleCustomerSearch.value = '';
       quickCustomerName.value = '';
       quickCustomerPhone.value = '';
       walkinCustomerName.value = '';
@@ -267,7 +728,7 @@ export function AdminAccounting() {
       }
       formNode.itemName.value = item.name;
       formNode.unitPrice.value = item.sellPrice !== null ? Number(item.sellPrice).toFixed(2) : '0.00';
-      formNode.expenseCategory.value = 'SUPPLIER';
+      formNode.expenseCategory.value = 'Supplies';
       formNode.itemName.readOnly = true;
     }
 
@@ -360,6 +821,11 @@ export function AdminAccounting() {
       saleCart.splice(index, 1);
       renderCart();
     };
+    window.clearCart = () => {
+      saleCart = [];
+      renderCart();
+      window.toast('Cart cleared.', 'success');
+    };
 
     function renderCart() {
       const tbody = document.getElementById('cart-tbody');
@@ -395,6 +861,11 @@ export function AdminAccounting() {
       document.getElementById('total-income-val').innerHTML = '<span class="skeleton h-8 w-24 inline-block rounded"></span>';
       document.getElementById('total-expense-val').innerHTML = '<span class="skeleton h-8 w-24 inline-block rounded"></span>';
       document.getElementById('net-profit-val').innerHTML = '<span class="skeleton h-8 w-24 inline-block rounded"></span>';
+      if (todayRevenueEl) todayRevenueEl.innerHTML = '<span class="skeleton h-6 w-24 inline-block rounded"></span>';
+      if (todayExpensesEl) todayExpensesEl.innerHTML = '<span class="skeleton h-6 w-24 inline-block rounded"></span>';
+      if (todayNetEl) todayNetEl.innerHTML = '<span class="skeleton h-6 w-24 inline-block rounded"></span>';
+      if (profitTrendEl) profitTrendEl.innerHTML = '<div class="h-[250px] rounded-lg border border-border/60 bg-bg/40"></div>';
+      if (expenseBreakdownEl) expenseBreakdownEl.innerHTML = '<div class="h-[250px] rounded-lg border border-border/60 bg-bg/40"></div>';
 
       try {
         const [txRes, sumRes] = await Promise.all([
@@ -404,58 +875,18 @@ export function AdminAccounting() {
 
         if (txRes && txRes.items) {
           window.allTransactions = txRes.items;
-          const sorted = txRes.items.sort((a, b) => new Date(b.occurredAt) - new Date(a.occurredAt));
-
-          if (sorted.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="10" class="text-center py-6 text-muted">No transactions found</td></tr>`;
-          } else {
-            tbody.innerHTML = sorted.map(t => {
-              const sign = t.type === 'INCOME' ? '+' : '-';
-              const color = t.type === 'INCOME' ? 'text-success' : 'text-danger';
-              const date = new Date(t.occurredAt);
-
-              let sellingType = t.incomeSource || t.expenseCategory || '-';
-              let itemTitle = t.itemName;
-              let hasDetails = false;
-
-              if (t.incomeSource === 'INVOICE' || t.incomeSource === 'INVENTORY_SALE') {
-                itemTitle = 'Inventory Cart Sale';
-                sellingType = 'CART_CHECKOUT';
-                if (t.invoice && t.invoice.invoiceLines) {
-                  hasDetails = true;
-                }
-              }
-
-              let note = t.note || t.description || '-';
-              if (note.length > 30) note = note.substring(0, 30) + '...';
-
-              return `
-              <tr class="group border-b border-border bg-surface hover:bg-bg transition-colors">
-                <td class="px-5 py-4 whitespace-nowrap text-xs font-mono text-muted">${date.toLocaleDateString()}<br>${date.toLocaleTimeString([], { timeStyle: 'short' })}</td>
-                <td class="px-5 py-4 whitespace-nowrap"><span class="px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider ${t.type === 'INCOME' ? 'bg-success/15 text-success' : 'bg-danger/15 text-danger'}">${t.type}</span></td>
-                <td class="px-5 py-4 whitespace-nowrap text-xs font-semibold text-muted tracking-wider">${sellingType.replace('_', ' ')}</td>
-                <td class="px-5 py-4 whitespace-nowrap text-sm font-bold text-text truncate max-w-[150px]">${itemTitle}</td>
-                <td class="px-5 py-4 whitespace-nowrap text-xs text-muted truncate max-w-[150px]">${note}</td>
-                <td class="px-5 py-4 whitespace-nowrap text-sm text-right font-bold text-text">${t.quantity} <span class="text-xs text-muted font-normal mx-1">x</span> ${t.unitPrice}</td>
-                <td class="px-5 py-4 whitespace-nowrap text-right font-bold font-mono ${color}">${sign}${Number(t.amount).toFixed(2)} JOD</td>
-                <td class="px-5 py-4 whitespace-nowrap text-right font-mono text-sm text-muted">${Number(t.runningBalance || 0).toFixed(2)} JOD</td>
-                <td class="px-5 py-4 whitespace-nowrap text-right">
-                  ${hasDetails ? `<button onclick="window.viewTransactionDetails('${t.id}')" class="text-xs font-bold text-primary border border-primary/30 px-3 py-1.5 rounded-md hover:bg-primary hover:text-white transition-colors">View Details</button>` : '<span class="text-xs text-muted">-</span>'}
-                </td>
-              </tr>
-              `;
-            }).join('');
-          }
+          applyTransactionFilters();
         }
 
-        if (sumRes) {
+        if (sumRes && (!txRes || !txRes.items)) {
           const inc = parseFloat(sumRes.walkInIncome || 0);
-          const exp = parseFloat(sumRes.expenses || 0);
+          const exp = Math.abs(parseFloat(sumRes.expenses || 0));
           const net = inc - exp;
 
-          document.getElementById('total-income-val').innerHTML = `+${inc.toFixed(2)} JOD`;
-          document.getElementById('total-expense-val').innerHTML = `-${exp.toFixed(2)} JOD`;
-          document.getElementById('net-profit-val').innerHTML = `${net.toFixed(2)} JOD`;
+          document.getElementById('total-income-val').innerHTML = `${inc.toFixed(2)} JOD`;
+          document.getElementById('total-expense-val').innerHTML = `${exp.toFixed(2)} JOD`;
+          document.getElementById('net-profit-val').innerHTML = `${net < 0 ? '-' : ''}${Math.abs(net).toFixed(2)} JOD`;
+          document.getElementById('net-profit-val').className = `mt-3 text-3xl font-bold leading-none tabular-nums ${net > 0 ? 'text-success' : net < 0 ? 'text-danger' : 'text-text'}`;
         }
 
       } catch (e) {
@@ -510,9 +941,11 @@ export function AdminAccounting() {
         }))
       };
 
-      const dateStr = document.getElementById('cart-sale-date').value;
-      if (dateStr) {
-        payload.issueDate = new Date(dateStr).toISOString();
+      const saleDateStr = document.getElementById('cart-sale-date').value;
+      const saleTimeStr = document.getElementById('cart-sale-time').value;
+      if (saleDateStr) {
+        const issueDateRaw = saleTimeStr ? `${saleDateStr}T${saleTimeStr}` : `${saleDateStr}T12:00`;
+        payload.issueDate = new Date(issueDateRaw).toISOString();
       }
 
       const idempotencyKey = `sale-${Date.now()}-${Math.random().toString(36).slice(2)}`;
@@ -541,6 +974,7 @@ export function AdminAccounting() {
             customers = [createdCustomer, ...customers.filter((item) => item.id !== createdCustomer.id)];
             renderCustomersSelect();
             saleCustomerSelect.value = createdCustomer.id;
+            syncSaleCustomerSearchFromSelect();
             payload.customerId = createdCustomer.id;
             if (created?.temporaryPassword) {
               window.toast(`Customer created. Temporary password: ${created.temporaryPassword}`, 'success');
@@ -556,6 +990,7 @@ export function AdminAccounting() {
         saleCart = [];
         renderCart();
         document.getElementById('cart-sale-date').value = '';
+        document.getElementById('cart-sale-time').value = '';
         saleCustomerTypeSelect.value = 'existing';
         resetSaleCustomerFields();
         updateSaleCustomerMode();
@@ -575,6 +1010,14 @@ export function AdminAccounting() {
       const selectedPartId = expenseItemSelect.value || undefined;
       const idempotencyKey = `expense-${Date.now()}-${Math.random().toString(36).slice(2)}`;
       const submitBtn = expenseForm.querySelector('button[type="submit"]');
+      const quantityInput = expenseForm.querySelector('[name="quantity"]');
+      const unitPriceInput = expenseForm.querySelector('[name="unitPrice"]');
+      const quantity = Number.parseInt(quantityInput?.value || '1', 10);
+      const unitPrice = Number.parseFloat(unitPriceInput?.value || '0');
+      if (!Number.isInteger(quantity) || quantity < 1 || Number.isNaN(unitPrice) || unitPrice < 0) {
+        window.toast('Invalid quantity or price.', 'error');
+        return;
+      }
       if (submitBtn) submitBtn.disabled = true;
       try {
         await apiFetch('/accounting/expenses', {
@@ -582,10 +1025,10 @@ export function AdminAccounting() {
           headers: { 'Idempotency-Key': idempotencyKey },
           body: {
             itemName: expenseForm.itemName.value,
-            unitPrice: parseFloat(expenseForm.unitPrice.value),
-            quantity: parseInt(expenseForm.quantity.value, 10),
+            unitPrice,
+            quantity,
             note: expenseForm.note.value || undefined,
-            expenseCategory: expenseForm.expenseCategory.value,
+            expenseCategory: EXPENSE_CATEGORY_TO_API[expenseForm.expenseCategory.value] || 'GENERAL',
             partId: selectedPartId,
             supplierName: expenseForm.supplierName.value || undefined,
             occurredAt: expenseForm.occurredAt.value ? new Date(expenseForm.occurredAt.value).toISOString() : new Date().toISOString()
@@ -646,6 +1089,41 @@ export function AdminAccounting() {
       }
     });
     saleCustomerTypeSelect.addEventListener('change', updateSaleCustomerMode);
+    saleCustomerSearch?.addEventListener('input', syncSaleCustomerSelectFromSearch);
+    saleCustomerSearch?.addEventListener('change', syncSaleCustomerSelectFromSearch);
+    saleCustomerSelect?.addEventListener('change', syncSaleCustomerSearchFromSelect);
+
+    const onTxFiltersChanged = () => {
+      txFilterState.q = txSearchInput?.value || '';
+      txFilterState.type = txTypeFilter?.value || 'ALL';
+      txFilterState.sellingType = txSellingTypeFilter?.value || 'ALL';
+      txFilterState.fromDate = txFromDate?.value || '';
+      txFilterState.toDate = txToDate?.value || '';
+      txFilterState.sort = txSortFilter?.value || 'NEWEST';
+      applyTransactionFilters();
+    };
+
+    txSearchInput?.addEventListener('input', onTxFiltersChanged);
+    txTypeFilter?.addEventListener('change', onTxFiltersChanged);
+    txSellingTypeFilter?.addEventListener('change', onTxFiltersChanged);
+    txFromDate?.addEventListener('change', onTxFiltersChanged);
+    txToDate?.addEventListener('change', onTxFiltersChanged);
+    txSortFilter?.addEventListener('change', onTxFiltersChanged);
+    profitTrendRangeFilterEl?.addEventListener('change', () => {
+      profitTrendRange = profitTrendRangeFilterEl.value || 'ALL';
+      applyTransactionFilters();
+    });
+    document.addEventListener('change', (event) => {
+      const target = event.target;
+      if (!(target instanceof HTMLSelectElement)) return;
+      if (target.id !== 'profit-trend-range-filter') return;
+      profitTrendRange = target.value || 'ALL';
+      applyTransactionFilters();
+    });
+    txClearFilters?.addEventListener('click', () => {
+      resetTransactionFilters();
+      applyTransactionFilters();
+    });
 
     await Promise.all([loadParts(), loadCustomers()]);
     selectDefaultIncomeItem();
@@ -669,33 +1147,85 @@ export function AdminAccounting() {
       </div>
 
       <!-- Quick Summary -->
-      <div id="report-summary" class="grid grid-cols-1 md:grid-cols-3 gap-4 relative z-10">
-        <div class="bg-surface border border-border rounded-xl p-6 flex flex-col justify-center shadow-sm">
-           <div class="flex items-center gap-3 mb-2">
-             <div class="w-8 h-8 rounded-full bg-success/10 text-success flex items-center justify-center shrink-0">
-               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path></svg>
-             </div>
-             <p class="text-xs uppercase font-bold text-muted tracking-widest">Total Income</p>
-           </div>
-           <h3 id="total-income-val" class="text-3xl font-bold text-text drop-shadow-sm">0.00</h3>
-        </div>
-        <div class="bg-surface border border-border rounded-xl p-6 flex flex-col justify-center shadow-sm">
-           <div class="flex items-center gap-3 mb-2">
-             <div class="w-8 h-8 rounded-full bg-danger/10 text-danger flex items-center justify-center shrink-0">
-               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 17h8m0 0V9m0 8l-8-8-4 4-6-6"></path></svg>
-             </div>
-             <p class="text-xs uppercase font-bold text-muted tracking-widest">Total Expenses</p>
-           </div>
-           <h3 id="total-expense-val" class="text-3xl font-bold text-text drop-shadow-sm">0.00</h3>
-        </div>
-        <div class="bg-surface border border-border rounded-xl p-6 flex flex-col justify-center shadow-sm">
-           <div class="flex items-center gap-3 mb-2">
-             <div class="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center shrink-0">
-               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-             </div>
-             <p class="text-xs uppercase font-bold text-muted tracking-widest">Net Profit / Loss</p>
-           </div>
-           <h3 id="net-profit-val" class="text-3xl font-bold text-primary drop-shadow-sm">0.00</h3>
+      <div class="flex items-center justify-between">
+        <p class="text-xs uppercase tracking-wider text-muted font-bold">This Month</p>
+      </div>
+      <div id="report-summary" class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3 relative z-10">
+        <article class="h-full min-h-[156px] rounded-xl border border-border bg-surface p-4 flex flex-col">
+          <div class="flex items-center gap-2">
+            <span class="inline-flex h-2 w-2 rounded-full bg-success"></span>
+            <p class="text-xs uppercase font-bold text-muted tracking-widest">Total Income</p>
+          </div>
+          <h3 id="total-income-val" class="mt-3 text-3xl font-bold leading-none tabular-nums text-success">0.00</h3>
+          <p class="mt-auto h-5 truncate text-xs text-muted">Across current transaction set</p>
+        </article>
+        <article class="h-full min-h-[156px] rounded-xl border border-border bg-surface p-4 flex flex-col">
+          <div class="flex items-center gap-2">
+            <span class="inline-flex h-2 w-2 rounded-full bg-danger"></span>
+            <p class="text-xs uppercase font-bold text-muted tracking-widest">Total Expenses</p>
+          </div>
+          <h3 id="total-expense-val" class="mt-3 text-3xl font-bold leading-none tabular-nums text-danger">0.00</h3>
+          <p class="mt-auto h-5 truncate text-xs text-muted">Across current transaction set</p>
+        </article>
+        <article class="h-full min-h-[156px] rounded-xl border border-border bg-surface p-4 flex flex-col">
+          <div class="flex items-center gap-2">
+            <span class="inline-flex h-2 w-2 rounded-full bg-primary"></span>
+            <p class="text-xs uppercase font-bold text-muted tracking-widest">Net Profit / Loss</p>
+          </div>
+          <h3 id="net-profit-val" class="mt-3 text-3xl font-bold leading-none tabular-nums text-text">0.00</h3>
+          <p class="mt-auto h-5 truncate text-xs text-muted">Income minus expenses</p>
+        </article>
+        <article class="h-full min-h-[156px] rounded-xl border border-border bg-surface p-4 flex flex-col">
+          <div class="flex items-center gap-2">
+            <span class="inline-flex h-2 w-2 rounded-full bg-success"></span>
+            <p class="text-xs uppercase font-bold text-muted tracking-widest">Today Revenue</p>
+          </div>
+          <h4 id="today-revenue-val" class="mt-3 text-3xl font-bold leading-none tabular-nums text-success">0.00 JOD</h4>
+          <p id="today-revenue-meta" class="mt-auto h-5 truncate text-xs text-muted">Compared to yesterday: 0%</p>
+        </article>
+        <article class="h-full min-h-[156px] rounded-xl border border-border bg-surface p-4 flex flex-col">
+          <div class="flex items-center gap-2">
+            <span class="inline-flex h-2 w-2 rounded-full bg-danger"></span>
+            <p class="text-xs uppercase font-bold text-muted tracking-widest">Today Expenses</p>
+          </div>
+          <h4 id="today-expenses-val" class="mt-3 text-3xl font-bold leading-none tabular-nums text-danger">0.00 JOD</h4>
+          <p id="today-expenses-meta" class="mt-auto h-5 truncate text-xs text-muted">0 expense records today</p>
+        </article>
+        <article class="h-full min-h-[156px] rounded-xl border border-border bg-surface p-4 flex flex-col">
+          <div class="flex items-center gap-2">
+            <span class="inline-flex h-2 w-2 rounded-full bg-primary"></span>
+            <p class="text-xs uppercase font-bold text-muted tracking-widest">Today Net Profit</p>
+          </div>
+          <h4 id="today-net-val" class="mt-3 text-3xl font-bold leading-none tabular-nums text-text">0.00 JOD</h4>
+          <p id="today-net-meta" class="mt-auto h-5 truncate text-xs text-muted">Positive day</p>
+        </article>
+      </div>
+
+      <!-- Ledger Insights -->
+      <div class="grid grid-cols-1 gap-4">
+        <div class="grid grid-cols-1 xl:grid-cols-3 gap-4">
+          <article class="xl:col-span-2 bg-surface border border-border rounded-xl p-4 min-h-[320px] flex flex-col">
+            <header class="mb-3 flex items-start justify-between gap-3">
+              <div>
+                <h3 class="text-sm font-bold text-text uppercase tracking-wider">Profit Trend</h3>
+                <p class="text-xs text-muted mt-1">Daily net profit over the selected period</p>
+              </div>
+              <select id="profit-trend-range-filter" class="h-9 rounded-lg border border-border bg-bg px-3 text-xs font-semibold text-text outline-none focus:border-primary">
+                <option value="ALL" selected>All</option>
+                <option value="7D">Last 7D</option>
+                <option value="30D">Last 30D</option>
+                <option value="90D">Last 90D</option>
+              </select>
+            </header>
+            <div id="chart-profit-trend-ledger" class="flex-1 min-h-[250px] overflow-hidden"></div>
+          </article>
+          <article class="bg-surface border border-border rounded-xl p-4 min-h-[320px] flex flex-col">
+            <header class="mb-3">
+              <h3 class="text-sm font-bold text-text uppercase tracking-wider">Expense Breakdown</h3>
+              <p class="text-xs text-muted mt-1">Where expenses are going</p>
+            </header>
+            <div id="chart-expense-breakdown-ledger" class="flex-1 min-h-[250px]"></div>
+          </article>
         </div>
       </div>
 
@@ -725,7 +1255,9 @@ export function AdminAccounting() {
                 </div>
                 <div id="existing-customer-fields" class="md:col-span-2">
                   <label class="mb-1 block text-xs font-bold uppercase tracking-wider text-muted">Existing Customer</label>
-                  <select id="sale-customer-select" class="w-full bg-bg border border-border rounded-lg px-3 py-2 text-text outline-none focus:border-success"></select>
+                  <input id="sale-customer-search" list="sale-customer-list" class="w-full bg-bg border border-border rounded-lg px-3 py-2 text-text outline-none focus:border-success" placeholder="Select or type customer name/phone..." autocomplete="off" />
+                  <datalist id="sale-customer-list"></datalist>
+                  <select id="sale-customer-select" class="hidden"></select>
                 </div>
                 <div id="quick-customer-fields" class="hidden md:col-span-2 grid gap-3 md:grid-cols-2">
                   <div>
@@ -755,7 +1287,14 @@ export function AdminAccounting() {
                   <select id="income-item-select" class="hidden"></select>
                 </div>
                 <button type="button" onclick="window.openAddToCartModal()" class="w-full rounded-md bg-success px-4 py-2 text-sm font-semibold text-white hover:bg-success/90 transition-colors md:col-span-2">Add To Cart</button>
-                <input id="cart-sale-date" type="datetime-local" class="w-full bg-bg border border-border rounded-lg px-3 py-2 text-text outline-none focus:border-success md:col-span-2" placeholder="Sale date (optional)" />
+                <div class="md:col-span-1">
+                  <label class="mb-1 block text-xs font-bold uppercase tracking-wider text-muted">Sale Date (Optional)</label>
+                  ${DateInput({ id: 'cart-sale-date', className: 'w-full rounded-lg px-3 py-2 border border-border bg-bg focus:border-success text-text' })}
+                </div>
+                <div class="md:col-span-1">
+                  <label class="mb-1 block text-xs font-bold uppercase tracking-wider text-muted">Sale Time (Optional)</label>
+                  <input id="cart-sale-time" type="time" class="w-full bg-bg border border-border rounded-lg px-3 py-2 text-text outline-none focus:border-success" />
+                </div>
               </div>
               <div class="overflow-x-auto rounded-lg border border-border bg-bg">
                 <table class="w-full text-sm">
@@ -777,7 +1316,10 @@ export function AdminAccounting() {
               </div>
               <div class="mt-4 flex flex-wrap items-center justify-between gap-3 bg-success/10 p-3 rounded-lg border border-success/20">
                 <p class="text-sm font-bold text-success">Cart Total: <span id="cart-total-display">0.00</span> JOD</p>
-                <button id="cart-checkout-btn" type="button" disabled onclick="window.checkoutCart()" class="rounded-md bg-success px-6 py-2 text-sm font-bold text-white hover:bg-success/90 disabled:opacity-60 transition-colors shadow-sm">Confirm Cart Sale</button>
+                <div class="flex items-center gap-2">
+                  <button id="cart-clear-btn" type="button" onclick="window.clearCart()" class="rounded-md border border-border px-4 py-2 text-sm font-bold text-text hover:bg-bg transition-colors">Clear Cart</button>
+                  <button id="cart-checkout-btn" type="button" disabled onclick="window.checkoutCart()" class="rounded-md bg-success px-6 py-2 text-sm font-bold text-white hover:bg-success/90 disabled:opacity-60 transition-colors shadow-sm">Confirm Cart Sale</button>
+                </div>
               </div>
             </div>
           </div>
@@ -844,44 +1386,49 @@ export function AdminAccounting() {
           <div class="p-6 overflow-y-auto">
             <div id="expense-container" class="bg-danger/10 border border-danger/30 rounded-xl p-6">
               <h3 class="font-bold text-danger mb-4 flex items-center gap-2">- Record Business Expense</h3>
-              <form id="expense-form" class="grid grid-cols-1 md:grid-cols-6 gap-4 items-end">
-                <div class="md:col-span-2">
+              <form id="expense-form" class="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
+                <div class="md:col-span-4">
                   <label class="block text-xs font-bold text-danger uppercase tracking-wider mb-1">Catalog Item</label>
                   <select id="expense-item-select" class="w-full bg-surface border border-danger/30 rounded-lg px-3 py-2 text-text outline-none"></select>
                 </div>
-                <div>
+                <div class="md:col-span-3">
                   <label class="block text-xs font-bold text-danger uppercase tracking-wider mb-1">Item Name</label>
                   <input type="text" name="itemName" required class="w-full bg-surface border border-danger/30 rounded-lg px-3 py-2 text-text outline-none focus:ring-1 focus:ring-danger">
                 </div>
-                <div>
+                <div class="md:col-span-2">
                   <label class="block text-xs font-bold text-danger uppercase tracking-wider mb-1">Category</label>
                   <select name="expenseCategory" class="w-full bg-surface border border-danger/30 rounded-lg px-3 py-2 text-text outline-none">
-                    <option value="GENERAL">General Operational</option>
-                    <option value="SUPPLIER">Supplier / Parts</option>
-                    <option value="SALARY">Payroll / Salary</option>
+                    <option value="Utilities">Utilities</option>
+                    <option value="Equipment">Equipment</option>
+                    <option value="Tools">Tools</option>
+                    <option value="Maintenance">Maintenance</option>
+                    <option value="Rent">Rent</option>
+                    <option value="Salary">Salary</option>
+                    <option value="Supplies">Supplies</option>
+                    <option value="Other" selected>Other</option>
                   </select>
                 </div>
-                <div>
+                <div class="md:col-span-3">
                   <label class="block text-xs font-bold text-danger uppercase tracking-wider mb-1">Supplier / Vendor</label>
                   <input type="text" name="supplierName" class="w-full bg-surface border border-danger/30 rounded-lg px-3 py-2 text-text outline-none focus:ring-1 focus:ring-danger">
                 </div>
-                <div>
+                <div class="md:col-span-3">
                   <label class="block text-xs font-bold text-danger uppercase tracking-wider mb-1">Cost</label>
                   <input type="number" step="0.01" name="unitPrice" required class="w-full bg-surface border border-danger/30 rounded-lg px-3 py-2 text-text outline-none focus:ring-1 focus:ring-danger">
                 </div>
-                <div>
+                <div class="md:col-span-2">
                   <label class="block text-xs font-bold text-danger uppercase tracking-wider mb-1">Qty</label>
                   <input type="number" name="quantity" value="1" min="1" required class="w-full bg-surface border border-danger/30 rounded-lg px-3 py-2 text-text outline-none focus:ring-1 focus:ring-danger">
                 </div>
-                <div>
+                <div class="md:col-span-4">
                   <label class="block text-xs font-bold text-danger uppercase tracking-wider mb-1">Date Occurred</label>
                   ${DateInput({ name: 'occurredAt', className: 'bg-surface border-danger/30 focus:border-danger focus:ring-danger' })}
                 </div>
-                <div class="md:col-span-6">
+                <div class="md:col-span-12">
                   <label class="block text-xs font-bold text-danger uppercase tracking-wider mb-1">Note</label>
                   <textarea name="note" rows="2" class="w-full bg-surface border border-danger/30 rounded-lg px-3 py-2 text-text outline-none focus:ring-1 focus:ring-danger resize-none"></textarea>
                 </div>
-                <button type="submit" class="md:col-span-6 justify-self-end bg-danger text-white px-8 py-2.5 rounded-lg font-bold">Charge</button>
+                <button type="submit" class="md:col-span-12 justify-self-end bg-danger text-white px-8 py-2.5 rounded-lg font-bold">Record Expense</button>
               </form>
             </div>
           </div>
@@ -895,6 +1442,40 @@ export function AdminAccounting() {
         <div class="bg-surface border border-border rounded-xl overflow-hidden shadow-sm flex-1 flex flex-col min-h-0 mt-4 md:mt-2">
           <div class="p-4 border-b border-border bg-bg/50">
             <h3 class="text-sm font-bold text-text uppercase tracking-wider px-2">Transaction Ledger</h3>
+            <div class="mt-4 rounded-xl border border-border bg-surface/40 p-3">
+              <div class="flex items-center gap-2 overflow-x-auto pb-1">
+                <input id="tx-search" type="text" class="min-w-[260px] flex-1 bg-bg border border-border rounded-lg px-3 py-2 text-sm text-text outline-none focus:border-primary" placeholder="Search item, customer, note, or transaction source..." />
+                <select id="tx-filter-type" class="min-w-[140px] bg-bg border border-border rounded-lg px-3 py-2 text-sm text-text outline-none focus:border-primary">
+                  <option value="ALL">Type: All</option>
+                  <option value="INCOME">Income</option>
+                  <option value="EXPENSE">Expense</option>
+                </select>
+                <select id="tx-filter-selling-type" class="min-w-[190px] bg-bg border border-border rounded-lg px-3 py-2 text-sm text-text outline-none focus:border-primary">
+                  <option value="ALL">Transaction Source: All</option>
+                  <option value="WALK_IN">Walk-in</option>
+                  <option value="BOOKING">Booking</option>
+                  <option value="INVENTORY">Inventory</option>
+                  <option value="EXPENSE">Expense</option>
+                  <option value="GENERAL">General</option>
+                </select>
+                <div class="min-w-[190px] flex items-center gap-2">
+                  <span class="shrink-0 text-xs font-semibold text-muted">From date</span>
+                  <input id="tx-filter-from-date" type="date" class="w-full rounded-lg px-3 py-2 border border-border bg-bg text-text focus:border-primary outline-none" />
+                </div>
+                <div class="min-w-[190px] flex items-center gap-2">
+                  <span class="shrink-0 text-xs font-semibold text-muted">To date</span>
+                  <input id="tx-filter-to-date" type="date" class="w-full rounded-lg px-3 py-2 border border-border bg-bg text-text focus:border-primary outline-none" />
+                </div>
+                <select id="tx-filter-sort" class="min-w-[200px] bg-bg border border-border rounded-lg px-3 py-2 text-sm text-text outline-none focus:border-primary">
+                  <option value="NEWEST">Sort: Newest first</option>
+                  <option value="OLDEST">Oldest first</option>
+                  <option value="AMOUNT_HIGH">Amount high to low</option>
+                  <option value="AMOUNT_LOW">Amount low to high</option>
+                </select>
+                <button id="tx-clear-filters" type="button" class="shrink-0 border border-border rounded-lg px-3 py-2 text-sm font-semibold text-muted hover:text-text hover:bg-bg transition-colors">Clear Filters</button>
+              </div>
+              <p id="tx-results-summary" class="mt-3 text-xs text-muted">Showing 0 transactions</p>
+            </div>
           </div>
           <div class="overflow-x-auto overflow-y-auto flex-1 h-full block">
             <table class="w-full text-left min-w-[1000px]">
@@ -902,12 +1483,13 @@ export function AdminAccounting() {
                 <tr>
                   <th class="px-5 py-4 text-xs font-bold text-muted uppercase tracking-wider">Date & Time</th>
                   <th class="px-5 py-4 text-xs font-bold text-muted uppercase tracking-wider">Type</th>
-                  <th class="px-5 py-4 text-xs font-bold text-muted uppercase tracking-wider">Selling Type</th>
+                  <th class="px-5 py-4 text-xs font-bold text-muted uppercase tracking-wider">Source</th>
                   <th class="px-5 py-4 text-xs font-bold text-muted uppercase tracking-wider">Item</th>
                   <th class="px-5 py-4 text-xs font-bold text-muted uppercase tracking-wider">Note</th>
-                  <th class="px-5 py-4 text-xs font-bold text-muted uppercase tracking-wider text-right">Qty/Price</th>
-                  <th class="px-5 py-4 text-xs font-bold text-muted uppercase tracking-wider text-right">Amount</th>
-                  <th class="px-5 py-4 text-xs font-bold text-muted uppercase tracking-wider text-right">Balance</th>
+                  <th class="px-5 py-4 text-xs font-bold text-muted uppercase tracking-wider text-right">Qty</th>
+                  <th class="px-5 py-4 text-xs font-bold text-muted uppercase tracking-wider text-right">Unit Price</th>
+                  <th class="px-5 py-4 text-xs font-bold text-muted uppercase tracking-wider text-right">Total</th>
+                  <th class="px-5 py-4 text-xs font-bold text-muted uppercase tracking-wider">Created By</th>
                   <th class="px-5 py-4 text-xs font-bold text-muted uppercase tracking-wider text-right">Action</th>
                 </tr>
               </thead>
@@ -955,3 +1537,8 @@ export function AdminAccounting() {
     </div>
         `;
 }
+
+
+
+
+

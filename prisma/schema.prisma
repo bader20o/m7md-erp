@@ -1241,6 +1241,7 @@ model RewardRule {
   rewardType         RewardType
   rewardServiceId    String?
   rewardLabel        String?
+  rewardIconUrl      String?
   discountPercentage Decimal?                 @db.Decimal(5, 2)
   fixedAmount        Decimal?                 @db.Decimal(12, 2)
   customGiftText     String?
@@ -1281,6 +1282,7 @@ model CustomerReward {
   rewardType         RewardType
   rewardServiceId    String?
   rewardLabel        String?
+  rewardIconUrl      String?
   discountPercentage Decimal?             @db.Decimal(5, 2)
   fixedAmount        Decimal?             @db.Decimal(12, 2)
   customGiftText     String?

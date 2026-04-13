@@ -59,7 +59,7 @@ function messageBody(message) {
   }
 
   if (message.type === "VOICE" && message.fileUrl) {
-    return `<audio controls src="${message.fileUrl}" class="max-w-full"></audio>`;
+    return `<audio controls src="${message.fileUrl}" class="max-w-full rounded-lg border border-border bg-bg/30"></audio>`;
   }
 
   if (message.type === "LINK") {
@@ -78,6 +78,25 @@ function detectMessageType(file) {
   if (file.type.startsWith("video/")) return "VIDEO";
   if (file.type.startsWith("audio/")) return "VOICE";
   return null;
+}
+
+function formatDuration(seconds) {
+  const total = Math.max(0, Number(seconds) || 0);
+  const m = Math.floor(total / 60);
+  const s = total % 60;
+  return `${m}:${String(s).padStart(2, "0")}`;
+}
+
+function detectRecorderMimeType() {
+  if (typeof MediaRecorder === "undefined") return "";
+  const preferred = [
+    "audio/webm;codecs=opus",
+    "audio/webm",
+    "audio/ogg;codecs=opus",
+    "audio/mp4",
+    "audio/mpeg"
+  ];
+  return preferred.find((mime) => MediaRecorder.isTypeSupported(mime)) || "";
 }
 
 async function uploadMedia(file) {
@@ -105,8 +124,17 @@ export function Chat() {
     const chatInput = document.getElementById("chat-input");
     const sendBtn = document.getElementById("send-msg-btn");
     const imageBtn = document.getElementById("send-image-btn");
-    const mediaBtn = document.getElementById("send-media-btn");
+    const voiceBtn = document.getElementById("voice-record-btn");
     const mediaInput = document.getElementById("chat-media-input");
+    const recordingBanner = document.getElementById("chat-recording-banner");
+    const recordingTimer = document.getElementById("chat-recording-timer");
+    const stopRecordingBtn = document.getElementById("chat-recording-stop");
+    const cancelRecordingBtn = document.getElementById("chat-recording-cancel");
+    const voicePreviewCard = document.getElementById("chat-voice-preview");
+    const voicePreviewAudio = document.getElementById("chat-voice-preview-audio");
+    const voicePreviewDuration = document.getElementById("chat-voice-preview-duration");
+    const sendVoiceBtn = document.getElementById("chat-voice-send");
+    const deleteVoiceBtn = document.getElementById("chat-voice-delete");
     const adminPill = document.getElementById("admin-chat-pill");
 
     const state = {
@@ -115,8 +143,19 @@ export function Chat() {
       currentConversationId: null,
       messages: [],
       currentConversation: null,
-      isSending: false
+      isSending: false,
+      recordingState: "idle",
+      recordingSeconds: 0,
+      recordedVoice: null
     };
+
+    let mediaRecorder = null;
+    let mediaStream = null;
+    let recordingTimerInterval = null;
+    let recordingStartedAt = null;
+    let recordedChunks = [];
+    let previewObjectUrl = null;
+    let discardRecording = false;
 
     async function loadThreads() {
       try {
@@ -261,7 +300,6 @@ export function Chat() {
       messagesContainer.innerHTML = state.messages
         .map((message) => {
           const isMine = message.senderId === myId;
-          const canDelete = !message.deletedAt && (isMine || isAdminRole(state.me?.role));
           const time = new Date(message.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 
           return `
@@ -275,7 +313,6 @@ export function Chat() {
                 </div>
                 <div class="flex items-center ${isMine ? "justify-end" : "justify-start"} gap-2">
                   <div class="text-[10px] text-muted">${time}</div>
-                  ${canDelete ? `<button class="text-[10px] text-danger hover:underline" onclick="window.deleteChatMessage('${message.id}')">Delete</button>` : ""}
                 </div>
               </div>
             </div>
@@ -286,10 +323,193 @@ export function Chat() {
       messagesContainer.scrollTop = messagesContainer.scrollHeight;
     }
 
+    function clearRecordingTimer() {
+      if (recordingTimerInterval) {
+        clearInterval(recordingTimerInterval);
+        recordingTimerInterval = null;
+      }
+    }
+
+    function stopMediaTracks() {
+      if (mediaStream) {
+        mediaStream.getTracks().forEach((track) => track.stop());
+      }
+      mediaStream = null;
+    }
+
+    function clearVoicePreviewUrl() {
+      if (previewObjectUrl) {
+        URL.revokeObjectURL(previewObjectUrl);
+      }
+      previewObjectUrl = null;
+    }
+
+    function setRecordingState(nextState) {
+      state.recordingState = nextState;
+      const isRecording = nextState === "recording";
+      const isPreview = nextState === "preview";
+      if (recordingBanner) {
+        recordingBanner.classList.toggle("hidden", !isRecording);
+      }
+      if (voicePreviewCard) {
+        voicePreviewCard.classList.toggle("hidden", !isPreview);
+      }
+      if (chatInput) {
+        chatInput.disabled = isRecording;
+        chatInput.classList.toggle("opacity-60", isRecording);
+      }
+      if (voiceBtn) {
+        voiceBtn.disabled = isRecording || state.isSending || nextState === "requesting";
+        voiceBtn.classList.toggle("opacity-60", voiceBtn.disabled);
+      }
+      if (sendVoiceBtn) {
+        sendVoiceBtn.disabled = !isPreview || state.isSending || !state.recordedVoice;
+      }
+    }
+
+    function resetRecorderToIdle() {
+      clearRecordingTimer();
+      stopMediaTracks();
+      mediaRecorder = null;
+      recordingStartedAt = null;
+      recordedChunks = [];
+      state.recordingSeconds = 0;
+      if (recordingTimer) recordingTimer.textContent = "0:00";
+      setRecordingState("idle");
+    }
+
+    function clearRecordedVoice() {
+      clearVoicePreviewUrl();
+      state.recordedVoice = null;
+      if (voicePreviewAudio) voicePreviewAudio.removeAttribute("src");
+      if (voicePreviewDuration) voicePreviewDuration.textContent = "";
+      setRecordingState("idle");
+    }
+
+    async function startVoiceRecording() {
+      if (state.recordingState === "recording" || state.recordingState === "requesting") return;
+      if (!navigator.mediaDevices?.getUserMedia) {
+        window.toast("Microphone recording is not supported in this browser.", "error");
+        return;
+      }
+      if (typeof MediaRecorder === "undefined") {
+        window.toast("MediaRecorder is not available in this browser.", "error");
+        return;
+      }
+
+      try {
+        setRecordingState("requesting");
+        discardRecording = false;
+        if (state.recordedVoice) clearRecordedVoice();
+        mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        if (!mediaStream.getAudioTracks().length) {
+          throw new Error("No microphone device was found.");
+        }
+
+        const mimeType = detectRecorderMimeType();
+        mediaRecorder = mimeType ? new MediaRecorder(mediaStream, { mimeType }) : new MediaRecorder(mediaStream);
+        recordedChunks = [];
+        recordingStartedAt = Date.now();
+        state.recordingSeconds = 0;
+        if (recordingTimer) recordingTimer.textContent = "0:00";
+
+        mediaRecorder.ondataavailable = (event) => {
+          if (event.data && event.data.size > 0) {
+            recordedChunks.push(event.data);
+          }
+        };
+
+        mediaRecorder.onstop = () => {
+          clearRecordingTimer();
+          stopMediaTracks();
+          if (discardRecording || !recordedChunks.length) {
+            resetRecorderToIdle();
+            return;
+          }
+
+          const durationSec = Math.max(1, Math.round((Date.now() - (recordingStartedAt || Date.now())) / 1000));
+          const finalType = mediaRecorder?.mimeType || mimeType || "audio/webm";
+          const blob = new Blob(recordedChunks, { type: finalType });
+          clearVoicePreviewUrl();
+          previewObjectUrl = URL.createObjectURL(blob);
+
+          state.recordedVoice = {
+            blob,
+            mimeType: finalType,
+            durationSec
+          };
+
+          if (voicePreviewAudio) {
+            voicePreviewAudio.src = previewObjectUrl;
+            voicePreviewAudio.load();
+          }
+          if (voicePreviewDuration) {
+            voicePreviewDuration.textContent = formatDuration(durationSec);
+          }
+          setRecordingState("preview");
+        };
+
+        mediaRecorder.start(250);
+        setRecordingState("recording");
+        recordingTimerInterval = setInterval(() => {
+          state.recordingSeconds = Math.max(0, Math.floor((Date.now() - (recordingStartedAt || Date.now())) / 1000));
+          if (recordingTimer) recordingTimer.textContent = formatDuration(state.recordingSeconds);
+        }, 250);
+      } catch (error) {
+        const name = error instanceof DOMException ? error.name : "";
+        if (name === "NotAllowedError" || name === "PermissionDeniedError") {
+          window.toast("Microphone access is required to record a voice message.", "error");
+        } else if (name === "NotFoundError" || name === "DevicesNotFoundError") {
+          window.toast("No microphone device found.", "error");
+        } else if (name === "NotReadableError" || name === "TrackStartError") {
+          window.toast("Microphone is currently unavailable.", "error");
+        } else {
+          window.toast(error?.message || "Voice recording failed to start.", "error");
+        }
+        resetRecorderToIdle();
+      }
+    }
+
+    function stopVoiceRecording() {
+      if (!mediaRecorder || mediaRecorder.state !== "recording") return;
+      mediaRecorder.stop();
+    }
+
+    function cancelVoiceRecording() {
+      discardRecording = true;
+      if (mediaRecorder && mediaRecorder.state === "recording") {
+        mediaRecorder.stop();
+      } else {
+        resetRecorderToIdle();
+      }
+      if (state.recordedVoice) {
+        clearRecordedVoice();
+      }
+    }
+
+    async function sendRecordedVoiceMessage() {
+      if (!state.recordedVoice || state.isSending) return;
+      const voice = state.recordedVoice;
+      const ext = voice.mimeType.includes("mpeg") ? "mp3" : voice.mimeType.includes("ogg") ? "ogg" : voice.mimeType.includes("mp4") ? "m4a" : "webm";
+      const file = new File([voice.blob], `voice-${Date.now()}.${ext}`, { type: voice.mimeType });
+      try {
+        const fileUrl = await uploadMedia(file);
+        await sendPayload({
+          type: "VOICE",
+          fileUrl,
+          content: `Voice message (${formatDuration(voice.durationSec)})`
+        });
+        clearRecordedVoice();
+      } catch (error) {
+        window.toast(error.message || "Failed to send voice message.", "error");
+      }
+    }
+
     async function sendPayload(payload) {
       state.isSending = true;
       sendBtn.disabled = true;
       sendBtn.classList.add("opacity-60");
+      setRecordingState(state.recordingState);
 
       try {
         let conversationId = state.currentConversationId;
@@ -310,12 +530,13 @@ export function Chat() {
         state.isSending = false;
         sendBtn.disabled = false;
         sendBtn.classList.remove("opacity-60");
+        setRecordingState(state.recordingState);
       }
     }
 
     async function sendTextMessage() {
       const body = chatInput.value.trim();
-      if (!body || state.isSending) return;
+      if (!body || state.isSending || state.recordingState === "recording") return;
       try {
         await sendPayload({ type: /^https?:\/\/\S+$/i.test(body) ? "LINK" : "TEXT", content: body });
       } catch (error) {
@@ -350,19 +571,11 @@ export function Chat() {
       void loadMessages(conversationId);
     };
 
-    window.deleteChatMessage = async (messageId) => {
-      try {
-        await apiFetch(`/chat/messages/${messageId}`, { method: "DELETE" });
-        await loadMessages(state.currentConversationId);
-      } catch (error) {
-        window.toast(error.message, "error");
-      }
-    };
-
     sendBtn.addEventListener("click", sendTextMessage);
     chatInput.addEventListener("keypress", (event) => {
       if (event.key === "Enter" && !event.shiftKey) {
         event.preventDefault();
+        if (state.recordingState === "recording") return;
         sendTextMessage();
       }
     });
@@ -372,9 +585,15 @@ export function Chat() {
       mediaInput.click();
     });
 
-    mediaBtn.addEventListener("click", () => {
-      mediaInput.accept = "image/*,video/*,audio/*";
-      mediaInput.click();
+    voiceBtn.addEventListener("click", () => {
+      void startVoiceRecording();
+    });
+
+    stopRecordingBtn.addEventListener("click", stopVoiceRecording);
+    cancelRecordingBtn.addEventListener("click", cancelVoiceRecording);
+    deleteVoiceBtn.addEventListener("click", clearRecordedVoice);
+    sendVoiceBtn.addEventListener("click", () => {
+      void sendRecordedVoiceMessage();
     });
 
     mediaInput.addEventListener("change", async (event) => {
@@ -384,7 +603,23 @@ export function Chat() {
       await sendMedia(file);
     });
 
+    const onEscape = (event) => {
+      if (event.key === "Escape" && state.recordingState === "recording") {
+        cancelVoiceRecording();
+      }
+    };
+    document.addEventListener("keydown", onEscape);
+
+    setRecordingState("idle");
+
     await loadThreads();
+
+    window.__pageCleanup = () => {
+      document.removeEventListener("keydown", onEscape);
+      cancelVoiceRecording();
+      clearVoicePreviewUrl();
+      clearRecordingTimer();
+    };
   };
 
   return `
@@ -411,14 +646,39 @@ export function Chat() {
         <div id="messages-container" class="flex-1 overflow-y-auto p-4 md:p-6 flex flex-col scroll-smooth"></div>
 
         <div class="p-4 bg-surface border-t border-border shrink-0">
+          <div id="chat-recording-banner" class="hidden mb-3 rounded-xl border border-danger/30 bg-danger/10 px-3 py-2">
+            <div class="flex items-center justify-between gap-3">
+              <div class="flex items-center gap-2">
+                <span class="h-2.5 w-2.5 rounded-full bg-danger animate-pulse"></span>
+                <span class="text-xs font-semibold text-danger">Recording...</span>
+                <span id="chat-recording-timer" class="text-xs font-semibold text-text">0:00</span>
+              </div>
+              <div class="flex items-center gap-2">
+                <button id="chat-recording-stop" class="px-3 py-1.5 rounded-lg border border-white/10 bg-bg text-xs font-semibold text-text hover:bg-slate-800/50">Stop</button>
+                <button id="chat-recording-cancel" class="px-3 py-1.5 rounded-lg border border-danger/40 bg-danger/10 text-xs font-semibold text-danger hover:bg-danger/20">Cancel</button>
+              </div>
+            </div>
+          </div>
+
+          <div id="chat-voice-preview" class="hidden mb-3 rounded-xl border border-white/10 bg-bg/40 p-3">
+            <div class="flex items-center justify-between gap-3 mb-2">
+              <p class="text-xs font-semibold text-text">Voice preview <span id="chat-voice-preview-duration" class="text-muted"></span></p>
+              <button id="chat-voice-delete" class="px-3 py-1.5 rounded-lg border border-danger/40 bg-danger/10 text-xs font-semibold text-danger hover:bg-danger/20">Delete recording</button>
+            </div>
+            <audio id="chat-voice-preview-audio" controls class="w-full"></audio>
+            <div class="mt-3 flex justify-end">
+              <button id="chat-voice-send" class="px-4 py-2 rounded-lg bg-primary hover:bg-primary-hover text-white text-xs font-semibold">Send audio</button>
+            </div>
+          </div>
+
           <div class="bg-bg border border-border rounded-xl p-2">
             <div class="flex items-end gap-2">
               <textarea id="chat-input" rows="1" class="flex-1 bg-transparent border-none focus:outline-none focus:ring-0 resize-none px-3 py-2 text-sm text-text max-h-32" placeholder="Write a message..."></textarea>
               <button id="send-image-btn" class="w-10 h-10 rounded-lg border border-border text-muted hover:text-primary hover:border-primary" title="Send image">
                 <svg class="w-4 h-4 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-10h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
               </button>
-              <button id="send-media-btn" class="w-10 h-10 rounded-lg border border-border text-muted hover:text-primary hover:border-primary" title="Send media">
-                <svg class="w-4 h-4 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14m-6 2h2a2 2 0 002-2V10a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2z"></path></svg>
+              <button id="voice-record-btn" class="w-10 h-10 rounded-lg border border-border text-muted hover:text-primary hover:border-primary" title="Record voice message">
+                <svg class="w-4 h-4 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4a3 3 0 00-3 3v4a3 3 0 106 0V7a3 3 0 00-3-3z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-14 0M12 18v3"></path></svg>
               </button>
               <button id="send-msg-btn" class="w-10 h-10 bg-primary hover:bg-primary-hover text-white rounded-lg flex items-center justify-center shrink-0 transition-transform active:scale-95">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path></svg>

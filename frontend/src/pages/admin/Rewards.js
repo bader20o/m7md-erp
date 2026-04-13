@@ -1,4 +1,5 @@
 import { apiFetch } from "../../lib/api.js";
+import { uploadLocalFile } from "../../lib/uploads.js";
 import { store } from "../../lib/store.js";
 import { isAdminRole } from "../../lib/roles.js";
 
@@ -61,6 +62,9 @@ export function AdminRewards() {
     const form = document.getElementById("reward-rule-form");
     const formTitle = document.getElementById("reward-form-title");
     const resetButton = document.getElementById("reward-form-reset");
+    const iconFileInput = document.getElementById("reward-icon-file");
+    const iconPreview = document.getElementById("reward-icon-preview");
+    const iconHint = document.getElementById("reward-icon-hint");
 
     const state = {
       rules: [],
@@ -83,8 +87,11 @@ export function AdminRewards() {
       state.editingId = null;
       formTitle.textContent = "Create Reward Rule";
       form.reset();
+      form.rewardIconUrl.value = "";
       form.isActive.checked = true;
       form.sortOrder.value = "0";
+      iconPreview.innerHTML = '<div class="text-[10px] text-muted">No icon</div>';
+      iconHint.textContent = "Upload a clear icon/photo for customers.";
       applyFormVisibility();
     }
 
@@ -99,6 +106,7 @@ export function AdminRewards() {
       form.rewardType.value = rule.rewardType;
       form.rewardServiceId.value = rule.rewardServiceId || "";
       form.rewardLabel.value = rule.rewardLabel || "";
+      form.rewardIconUrl.value = rule.rewardIconUrl || "";
       form.discountPercentage.value = rule.discountPercentage ?? "";
       form.fixedAmount.value = rule.fixedAmount ?? "";
       form.customGiftText.value = rule.customGiftText || "";
@@ -108,6 +116,13 @@ export function AdminRewards() {
       form.sortOrder.value = String(rule.sortOrder ?? 0);
       form.startsAt.value = toLocalDateTime(rule.startsAt);
       form.endsAt.value = toLocalDateTime(rule.endsAt);
+      if (rule.rewardIconUrl) {
+        iconPreview.innerHTML = `<img src="${esc(rule.rewardIconUrl)}" alt="${esc(rule.title)}" class="h-full w-full object-cover rounded-lg" />`;
+        iconHint.textContent = "Icon uploaded. You can replace it.";
+      } else {
+        iconPreview.innerHTML = '<div class="text-[10px] text-muted">No icon</div>';
+        iconHint.textContent = "Upload a clear icon/photo for customers.";
+      }
       applyFormVisibility();
     }
 
@@ -121,6 +136,7 @@ export function AdminRewards() {
         rewardType: form.rewardType.value,
         rewardServiceId: form.rewardServiceId.value || null,
         rewardLabel: form.rewardLabel.value.trim() || null,
+        rewardIconUrl: form.rewardIconUrl.value.trim() || null,
         discountPercentage: form.discountPercentage.value ? Number(form.discountPercentage.value) : null,
         fixedAmount: form.fixedAmount.value ? Number(form.fixedAmount.value) : null,
         customGiftText: form.customGiftText.value.trim() || null,
@@ -147,7 +163,14 @@ export function AdminRewards() {
               <td class="px-4 py-3 text-sm font-semibold text-text">${esc(rule.title)}</td>
               <td class="px-4 py-3 text-xs text-muted">${esc(TRIGGER_LABELS[rule.triggerType] || rule.triggerType)} / ${rule.triggerValue}</td>
               <td class="px-4 py-3 text-xs text-text">${esc(REWARD_LABELS[rule.rewardType] || rule.rewardType)}</td>
-              <td class="px-4 py-3 text-xs text-text">${esc(rewardSummary(rule))}</td>
+              <td class="px-4 py-3 text-xs text-text">
+                <div class="flex items-center gap-2">
+                  <div class="h-8 w-8 shrink-0 overflow-hidden rounded-md border border-border bg-bg">
+                    ${rule.rewardIconUrl ? `<img src="${esc(rule.rewardIconUrl)}" alt="${esc(rule.title)}" class="h-full w-full object-cover" />` : '<div class="h-full w-full text-[9px] text-muted flex items-center justify-center">No</div>'}
+                  </div>
+                  <span>${esc(rewardSummary(rule))}</span>
+                </div>
+              </td>
               <td class="px-4 py-3 text-xs text-muted">${rule.periodDays ? `${rule.periodDays} days` : "No reset"}</td>
               <td class="px-4 py-3 text-xs">${statusBadge(rule.isActive)}</td>
               <td class="px-4 py-3 text-xs text-muted">Issued ${usage.issued} / Redeemed ${usage.redeemed}</td>
@@ -296,6 +319,23 @@ export function AdminRewards() {
 
     form.rewardType.addEventListener("change", applyFormVisibility);
     resetButton.addEventListener("click", resetForm);
+    iconFileInput.addEventListener("change", async (event) => {
+      const file = event.target.files?.[0];
+      if (!file) return;
+      try {
+        iconHint.textContent = "Uploading icon...";
+        const iconUrl = await uploadLocalFile(file, { folder: "rewards" });
+        form.rewardIconUrl.value = iconUrl;
+        iconPreview.innerHTML = `<img src="${esc(iconUrl)}" alt="Reward icon" class="h-full w-full object-cover rounded-lg" />`;
+        iconHint.textContent = "Icon uploaded.";
+        window.toast("Reward icon uploaded.", "success");
+      } catch (error) {
+        iconHint.textContent = "Upload failed.";
+        window.toast(error.message || "Failed to upload reward icon.", "error");
+      } finally {
+        event.target.value = "";
+      }
+    });
 
     if (!canManage) {
       form.querySelectorAll("input, select, textarea, button[type='submit']").forEach((el) => {
@@ -419,6 +459,17 @@ export function AdminRewards() {
               <div id="field-custom-gift" class="hidden"><input name="customGiftText" placeholder="Custom gift text" class="rounded-lg border border-border bg-bg px-3 py-2 text-sm" /></div>
 
               <input name="rewardLabel" placeholder="Optional reward label" class="rounded-lg border border-border bg-bg px-3 py-2 text-sm" />
+              <input name="rewardIconUrl" type="hidden" />
+              <div class="rounded-lg border border-border bg-bg p-3">
+                <div class="flex items-center gap-3">
+                  <label for="reward-icon-file" class="cursor-pointer rounded-lg border border-border px-3 py-2 text-xs font-semibold hover:border-primary">Upload Icon</label>
+                  <input id="reward-icon-file" type="file" accept="image/*" class="hidden" />
+                  <div id="reward-icon-preview" class="flex h-12 w-12 items-center justify-center overflow-hidden rounded-lg border border-border bg-surface">
+                    <div class="text-[10px] text-muted">No icon</div>
+                  </div>
+                  <div id="reward-icon-hint" class="text-xs text-muted">Upload a clear icon/photo for customers.</div>
+                </div>
+              </div>
 
               <div class="grid grid-cols-3 gap-3">
                 <input name="currency" value="JOD" class="rounded-lg border border-border bg-bg px-3 py-2 text-sm" />

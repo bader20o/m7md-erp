@@ -1,0 +1,6 @@
+ALTER TABLE "RewardRule"
+ADD COLUMN IF NOT EXISTS "rewardIconUrl" TEXT;
+
+ALTER TABLE "CustomerReward"
+ADD COLUMN IF NOT EXISTS "rewardIconUrl" TEXT;
+

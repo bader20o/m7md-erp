@@ -28,6 +28,8 @@ type ResponsiveDataTableProps<T> = {
   appearance?: "light" | "dark";
   tableClassName?: string;
   cardClassName?: string;
+  rowClassName?: (item: T) => string;
+  cardItemClassName?: (item: T) => string;
 };
 
 export function ResponsiveDataTable<T>({
@@ -42,7 +44,9 @@ export function ResponsiveDataTable<T>({
   emptyState,
   appearance = "light",
   tableClassName,
-  cardClassName
+  cardClassName,
+  rowClassName,
+  cardItemClassName
 }: ResponsiveDataTableProps<T>): React.ReactElement {
   const isDark = appearance === "dark";
 
@@ -64,7 +68,7 @@ export function ResponsiveDataTable<T>({
               items.map((item) => (
                 <tr
                   key={getKey(item)}
-                  className={`align-top ${isDark ? "border-t border-white/10" : "border-t border-slate-100"}`}
+                  className={`align-top ${isDark ? "border-t border-white/10" : "border-t border-slate-100"} ${rowClassName ? rowClassName(item) : ""}`.trim()}
                 >
                   {columns.map((column) => (
                     <td key={column.key} className={`px-3 py-3 ${column.className ?? ""}`.trim()}>
@@ -91,7 +95,7 @@ export function ResponsiveDataTable<T>({
               key={getKey(item)}
               className={`rounded-2xl border p-4 shadow-[0_18px_40px_-30px_rgba(15,23,42,0.28)] ${
                 isDark ? "border-white/10 bg-slate-950" : "border-slate-200 bg-white"
-              } ${cardClassName ?? ""}`.trim()}
+              } ${cardClassName ?? ""} ${cardItemClassName ? cardItemClassName(item) : ""}`.trim()}
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0 flex-1">

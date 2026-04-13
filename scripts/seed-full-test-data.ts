@@ -184,6 +184,8 @@ type SeedService = { id: string; code: string; nameEn: string; nameAr: string; c
 type SeedPart = { id: string; code: string; name: string; costPrice: number; sellPrice: number; lowStockThreshold: number; stockQty: number };
 type SeedSupplier = { id: string; name: string };
 
+const SEEDED_CUSTOMER_PHONES = Array.from({ length: TOTAL_CUSTOMERS }, (_, index) => seedCustomerPhone(index));
+
 function seedCustomerPhone(index: number): string {
   return `07988${String(index + 1).padStart(5, "0")}`;
 }
@@ -378,7 +380,7 @@ async function main(): Promise<void> {
 
   const transactionCount = await prisma.transaction.count({ where: { id: { startsWith: `${SEED_PREFIX}_tx_` } } });
   const bookingCount = await prisma.booking.count({ where: { id: { startsWith: `${SEED_PREFIX}_booking_` } } });
-  const customerCount = await prisma.user.count({ where: { id: { startsWith: `${SEED_PREFIX}_customer_` } } });
+  const customerCount = await prisma.user.count({ where: { phone: { in: SEEDED_CUSTOMER_PHONES } } });
   const totalIncome = await sumTransactions(TransactionType.INCOME);
   const totalExpenses = await sumTransactions(TransactionType.EXPENSE);
 
@@ -428,6 +430,7 @@ async function clearPreviousSeedData(adminId: string): Promise<void> {
   await prisma.expense.deleteMany({ where: { id: { startsWith: `${SEED_PREFIX}_expense_` } } });
   await prisma.salaryPayment.deleteMany({ where: { id: { startsWith: `${SEED_PREFIX}_salary_` } } });
   await prisma.attendanceEvent.deleteMany({ where: { id: { startsWith: `${SEED_PREFIX}_attendance_event_` } } });
+  await prisma.attendanceDay.deleteMany({ where: { id: { startsWith: `${SEED_PREFIX}_attendance_day_` } } });
   await prisma.attendance.deleteMany({ where: { id: { startsWith: `${SEED_PREFIX}_attendance_` } } });
   await prisma.booking.deleteMany({ where: { id: { startsWith: `${SEED_PREFIX}_booking_` } } });
   await prisma.employeePermissionGrant.deleteMany({ where: { employeeId: { startsWith: `${SEED_PREFIX}_employee_` } } });
@@ -501,8 +504,16 @@ async function seedEmployees(adminId: string): Promise<SeedEmployee[]> {
     const userId = `${SEED_PREFIX}_employee_user_${employee.code}`;
     const employeeId = `${SEED_PREFIX}_employee_${employee.code}`;
 
-    await prisma.user.create({
-      data: {
+    const user = await prisma.user.upsert({
+      where: { phone: employee.phone },
+      update: {
+        passwordHash,
+        fullName: employee.fullName,
+        role: Role.EMPLOYEE,
+        status: UserStatus.ACTIVE,
+        isActive: true
+      },
+      create: {
         id: userId,
         phone: employee.phone,
         passwordHash,
@@ -514,10 +525,34 @@ async function seedEmployees(adminId: string): Promise<SeedEmployee[]> {
       }
     });
 
-    await prisma.employee.create({
-      data: {
+    const employeeRecord = await prisma.employee.upsert({
+      where: { userId: user.id },
+      update: {
+        createdByAdminId: adminId,
+        nationalIdHash: sha256(`${SEED_PREFIX}_${employee.code}_nid`),
+        nationalIdEncrypted: `enc:${employee.code}:nid`,
+        birthDateEncrypted: `enc:${employee.code}:1992-01-01`,
+        jobTitleEncrypted: `enc:${employee.jobTitle}`,
+        defaultSalaryEncrypted: `enc:${employee.monthlyBase}`,
+        workScheduleEncrypted: "enc:Sun-Thu 09:00-18:00",
+        roleProfile:
+          employee.jobTitle.includes("Advisor")
+            ? EmployeeRoleProfile.RECEPTION
+            : employee.jobTitle.includes("Parts")
+              ? EmployeeRoleProfile.MANAGER
+              : EmployeeRoleProfile.TECHNICIAN,
+        employmentType: EmploymentType.FULL_TIME,
+        employmentStatus: EmploymentStatus.ACTIVE,
+        department: employee.department,
+        jobTitle: employee.jobTitle,
+        monthlyBase: employee.monthlyBase,
+        startDate: addDays(new Date(), -240),
+        hiredAt: addDays(new Date(), -240),
+        isActive: true
+      },
+      create: {
         id: employeeId,
-        userId,
+        userId: user.id,
         createdByAdminId: adminId,
         nationalIdHash: sha256(`${SEED_PREFIX}_${employee.code}_nid`),
         nationalIdEncrypted: `enc:${employee.code}:nid`,
@@ -542,17 +577,18 @@ async function seedEmployees(adminId: string): Promise<SeedEmployee[]> {
       }
     });
 
+    await prisma.employeePermissionGrant.deleteMany({ where: { employeeId: employeeRecord.id } });
     await prisma.employeePermissionGrant.createMany({
       data: employee.permissions.map((permission) => ({
         id: `${SEED_PREFIX}_permission_${employee.code}_${permission.toLowerCase()}`,
-        employeeId,
+        employeeId: employeeRecord.id,
         permission
       }))
     });
 
     result.push({
-      id: employeeId,
-      userId,
+      id: employeeRecord.id,
+      userId: user.id,
       fullName: employee.fullName,
       monthlyBase: employee.monthlyBase
     });
@@ -687,8 +723,24 @@ async function seedCustomers(adminId: string, dayStarts: Date[]): Promise<SeedUs
     const [carCompany, carModel, carYear] = CAR_PROFILES[index % CAR_PROFILES.length];
     const joinDate = addDays(dayStarts[0], (index * 3) % 70);
 
-    const item = await prisma.user.create({
-      data: {
+    const item = await prisma.user.upsert({
+      where: { phone: seedCustomerPhone(index) },
+      update: {
+        passwordHash,
+        role: Role.CUSTOMER,
+        status: UserStatus.ACTIVE,
+        isActive: true,
+        fullName: `${firstName} ${lastName}`,
+        carCompany,
+        carModel,
+        carYear,
+        governorate: "Amman",
+        city: "Amman",
+        location: "Amman",
+        licensePlate: `${randomInt(10, 99)}-${randomInt(10000, 99999)}`,
+        preferredContact: index % 4 === 0 ? "WHATSAPP" : "PHONE"
+      },
+      create: {
         id: `${SEED_PREFIX}_customer_${String(index + 1).padStart(2, "0")}`,
         phone: seedCustomerPhone(index),
         passwordHash,

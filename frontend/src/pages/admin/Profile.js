@@ -1,7 +1,7 @@
 import { apiFetch, buildQuery } from "../../lib/api.js";
 import { openImageCropper } from "../../components/ui/ImageCropper.js";
 import { uploadLocalFile } from "../../lib/uploads.js";
-import { isAdminRole, isEmployeeRole } from "../../lib/roles.js";
+import { getDefaultRouteForUser, isAdminRole, isEmployeeRole } from "../../lib/roles.js";
 import { store } from "../../lib/store.js";
 import { ConfirmModal, AlertModal, Modal } from "../../components/ui/Modal.js";
 import { Profile as LegacyProfile } from "../customer/Profile.js";
@@ -162,7 +162,7 @@ function normalizePerformance(performance) {
   return {
     cards: (performance?.cards || []).map((card) => ({
       ...card,
-      value: !hasRows && isZeroLike(card.value) ? "No data yet" : card.value
+      value: !hasRows && isZeroLike(card.value) ? "Awaiting tracked work data" : card.value
     })),
     rows: performance?.rows || []
   };
@@ -212,7 +212,7 @@ function renderAttendanceTable(log) {
   `;
 
   if (!log?.length) {
-    return heatmapHtml + `<div class="rounded-2xl border border-dashed border-border px-4 py-10 text-center text-sm text-muted">No attendance records yet.</div>`;
+    return heatmapHtml + `<div class="rounded-2xl border border-dashed border-border px-4 py-10 text-center text-sm text-muted">Attendance records for the selected period will appear here.</div>`;
   }
   return heatmapHtml + `
     <div class="overflow-auto rounded-[24px] border border-border bg-surface shadow-sm">
@@ -501,6 +501,7 @@ export function AdminProfile() {
                 </div>
               </div>
             </div>
+            <div class="lg:col-span-2 text-[11px] font-bold uppercase tracking-widest text-muted">Personal Information</div>
             <div>
               <label class="mb-1.5 block text-xs font-bold uppercase tracking-wide text-muted">Full Name</label>
               <input name="fullName" value="${esc(item.profile.fullName || "")}" placeholder="Full name" class="w-full rounded-xl border border-border bg-surface px-4 py-3 shadow-sm focus:border-primary focus:ring-1 focus:ring-primary/20 transition-all" ${!(canEditPartial || canEditFull) || isLocked ? "readonly" : ""}>
@@ -511,6 +512,7 @@ export function AdminProfile() {
               <input name="phone" value="${esc(item.profile.phone || "")}" placeholder="Phone" class="w-full rounded-xl border border-border bg-surface px-4 py-3 shadow-sm focus:border-primary focus:ring-1 focus:ring-primary/20 transition-all" ${!(canEditPartial || canEditFull) || isLocked ? "readonly" : ""}>
               ${renderFieldError(state.validation.profile, "phone")}
             </div>
+            <div class="lg:col-span-2 text-[11px] font-bold uppercase tracking-widest text-muted">Employment Information</div>
             <div>
               <label class="mb-1.5 block text-xs font-bold uppercase tracking-wide text-muted">Job Title</label>
               <input name="jobTitle" value="${esc(item.profile.jobTitle || "")}" placeholder="Job title" class="w-full rounded-xl border border-border bg-surface px-4 py-3 shadow-sm focus:border-primary focus:ring-1 focus:ring-primary/20 transition-all" ${!canEditFull || isLocked ? "readonly" : ""}>
@@ -538,6 +540,7 @@ export function AdminProfile() {
               ${item.status === "SUSPENDED" ? `<div class="mt-1 text-xs text-amber-500">${esc(item.suspendedUntil ? `Suspended until ${d(item.suspendedUntil)}` : "Suspended")}</div>` : ""}
               ${renderFieldError(state.validation.profile, "status")}
             </div>
+            <div class="lg:col-span-2 text-[11px] font-bold uppercase tracking-widest text-muted">Contact & Emergency</div>
             <div>
               <label class="mb-1.5 block text-xs font-bold uppercase tracking-wide text-muted">Emergency Contact</label>
               <input name="emergencyContact" value="${esc(item.profile.emergencyContact || "")}" placeholder="Emergency contact" class="w-full rounded-xl border border-border bg-surface px-4 py-3 shadow-sm focus:border-primary focus:ring-1 focus:ring-primary/20 transition-all" ${!canEditFull || isLocked ? "readonly" : ""}>
@@ -552,16 +555,39 @@ export function AdminProfile() {
               <button id="emp-profile-save" ${isLocked || state.savingForm === "profile" ? "disabled" : "disabled"} class="rounded-xl bg-primary px-5 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50">${state.savingForm === "profile" ? "Saving..." : "Save profile"}</button>
             </div>
           </form>
+          ${
+            !employeeId
+              ? `
+                <form id="emp-self-password-form" class="rounded-xl border border-white/10 bg-bg/30 p-4">
+                  <div class="mb-3 text-sm font-semibold text-text">Change Password</div>
+                  <div class="grid grid-cols-1 gap-3 md:grid-cols-3">
+                    <input name="oldPassword" type="password" required placeholder="Current password" class="rounded-xl border border-border bg-surface px-4 py-3 text-sm">
+                    <input name="newPassword" type="password" required placeholder="New password" class="rounded-xl border border-border bg-surface px-4 py-3 text-sm">
+                    <input name="confirmPassword" type="password" required placeholder="Confirm new password" class="rounded-xl border border-border bg-surface px-4 py-3 text-sm">
+                  </div>
+                  <div class="mt-3 flex justify-end">
+                    <button id="emp-self-password-save" ${state.savingForm === "self_password" ? "disabled" : ""} class="rounded-xl border border-white/10 px-4 py-2.5 text-sm font-semibold text-text hover:bg-surface disabled:opacity-60">${state.savingForm === "self_password" ? "Updating..." : "Update password"}</button>
+                  </div>
+                </form>
+              `
+              : ""
+          }
         </div>
       `;
 
       if (state.tab === "permissions") {
         const o = item.permissions.overrides || {};
+        const securityChanges = item.activityLog || [];
+        const recentAccess = item.sessions || [];
         body = `
           <div class="space-y-4">
             ${warningBanner}
             <form id="emp-permissions-form" class="space-y-4">
-            <select name="roleProfile" class="w-full rounded-xl border border-border bg-surface px-4 py-3" ${!canEditFull || isLocked ? "disabled" : ""}>${["ADMIN", "MANAGER", "RECEPTION", "ACCOUNTANT", "TECHNICIAN", "EMPLOYEE"].map((v) => `<option value="${v}" ${item.permissions.roleProfile === v ? "selected" : ""}>${v}</option>`).join("")}</select>
+              <div class="rounded-xl border border-white/10 bg-bg/30 px-4 py-3">
+                <div class="text-xs uppercase tracking-wide text-muted mb-2">Role Preset</div>
+                <select name="roleProfile" class="w-full rounded-xl border border-white/10 bg-surface px-4 py-3" ${!canEditFull || isLocked ? "disabled" : ""}>${["ADMIN", "MANAGER", "RECEPTION", "ACCOUNTANT", "TECHNICIAN", "EMPLOYEE"].map((v) => `<option value="${v}" ${item.permissions.roleProfile === v ? "selected" : ""}>${v}</option>`).join("")}</select>
+                <div class="mt-2 text-xs text-muted">Role presets define baseline permissions; overrides below apply granular access changes.</div>
+              </div>
             <div class="grid grid-cols-1 gap-3 md:grid-cols-2">${[
             ["canManageBookings", "Manage bookings"],
             ["canAccessAccounting", "Access accounting"],
@@ -570,9 +596,23 @@ export function AdminProfile() {
             ["canViewReports", "View reports"],
             ["canIssueRefunds", "Issue refunds"]
           ]
-            .map(([key, label]) => `<label class="flex items-center justify-between rounded-2xl border border-border px-4 py-3"><span class="text-sm text-text">${label}</span><input type="checkbox" name="${key}" ${o[key] ? "checked" : ""} ${!canEditFull || isLocked ? "disabled" : ""} class="h-4 w-4 rounded border-border bg-bg text-primary"></label>`)
+            .map(([key, label]) => `<label class="flex items-center justify-between rounded-xl border border-white/10 px-4 py-3"><span class="text-sm text-text">${label}</span><input type="checkbox" name="${key}" ${o[key] ? "checked" : ""} ${!canEditFull || isLocked ? "disabled" : ""} class="h-4 w-4 rounded border-border bg-bg text-primary"></label>`)
             .join("")}</div>
-            <div class="text-sm text-muted">Role sets defaults. Overrides customize access for this employee.</div>
+            <div class="text-sm text-muted">Permission matrix controls operational authority across bookings, accounting, inventory, and HR functions.</div>
+            <div class="grid grid-cols-1 gap-3 lg:grid-cols-2">
+              ${section(
+                "Recent Access Events",
+                recentAccess.length
+                  ? `<div class="space-y-2">${recentAccess.slice(0, 5).map((entry) => `<div class="rounded-xl border border-white/10 px-3 py-2 text-sm"><div class="text-text">${esc(formatIpAddress(entry.ipAddress))}</div><div class="text-xs text-muted">${dt(entry.createdAt || entry.lastSeenAt)}</div></div>`).join("")}</div>`
+                  : `<div class="text-sm text-muted">No access sessions were recorded in this range. New sign-in sessions will appear here.</div>`
+              )}
+              ${section(
+                "Security Change Log",
+                securityChanges.length
+                  ? `<div class="space-y-2">${securityChanges.slice(0, 5).map((entry) => `<div class="rounded-xl border border-white/10 px-3 py-2 text-sm"><div class="text-text">${esc(entry.action || "Security update")}</div><div class="text-xs text-muted">${dt(entry.createdAt)}</div></div>`).join("")}</div>`
+                  : `<div class="text-sm text-muted">No security or permission updates were recorded in the selected range.</div>`
+              )}
+            </div>
             <div class="flex justify-end ${!canEditFull ? "hidden" : ""}"><button id="emp-permissions-save" ${isLocked || state.savingForm === "permissions" ? "disabled" : "disabled"} class="rounded-xl bg-primary px-5 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50">${state.savingForm === "permissions" ? "Saving..." : "Save permissions"}</button></div>
             </form>
           </div>
@@ -581,7 +621,7 @@ export function AdminProfile() {
 
       if (state.tab === "performance") {
         body = `
-          <form id="emp-performance-range-form" class="mb-6 grid grid-cols-1 gap-4 md:grid-cols-4 lg:col-span-3">
+          <form id="emp-performance-range-form" class="mb-4 grid grid-cols-1 gap-4 md:grid-cols-4 lg:col-span-3">
             <div>
               <label class="mb-1.5 block text-xs font-bold uppercase tracking-wide text-muted">From Date</label>
               <input name="from" type="date" value="${esc(state.performanceFrom)}" class="w-full rounded-xl border border-border bg-surface px-4 py-3 shadow-sm hover:border-primary transition-colors focus:ring focus:ring-primary/20">
@@ -597,6 +637,11 @@ export function AdminProfile() {
               <button type="button" class="w-full rounded-xl border border-primary/30 border-b-[3px] bg-primary/10 px-4 py-3 text-sm font-bold text-primary hover:bg-primary/20 transition-all active:translate-y-[1px] active:border-b shadow-sm">Compare Team</button>
             </div>
           </form>
+          <div class="mb-4 grid grid-cols-1 gap-3 md:grid-cols-3">
+            <div class="rounded-xl border border-white/10 bg-bg/30 px-4 py-3 text-sm text-muted">Current performance score: <span class="font-semibold text-text">${insights.performanceScore}/100</span></div>
+            <div class="rounded-xl border border-white/10 bg-bg/30 px-4 py-3 text-sm text-muted">Attendance correlation: <span class="font-semibold text-text">${insights.attendanceRate}%</span></div>
+            <div class="rounded-xl border border-white/10 bg-bg/30 px-4 py-3 text-sm text-muted">Revenue trend vs previous period: <span class="${insights.revenueTrend >= 0 ? "text-emerald-500" : "text-danger"} font-semibold">${insights.revenueTrend}%</span></div>
+          </div>
           <div class="grid grid-cols-1 gap-4 md:grid-cols-3 lg:col-span-3">
              ${performance.cards.map((card, i) => {
           const trend = card.label.toLowerCase().includes('revenue') ? (state.insights?.revenueTrend || 0) : (i === 0 ? 12 : -5);
@@ -616,7 +661,7 @@ export function AdminProfile() {
         }).join("")}
           </div>
           <div class="mt-6 lg:col-span-3 rounded-[24px] overflow-hidden shadow-sm border border-border">
-             ${renderTable(performance.rows || [], "No activity recorded for this period.")}
+             ${renderTable(performance.rows || [], "No performance records were captured in this range. KPI and trend details will appear once operational activity is logged.")}
           </div>
         `;
       }
@@ -637,18 +682,21 @@ export function AdminProfile() {
              </div>
           </form>
           <div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
-            ${section("Security Snapshot", `<div class="space-y-3 text-sm"><div>Last login: <span class="text-muted">${dt(item.security.lastLoginAt)}</span></div><div>Last active: <span class="text-muted">${dt(item.security.lastActiveAt)}</span></div><div>Device / Browser: <span class="text-muted">${esc(formatDeviceBrowser(item.security))}</span></div><div>IP address: <span class="text-muted">${esc(formatIpAddress(item.security.ipAddress))}</span></div></div>`)}
-            ${section("Admin Controls", `<div class="grid grid-cols-1 gap-3 sm:grid-cols-2 ${!canEditHr || isLocked ? "hidden" : ""}"><button type="button" data-action="force_logout_all" class="rounded-xl border border-border px-4 py-3 text-sm font-medium text-text">Force logout all sessions</button><button type="button" data-action="force_password_reset" class="rounded-xl border border-border px-4 py-3 text-sm font-medium text-text">Force password reset</button><button type="button" data-action="reset_password" class="rounded-xl border border-border px-4 py-3 text-sm font-medium text-text">Reset password</button></div>${isLocked ? `<div class="text-sm text-muted">Admin actions are disabled while the employee is banned.</div>` : ""}`)}
+            ${section("Security Activity", `<div class="space-y-3 text-sm"><div>Last login: <span class="text-muted">${dt(item.security.lastLoginAt)}</span></div><div>Last active: <span class="text-muted">${dt(item.security.lastActiveAt)}</span></div><div>Device / Browser: <span class="text-muted">${esc(formatDeviceBrowser(item.security))}</span></div><div>IP address: <span class="text-muted">${esc(formatIpAddress(item.security.ipAddress))}</span></div></div>`)}
+            ${section("Admin Actions", `<div class="grid grid-cols-1 gap-3 sm:grid-cols-2 ${!canEditHr || isLocked ? "hidden" : ""}"><button type="button" data-action="force_logout_all" class="rounded-xl border border-border px-4 py-3 text-sm font-medium text-text">Force logout all sessions</button><button type="button" data-action="force_password_reset" class="rounded-xl border border-border px-4 py-3 text-sm font-medium text-text">Force password reset</button><button type="button" data-action="reset_password" class="rounded-xl border border-border px-4 py-3 text-sm font-medium text-text">Reset password</button></div>${isLocked ? `<div class="text-sm text-muted">Admin actions are disabled while the employee is banned.</div>` : ""}`)}
           </div>
           <div class="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
-            ${section("Sessions", renderRows(item.sessions, "No sessions logged."))}
-            ${section("Action History", renderRows(item.activityLog, "No activity recorded for this period."))}
+            ${section("Session History", renderRows(item.sessions, "No session events were recorded in this range."))}
+            ${section("Audit Trail", renderRows(item.activityLog, "No security or admin events were recorded in this range."))}
           </div>
         `;
       }
 
       if (state.tab === "attendance") {
         const attendance = item.attendance || emptyAttendance;
+        const attendanceLog = attendance.log || [];
+        const lateCount = attendanceLog.filter((row) => String(row.action || "").toLowerCase().includes("late")).length;
+        const absentCount = attendanceLog.filter((row) => String(row.action || "").toLowerCase().includes("absent")).length;
         body = `
           <form id="emp-attendance-range-form" class="mb-4 grid grid-cols-1 gap-3 md:grid-cols-3">
              <div>
@@ -663,11 +711,14 @@ export function AdminProfile() {
                <button class="w-full rounded-xl border border-border px-4 py-3 text-sm font-bold text-text bg-bg hover:bg-surface transition-all shadow-sm">Apply filter</button>
              </div>
           </form>
-          <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <div class="grid grid-cols-1 gap-4 md:grid-cols-4">
             <div class="rounded-2xl border border-border px-4 py-4"><div class="text-xs uppercase tracking-wide text-muted">Last Check-in</div><div class="mt-2 text-lg font-semibold text-text">${esc(dt(attendance.snapshot?.lastCheckInAt))}</div></div>
             <div class="rounded-2xl border border-border px-4 py-4"><div class="text-xs uppercase tracking-wide text-muted">Last Check-out</div><div class="mt-2 text-lg font-semibold text-text">${esc(dt(attendance.snapshot?.lastCheckOutAt))}</div></div>
+            <div class="rounded-2xl border border-border px-4 py-4"><div class="text-xs uppercase tracking-wide text-muted">Late Events</div><div class="mt-2 text-lg font-semibold text-amber-500 tabular-nums">${lateCount}</div></div>
+            <div class="rounded-2xl border border-border px-4 py-4"><div class="text-xs uppercase tracking-wide text-muted">Absent Events</div><div class="mt-2 text-lg font-semibold text-danger tabular-nums">${absentCount}</div></div>
           </div>
-          <div class="mt-4">${attendance.monthlySummary ? `<div class="rounded-2xl border border-border px-4 py-4 text-sm text-text">Monthly summary (${esc(attendance.monthlySummary.month)}): ${esc(`${attendance.monthlySummary.presentDays} present days, ${attendance.monthlySummary.completedShifts} completed shifts, ${attendance.monthlySummary.totalWorkedHours}`)}</div>` : `<div class="rounded-2xl border border-dashed border-border px-4 py-4 text-sm text-muted">No attendance records yet.</div>`}</div>
+          <div class="mt-4">${attendance.monthlySummary ? `<div class="rounded-2xl border border-border px-4 py-4 text-sm text-text">Monthly summary (${esc(attendance.monthlySummary.month)}): ${esc(`${attendance.monthlySummary.presentDays} present days, ${attendance.monthlySummary.completedShifts} completed shifts, ${attendance.monthlySummary.totalWorkedHours}`)}</div>` : `<div class="rounded-2xl border border-dashed border-border px-4 py-4 text-sm text-muted">Attendance records for the selected period will appear here.</div>`}</div>
+          <div class="mt-4 rounded-2xl border border-white/10 bg-bg/30 px-4 py-3 text-sm text-muted">${lateCount + absentCount > 0 ? `Attendance alerts detected: ${lateCount} late and ${absentCount} absent entries in this range.` : "No late or absent attendance patterns detected in this range."}</div>
           <div class="mt-4">${renderAttendanceTable(attendance.log)}</div>
         `;
       }
@@ -676,71 +727,104 @@ export function AdminProfile() {
       const isHealthy = insights.riskLevel === "Healthy";
       const isWarning = insights.riskLevel === "Warning";
       const isCritical = insights.riskLevel === "Critical";
-      const riskTheme = isCritical
-        ? "border-danger/20 bg-gradient-to-br from-danger/20 via-danger/5 to-bg text-danger shadow-[0_0_30px_rgba(239,68,68,0.15)]"
-        : isWarning
-          ? "border-amber-500/30 bg-gradient-to-br from-amber-500/20 via-amber-500/5 to-bg text-amber-500 shadow-[0_0_30px_rgba(245,158,11,0.15)]"
-          : "border-primary/20 bg-gradient-to-br from-primary/10 via-primary/5 to-bg text-primary shadow-[0_0_30px_rgba(var(--primary-rgb),0.1)]";
-
-      const badgeTone = isCritical ? "border-danger text-danger bg-danger/10" : isWarning ? "border-amber-500 text-amber-500 bg-amber-500/10" : "border-emerald-500 text-emerald-500 bg-emerald-500/10";
-
+      const headerStatusTone = isCritical ? "border-danger/30 bg-danger/10 text-danger" : isWarning ? "border-amber-500/30 bg-amber-500/10 text-amber-500" : "border-emerald-500/30 bg-emerald-500/10 text-emerald-500";
       const intelligenceBanner = `
-        <div class="relative overflow-hidden rounded-[32px] border-2 ${riskTheme} px-8 py-8 transition-all duration-500 mb-6 group">
-           <div class="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-white/5 blur-3xl group-hover:bg-white/10 transition-colors duration-700"></div>
-           <div class="relative z-10 flex flex-col gap-8 lg:flex-row lg:items-center lg:justify-between">
-              <div class="flex items-center gap-6">
-                 ${avatar(item.fullName, item.avatar, "w-24 h-24 text-4xl shadow-xl ring-4 ring-bg")}
-                 <div class="space-y-1.5">
-                    <div class="text-3xl font-heading font-black text-text tracking-tight">${esc(item.fullName || "Employee")}</div>
-                    <div class="flex items-center gap-3 mt-1">
-                       <span class="rounded-xl border border-border bg-surface px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-text shadow-sm">${esc(item.roleProfile)}</span>
-                       <span class="rounded-xl border ${badgeTone} px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider shadow-sm flex items-center gap-1.5">
-                         <span class="relative flex h-2 w-2">
-                           <span class="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 object-cover ${isCritical ? 'bg-danger' : isWarning ? 'bg-amber-500' : 'bg-emerald-500'}"></span>
-                           <span class="relative inline-flex rounded-full h-2 w-2 ${isCritical ? 'bg-danger' : isWarning ? 'bg-amber-500' : 'bg-emerald-500'}"></span>
-                         </span>
-                         ${insights.riskLevel}
-                       </span>
-                    </div>
-                    <div class="text-xs font-semibold opacity-70 mt-2">
-                      ${insights.inactivityDays > 0 ? `Last active ${insights.inactivityDays} days ago` : 'Active today'}
-                    </div>
-                 </div>
+        <div class="rounded-2xl border border-white/10 bg-surface px-5 py-4">
+          <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div class="flex items-center gap-3">
+              ${avatar(item.fullName, item.avatar, "w-16 h-16 text-2xl")}
+              <div>
+                <div class="text-xl font-heading font-black text-text">${esc(item.fullName || "Employee")}</div>
+                <div class="mt-1 flex flex-wrap items-center gap-2">
+                  <span class="rounded-lg border border-white/10 bg-bg px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-text">${esc(item.roleProfile)}</span>
+                  <span class="rounded-lg border ${headerStatusTone} px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider">${esc(item.status || insights.riskLevel)}</span>
+                </div>
+                <div class="mt-1 text-xs text-muted">${insights.inactivityDays > 0 ? `Last active ${insights.inactivityDays} day(s) ago` : "Last active today"}</div>
               </div>
-              <div class="flex items-center gap-8 lg:ml-auto">
-                 <div class="flex flex-col border-l-2 border-border/50 pl-6">
-                    <span class="text-[10px] font-bold uppercase tracking-widest opacity-60">Performance</span>
-                    <span class="text-4xl font-black font-heading tracking-tight flex items-baseline gap-1">${insights.performanceScore}<span class="text-sm font-semibold opacity-50">/100</span></span>
-                 </div>
-                 <div class="flex flex-col border-l-2 border-border/50 pl-6">
-                    <span class="text-[10px] font-bold uppercase tracking-widest opacity-60">Attendance</span>
-                    <span class="text-4xl font-black font-heading tracking-tight flex items-baseline gap-1">${insights.attendanceRate}<span class="text-sm font-semibold opacity-50">%</span></span>
-                 </div>
+            </div>
+            <div class="grid grid-cols-2 gap-3 lg:w-[17rem]">
+              <div class="rounded-xl border border-white/10 bg-bg/30 px-3 py-2">
+                <div class="text-[10px] uppercase tracking-wider text-muted">Performance Score</div>
+                <div class="mt-1 text-xl font-bold text-text tabular-nums">${insights.performanceScore}<span class="text-xs text-muted">/100</span></div>
               </div>
-           </div>
+              <div class="rounded-xl border border-white/10 bg-bg/30 px-3 py-2">
+                <div class="text-[10px] uppercase tracking-wider text-muted">Attendance</div>
+                <div class="mt-1 text-xl font-bold text-text tabular-nums">${insights.attendanceRate}<span class="text-xs text-muted">%</span></div>
+              </div>
+            </div>
+          </div>
         </div>
       `;
 
       const flagItems = insights.flags.length > 0
-        ? insights.flags.map(f => `<div class="mb-3 flex items-start gap-3 rounded-2xl bg-danger/10 border border-danger/20 px-4 py-3 text-sm font-medium text-danger shadow-sm"><svg class="mt-0.5 h-5 w-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>${esc(f)}</div>`).join("")
-        : `<div class="text-sm text-muted bg-surface border border-border px-4 py-3 rounded-2xl shadow-sm">No active flags. Employee is healthy.</div>`;
+        ? insights.flags.map(f => `<div class="mb-2 rounded-xl border border-danger/20 bg-danger/10 px-3 py-2 text-sm text-danger">${esc(f)}</div>`).join("")
+        : `<div class="text-sm text-muted rounded-xl border border-white/10 bg-bg/30 px-3 py-2">No active flags detected for this employee.</div>`;
 
       let recommendations = "";
       if (insights.attendanceRate < 70) recommendations += `<button type="button" class="w-full mb-3 rounded-2xl bg-amber-500/10 border border-amber-500/20 px-4 py-3.5 text-sm font-bold text-amber-500 transition-all hover:bg-amber-500/20 hover:scale-[1.02] shadow-sm">Review Attendance</button>`;
       if (insights.revenueTrend < 0) recommendations += `<button type="button" class="w-full mb-3 rounded-2xl bg-blue-500/10 border border-blue-500/20 px-4 py-3.5 text-sm font-bold text-blue-500 transition-all hover:bg-blue-500/20 hover:scale-[1.02] shadow-sm">Review Performance</button>`;
       if (insights.riskLevel === "Critical") recommendations += `<button type="button" class="w-full mb-3 rounded-2xl bg-danger/10 border border-danger/20 px-4 py-3.5 text-sm font-bold text-danger transition-all hover:bg-danger/20 hover:scale-[1.02] shadow-sm" data-action="suspend" data-days="3">Recommend: 3-Day Suspension</button>`;
 
+      const overviewSummaryStrip = `
+        <div class="grid grid-cols-2 gap-2 rounded-xl border border-white/10 bg-surface p-2 md:grid-cols-5">
+          <div class="rounded-lg border border-white/10 bg-bg/30 px-3 py-2"><div class="text-[10px] uppercase tracking-wider text-muted">Jobs Completed</div><div class="mt-1 text-sm font-semibold text-text tabular-nums">${esc(String(item.performance?.rows?.length || 0))}</div></div>
+          <div class="rounded-lg border border-white/10 bg-bg/30 px-3 py-2"><div class="text-[10px] uppercase tracking-wider text-muted">Revenue Generated</div><div class="mt-1 text-sm font-semibold text-text tabular-nums">${esc(String(item.performance?.cards?.find((c) => String(c.label || "").toLowerCase().includes("revenue"))?.value || "N/A"))}</div></div>
+          <div class="rounded-lg border border-white/10 bg-bg/30 px-3 py-2"><div class="text-[10px] uppercase tracking-wider text-muted">Open Tasks</div><div class="mt-1 text-sm font-semibold text-text tabular-nums">${esc(String((state.tasksData?.data || []).filter((t) => ["NOT_STARTED", "IN_PROGRESS", "OVERDUE"].includes(t.status)).length))}</div></div>
+          <div class="rounded-lg border border-white/10 bg-bg/30 px-3 py-2"><div class="text-[10px] uppercase tracking-wider text-muted">Last Check-in</div><div class="mt-1 text-sm font-semibold text-text">${esc(d(item.attendance?.snapshot?.lastCheckInAt))}</div></div>
+          <div class="rounded-lg border border-white/10 bg-bg/30 px-3 py-2"><div class="text-[10px] uppercase tracking-wider text-muted">Last Payroll Update</div><div class="mt-1 text-sm font-semibold text-text">${esc(d(item.hr?.lastPayrollUpdatedAt))}</div></div>
+        </div>
+      `;
+
+      let contextualInsightsTitle = "Insights Engine";
+      let contextualInsightsBody = `
+        <div class="mb-4">
+          <h4 class="mb-2 text-[10px] uppercase tracking-wider text-muted">Detected Rules</h4>
+          ${flagItems}
+        </div>
+        <div>
+          <h4 class="mb-2 text-[10px] uppercase tracking-wider text-muted">Smart Actions</h4>
+          ${recommendations || `<div class="rounded-xl border border-white/10 bg-bg/30 px-3 py-2 text-sm text-muted">No actions required for this employee right now.</div>`}
+        </div>
+      `;
+      if (state.tab === "permissions") {
+        contextualInsightsTitle = "Insights Engine";
+        contextualInsightsBody = `
+          <div class="space-y-2 text-sm">
+            <div class="rounded-xl border border-white/10 bg-bg/30 px-3 py-2 text-muted">Review elevated access before granting financial or HR privileges.</div>
+            <div class="rounded-xl border border-white/10 bg-bg/30 px-3 py-2 text-muted">${item.sessions?.length ? `Recent session count: ${item.sessions.length}` : "Session events will appear when the employee signs in from tracked devices."}</div>
+            <div class="rounded-xl border border-white/10 bg-bg/30 px-3 py-2 text-muted">${item.activityLog?.length ? `Security changes in range: ${item.activityLog.length}` : "No recent permission or security change events in the selected range."}</div>
+          </div>
+        `;
+      } else if (state.tab === "performance") {
+        contextualInsightsBody = `
+          <div class="space-y-2 text-sm">
+            <div class="rounded-xl border border-white/10 bg-bg/30 px-3 py-2 text-muted">Performance score: <span class="text-text font-semibold">${insights.performanceScore}/100</span></div>
+            <div class="rounded-xl border border-white/10 bg-bg/30 px-3 py-2 text-muted">Revenue trend: <span class="${insights.revenueTrend >= 0 ? "text-emerald-500" : "text-danger"} font-semibold">${insights.revenueTrend}%</span></div>
+            <div class="rounded-xl border border-white/10 bg-bg/30 px-3 py-2 text-muted">Use this tab to compare period KPIs and identify recovery opportunities.</div>
+          </div>
+        `;
+      } else if (state.tab === "attendance") {
+        contextualInsightsBody = `
+          <div class="space-y-2 text-sm">
+            <div class="rounded-xl border border-white/10 bg-bg/30 px-3 py-2 text-muted">Attendance rate: <span class="text-text font-semibold">${insights.attendanceRate}%</span></div>
+            <div class="rounded-xl border border-white/10 bg-bg/30 px-3 py-2 text-muted">${insights.attendanceRate < 80 ? "Attendance risk detected. Review lateness and absence pattern in current range." : "Attendance trend is within expected range."}</div>
+            <div class="rounded-xl border border-white/10 bg-bg/30 px-3 py-2 text-muted">Late or absent clusters are highlighted in attendance logs when available.</div>
+          </div>
+        `;
+      } else if (state.tab === "hr") {
+        contextualInsightsBody = `
+          <div class="space-y-2 text-sm">
+            <div class="rounded-xl border border-white/10 bg-bg/30 px-3 py-2 text-muted">Payroll frequency: <span class="text-text font-semibold">${esc(item.hr?.paymentFrequency || "Not set")}</span></div>
+            <div class="rounded-xl border border-white/10 bg-bg/30 px-3 py-2 text-muted">Leave balance: annual ${esc(String(item.hr?.leaveBalance?.annual ?? 0))}, sick ${esc(String(item.hr?.leaveBalance?.sick ?? 0))}</div>
+            <div class="rounded-xl border border-white/10 bg-bg/30 px-3 py-2 text-muted">Track payroll and leave changes to keep HR records audit-ready.</div>
+          </div>
+        `;
+      }
+
       const adminAttentionPanel = `
-        <div class="rounded-[32px] border border-border bg-surface p-6 shadow-md transition-all duration-300 hover:shadow-lg">
-          <h3 class="font-heading text-xl font-black text-text mb-6">Insights Engine</h3>
-          <div class="mb-8">
-            <h4 class="text-[10px] uppercase tracking-widest text-muted mb-4 font-bold opacity-80">Detected Rules</h4>
-            ${flagItems}
-          </div>
-          <div>
-            <h4 class="text-[10px] uppercase tracking-widest text-muted mb-4 font-bold opacity-80">Smart Actions</h4>
-            ${recommendations || `<div class="text-sm text-muted bg-bg border border-border px-4 py-3 rounded-2xl shadow-sm">No actions required.</div>`}
-          </div>
+        <div class="rounded-2xl border border-white/10 bg-surface p-4">
+          <h3 class="mb-3 text-sm font-bold text-text">${contextualInsightsTitle}</h3>
+          ${contextualInsightsBody}
         </div>
       `;
 
@@ -749,6 +833,12 @@ export function AdminProfile() {
         body = `
           <div class="space-y-4">
             ${warningBanner}
+            <div class="grid grid-cols-2 gap-3 md:grid-cols-4">
+              <div class="rounded-xl border border-white/10 bg-bg/30 px-4 py-3"><div class="text-[10px] uppercase tracking-wider text-muted">Salary</div><div class="mt-1 text-sm font-semibold text-text">${esc(String(item.hr.salary || "Not set"))}</div></div>
+              <div class="rounded-xl border border-white/10 bg-bg/30 px-4 py-3"><div class="text-[10px] uppercase tracking-wider text-muted">Payment Frequency</div><div class="mt-1 text-sm font-semibold text-text">${esc(item.hr.paymentFrequency || "Not set")}</div></div>
+              <div class="rounded-xl border border-white/10 bg-bg/30 px-4 py-3"><div class="text-[10px] uppercase tracking-wider text-muted">Annual Leave</div><div class="mt-1 text-sm font-semibold text-text tabular-nums">${esc(String(leave.annual ?? 0))}</div></div>
+              <div class="rounded-xl border border-white/10 bg-bg/30 px-4 py-3"><div class="text-[10px] uppercase tracking-wider text-muted">Sick Leave</div><div class="mt-1 text-sm font-semibold text-text tabular-nums">${esc(String(leave.sick ?? 0))}</div></div>
+            </div>
             <form id="emp-hr-form" class="grid grid-cols-1 gap-4 lg:grid-cols-2">
               <div>
                 <label class="mb-1.5 block text-xs font-bold uppercase tracking-wide text-muted">Salary</label>
@@ -768,11 +858,11 @@ export function AdminProfile() {
               </div>
               <div class="rounded-2xl border border-border px-4 py-4 text-sm text-muted">
                 <div class="mb-2 text-xs font-bold uppercase tracking-wide text-text/70">Bonus History</div>
-                ${item.hr.bonusHistory?.length ? item.hr.bonusHistory.map((entry) => `<div>${esc(JSON.stringify(entry))}</div>`).join("") : "No bonus history recorded."}
+                ${item.hr.bonusHistory?.length ? item.hr.bonusHistory.map((entry) => `<div>${esc(JSON.stringify(entry))}</div>`).join("") : "No bonus records are available. Approved bonuses will appear here with payroll updates."}
               </div>
               <div class="rounded-2xl border border-border px-4 py-4 text-sm text-muted">
                 <div class="mb-2 text-xs font-bold uppercase tracking-wide text-text/70">Deductions</div>
-                ${item.hr.deductions?.length ? item.hr.deductions.map((entry) => `<div>${esc(JSON.stringify(entry))}</div>`).join("") : "No deductions recorded."}
+                ${item.hr.deductions?.length ? item.hr.deductions.map((entry) => `<div>${esc(JSON.stringify(entry))}</div>`).join("") : "No deductions are currently recorded for this employee."}
               </div>
               <div class="lg:col-span-2">
                 <label class="mb-1.5 block text-xs font-bold uppercase tracking-wide text-muted">Internal Notes</label>
@@ -894,34 +984,47 @@ export function AdminProfile() {
             </div>
           `;
 
-          const listHTML = state.tasksError
-            ? `<div class="text-center py-10 text-danger border border-danger/20 rounded-2xl bg-danger/5">${esc(state.tasksError)}</div>`
-            : tasks.length === 0 ? `<div class="text-center py-10 text-muted border border-dashed border-border rounded-2xl bg-surface">No tasks assigned.</div>` : `
-            <div class="grid gap-3">
-               ${tasks.map(t => {
+          const groupedTasks = {
+            overdue: tasks.filter((t) => t.status === "OVERDUE"),
+            pending: tasks.filter((t) => ["NOT_STARTED", "IN_PROGRESS", "SUBMITTED", "REJECTED"].includes(t.status)),
+            completed: tasks.filter((t) => ["APPROVED"].includes(t.status))
+          };
+          const renderTaskCard = (t) => {
             const priorityTone = t.priority === "HIGH" ? "border-danger text-danger bg-danger/10" : t.priority === "MEDIUM" ? "border-amber-500 text-amber-500 bg-amber-500/10" : "border-emerald-500 text-emerald-500 bg-emerald-500/10";
             const statusTone = t.status === "APPROVED" ? "border-emerald-500 text-emerald-500 bg-emerald-500/10" : t.status === "REJECTED" || t.status === "OVERDUE" ? "border-danger text-danger bg-danger/10" : "border-amber-500 text-amber-500 bg-amber-500/10";
             return `
-                   <div class="rounded-2xl border border-border bg-surface p-5 shadow-sm hover:border-text transition-all cursor-pointer flex justify-between items-center group" data-view-task="${t.id}">
-                      <div>
-                        <div class="flex items-center gap-2 mb-2">
-                           ${badge(t.priority, priorityTone)}
-                           ${badge(t.status.replace("_", " "), statusTone)}
-                        </div>
-                        <div class="text-lg font-bold text-text group-hover:text-primary transition-colors">${esc(t.title)}</div>
-                        <div class="text-sm text-muted mt-1 max-w-2xl truncate">${esc(t.description || "No description provided.")}</div>
-                        <div class="text-xs text-muted font-semibold mt-3 flex items-center gap-2">
-                           Due ${d(t.dueAt)}
-                        </div>
-                      </div>
-                      <div class="h-10 w-10 flex items-center justify-center rounded-full bg-bg border border-border group-hover:bg-primary/10 group-hover:border-primary/20 group-hover:text-primary transition-colors text-muted">
-                        &rarr;
-                      </div>
-                   </div>
-                 `;
-          }).join("")}
-            </div>
+              <div class="rounded-2xl border border-border bg-surface p-5 shadow-sm hover:border-text transition-all cursor-pointer flex justify-between items-center group" data-view-task="${t.id}">
+                <div>
+                  <div class="flex items-center gap-2 mb-2">
+                    ${badge(t.priority, priorityTone)}
+                    ${badge(t.status.replace("_", " "), statusTone)}
+                  </div>
+                  <div class="text-lg font-bold text-text group-hover:text-primary transition-colors">${esc(t.title)}</div>
+                  <div class="text-sm text-muted mt-1 max-w-2xl truncate">${esc(t.description || "Task details will appear once a description is provided.")}</div>
+                  <div class="text-xs text-muted font-semibold mt-3">Due ${d(t.dueAt)}</div>
+                </div>
+                <div class="h-10 w-10 flex items-center justify-center rounded-full bg-bg border border-border group-hover:bg-primary/10 group-hover:border-primary/20 group-hover:text-primary transition-colors text-muted">&rarr;</div>
+              </div>
+            `;
+          };
+          const renderTaskGroup = (title, items, emptyText) => `
+            <section class="space-y-3">
+              <div class="text-sm font-semibold text-text">${title}</div>
+              ${items.length ? `<div class="grid gap-3">${items.map(renderTaskCard).join("")}</div>` : `<div class="rounded-xl border border-dashed border-white/10 px-4 py-6 text-sm text-muted">${emptyText}</div>`}
+            </section>
           `;
+
+          const listHTML = state.tasksError
+            ? `<div class="text-center py-10 text-danger border border-danger/20 rounded-2xl bg-danger/5">${esc(state.tasksError)}</div>`
+            : tasks.length === 0
+              ? `<div class="text-center py-10 text-muted border border-dashed border-border rounded-2xl bg-surface">No tasks are assigned to this employee yet. Assigned tasks and status progress will appear here.</div>`
+              : `
+                <div class="space-y-5">
+                  ${renderTaskGroup("Overdue Tasks", groupedTasks.overdue, "No overdue tasks for this employee in the selected range.")}
+                  ${renderTaskGroup("Pending & In Progress", groupedTasks.pending, "No pending tasks. New assignments will appear here once created.")}
+                  ${renderTaskGroup("Completed Tasks", groupedTasks.completed, "No completed tasks yet. Approved task completions will appear here.")}
+                </div>
+              `;
 
           body = `<div>${summaryHTML}${listHTML}</div>`;
         }
@@ -941,7 +1044,9 @@ export function AdminProfile() {
                      </button>
                    `).join("")}
                 </div>
-                
+
+                ${overviewSummaryStrip}
+
                 <div class="animate-in fade-in duration-300">
                   ${body}
                 </div>
@@ -950,11 +1055,11 @@ export function AdminProfile() {
              <div class="lg:col-span-1 space-y-6">
                 ${adminAttentionPanel}
                 
-                <div class="rounded-[32px] border border-border bg-surface p-6 shadow-md">
-                   <h4 class="text-[10px] uppercase tracking-widest text-muted mb-4 font-bold opacity-80">System Controls</h4>
+                <div class="rounded-2xl border border-white/10 bg-surface p-4">
+                   <h4 class="text-[10px] uppercase tracking-widest text-muted mb-3 font-bold opacity-80">System Controls</h4>
                    <div class="flex flex-col gap-3">
-                     ${canEditHr && !isLocked ? `<button type="button" data-action="reset_password" class="w-full rounded-2xl border border-border bg-bg px-4 py-3.5 text-sm font-bold text-text transition-all hover:bg-surface hover:-translate-y-0.5 shadow-sm">Reset Password</button>` : ""}
-                     ${employeeId ? `<button type="button" id="back-employees" class="w-full rounded-2xl border border-border bg-bg px-4 py-3.5 text-sm font-bold text-text transition-all hover:bg-surface hover:-translate-y-0.5 shadow-sm">Back to Directory</button>` : ""}
+                     ${canEditHr && !isLocked ? `<button type="button" data-action="reset_password" class="w-full rounded-xl border border-white/10 bg-bg px-4 py-3 text-sm font-bold text-text transition-all hover:bg-surface">Reset Password</button>` : ""}
+                     ${employeeId ? `<button type="button" id="back-employees" class="w-full rounded-xl border border-white/10 bg-bg px-4 py-3 text-sm font-bold text-text transition-all hover:bg-surface">Back to Directory</button>` : ""}
                    </div>
                 </div>
              </div>
@@ -1074,6 +1179,32 @@ export function AdminProfile() {
           state.validation.hr = mapValidationErrors(error);
           if (!Object.keys(state.validation.hr).length) window.toast(error.message, "error");
           render();
+        }
+      });
+      root.querySelector("#emp-self-password-form")?.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const form = event.target;
+        state.savingForm = "self_password";
+        render();
+        try {
+          await patch({
+            action: "change_password",
+            oldPassword: form.oldPassword.value,
+            newPassword: form.newPassword.value,
+            confirmPassword: form.confirmPassword.value
+          });
+          form.reset();
+          await store.syncAuth();
+          state.savingForm = "";
+          render();
+          window.toast("Password updated", "success");
+          if (!store.state.user?.mustChangePassword) {
+            window.navigate(null, getDefaultRouteForUser(store.state.user));
+          }
+        } catch (error) {
+          state.savingForm = "";
+          render();
+          window.toast(error.message, "error");
         }
       });
       root.querySelector("#emp-avatar-file")?.addEventListener("change", async (event) => {

@@ -63,6 +63,7 @@ export async function POST(request: Request): Promise<Response> {
       rewardType: data.rewardType,
       rewardServiceId: data.rewardServiceId,
       rewardLabel: data.rewardLabel,
+      rewardIconUrl: data.rewardIconUrl,
       discountPercentage: data.discountPercentage == null ? null : Number(data.discountPercentage),
       fixedAmount: data.fixedAmount == null ? null : Number(data.fixedAmount),
       customGiftText: data.customGiftText,

@@ -159,6 +159,28 @@ function isMembershipSchemaCompatibilityError(error: unknown): boolean {
   );
 }
 
+function isSkipDuplicatesUnsupportedError(error: unknown): boolean {
+  if (!(error instanceof Prisma.PrismaClientValidationError)) {
+    return false;
+  }
+  const message = String(error.message || "").toLowerCase();
+  return message.includes("skipduplicates") && message.includes("unknown argument");
+}
+
+async function createManyWithOptionalSkipDuplicates(
+  operationWithSkipDuplicates: () => Promise<void>,
+  operationWithoutSkipDuplicates: () => Promise<void>
+): Promise<void> {
+  try {
+    await operationWithSkipDuplicates();
+  } catch (error) {
+    if (!isSkipDuplicatesUnsupportedError(error)) {
+      throw error;
+    }
+    await operationWithoutSkipDuplicates();
+  }
+}
+
 function mapMembershipPlanMutationError(error: unknown): never {
   if (
     error instanceof Prisma.PrismaClientKnownRequestError &&
@@ -375,19 +397,28 @@ async function ensurePlanBenefitDefinitions(
     return plan;
   }
 
-  await db.membershipBenefit.createMany({
-    data: plan.entitlements.map((entitlement) => ({
-      planId: plan.id,
-      code: `service_${entitlement.serviceId}`,
-      titleEn: entitlement.service.nameEn,
-      titleAr: entitlement.service.nameAr,
-      descriptionEn: entitlement.service.descriptionEn,
-      descriptionAr: entitlement.service.descriptionAr,
-      limitCount: entitlement.totalUses,
-      isActive: true
-    })),
-    skipDuplicates: true
-  });
+  const benefitRows = plan.entitlements.map((entitlement) => ({
+    planId: plan.id,
+    code: `service_${entitlement.serviceId}`,
+    titleEn: entitlement.service.nameEn,
+    titleAr: entitlement.service.nameAr,
+    descriptionEn: entitlement.service.descriptionEn,
+    descriptionAr: entitlement.service.descriptionAr,
+    limitCount: entitlement.totalUses,
+    isActive: true
+  }));
+
+  await createManyWithOptionalSkipDuplicates(
+    () =>
+      db.membershipBenefit.createMany({
+        data: benefitRows,
+        skipDuplicates: true
+      }),
+    () =>
+      db.membershipBenefit.createMany({
+        data: benefitRows
+      })
+  );
 
   const refreshedPlan = await db.membershipPlan.findUnique({
     where: { id: planId },
@@ -430,22 +461,31 @@ export async function ensureOrderBenefitSnapshots(
     return;
   }
 
-  await db.membershipOrderBenefit.createMany({
-    data: plan.benefits
-      .filter((benefit) => benefit.isActive)
-      .map((benefit) => ({
-        membershipOrderId: order.id,
-        planBenefitId: benefit.id,
-        code: benefit.code,
-        titleEn: benefit.titleEn,
-        titleAr: benefit.titleAr,
-        descriptionEn: benefit.descriptionEn,
-        descriptionAr: benefit.descriptionAr,
-        limitCount: benefit.limitCount,
-        isActive: benefit.isActive
-      })),
-    skipDuplicates: true
-  });
+  const orderBenefitRows = plan.benefits
+    .filter((benefit) => benefit.isActive)
+    .map((benefit) => ({
+      membershipOrderId: order.id,
+      planBenefitId: benefit.id,
+      code: benefit.code,
+      titleEn: benefit.titleEn,
+      titleAr: benefit.titleAr,
+      descriptionEn: benefit.descriptionEn,
+      descriptionAr: benefit.descriptionAr,
+      limitCount: benefit.limitCount,
+      isActive: benefit.isActive
+    }));
+
+  await createManyWithOptionalSkipDuplicates(
+    () =>
+      db.membershipOrderBenefit.createMany({
+        data: orderBenefitRows,
+        skipDuplicates: true
+      }),
+    () =>
+      db.membershipOrderBenefit.createMany({
+        data: orderBenefitRows
+      })
+  );
 }
 
 async function getOrderDetailOrThrow(membershipOrderId: string): Promise<MembershipOrderDetail> {
@@ -1219,22 +1259,31 @@ export async function approveMembershipSubscription(
 
     const plan = await ensurePlanBenefitDefinitions(tx, order.planId);
     if (plan.benefits.length > 0) {
-      await tx.membershipOrderBenefit.createMany({
-        data: plan.benefits
-          .filter((benefit) => benefit.isActive)
-          .map((benefit) => ({
-            membershipOrderId,
-            planBenefitId: benefit.id,
-            code: benefit.code,
-            titleEn: benefit.titleEn,
-            titleAr: benefit.titleAr,
-            descriptionEn: benefit.descriptionEn,
-            descriptionAr: benefit.descriptionAr,
-            limitCount: benefit.limitCount,
-            isActive: benefit.isActive
-          })),
-        skipDuplicates: true
-      });
+      const approvalBenefitRows = plan.benefits
+        .filter((benefit) => benefit.isActive)
+        .map((benefit) => ({
+          membershipOrderId,
+          planBenefitId: benefit.id,
+          code: benefit.code,
+          titleEn: benefit.titleEn,
+          titleAr: benefit.titleAr,
+          descriptionEn: benefit.descriptionEn,
+          descriptionAr: benefit.descriptionAr,
+          limitCount: benefit.limitCount,
+          isActive: benefit.isActive
+        }));
+
+      await createManyWithOptionalSkipDuplicates(
+        () =>
+          tx.membershipOrderBenefit.createMany({
+            data: approvalBenefitRows,
+            skipDuplicates: true
+          }),
+        () =>
+          tx.membershipOrderBenefit.createMany({
+            data: approvalBenefitRows
+          })
+      );
     }
 
     await tx.transaction.create({

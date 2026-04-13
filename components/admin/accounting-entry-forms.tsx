@@ -14,6 +14,12 @@ type InvoiceOption = {
   number: string;
 };
 
+type CustomerOption = {
+  id: string;
+  fullName: string | null;
+  phone: string;
+};
+
 type PartOption = {
   id: string;
   name: string;
@@ -26,6 +32,7 @@ type PartOption = {
 };
 
 type SaleCartLine = {
+  id: string;
   partId: string;
   partName: string;
   vehicleCategory: string;
@@ -35,9 +42,43 @@ type SaleCartLine = {
   note: string;
 };
 
+type ApiExpenseCategory = "SUPPLIER" | "GENERAL" | "SALARY";
+type ExpenseUiCategory =
+  | "Utilities"
+  | "Equipment"
+  | "Tools"
+  | "Maintenance"
+  | "Rent"
+  | "Salary"
+  | "Supplies"
+  | "Other";
+
+const EXPENSE_UI_CATEGORIES: ExpenseUiCategory[] = [
+  "Utilities",
+  "Equipment",
+  "Tools",
+  "Maintenance",
+  "Rent",
+  "Salary",
+  "Supplies",
+  "Other"
+];
+
+const EXPENSE_UI_TO_API: Record<ExpenseUiCategory, ApiExpenseCategory> = {
+  Utilities: "GENERAL",
+  Equipment: "SUPPLIER",
+  Tools: "SUPPLIER",
+  Maintenance: "GENERAL",
+  Rent: "GENERAL",
+  Salary: "SALARY",
+  Supplies: "SUPPLIER",
+  Other: "GENERAL"
+};
+
 type Props = {
   suppliers: SupplierOption[];
   invoices: InvoiceOption[];
+  customers: CustomerOption[];
   parts: PartOption[];
   recordedByName: string;
 };
@@ -51,9 +92,18 @@ function getErrorMessage(payload: unknown, fallback: string): string {
   return typed?.error?.message ?? fallback;
 }
 
+function toCustomerLabel(customer: CustomerOption): string {
+  return customer.fullName ? `${customer.fullName} (${customer.phone})` : customer.phone;
+}
+
+function toPartLabel(part: PartOption): string {
+  return `${part.name}${part.vehicleModel ? ` - ${part.vehicleModel}` : ""}${part.vehicleType ? ` (${part.vehicleType})` : ""}`;
+}
+
 export function AccountingEntryForms({
   suppliers,
   invoices,
+  customers,
   parts,
   recordedByName
 }: Props): React.ReactElement {
@@ -64,49 +114,84 @@ export function AccountingEntryForms({
   const [walkinQuantity, setWalkinQuantity] = useState("1");
   const [walkinDate, setWalkinDate] = useState("");
   const [walkinNote, setWalkinNote] = useState("");
+
   const [expenseItemName, setExpenseItemName] = useState("");
   const [expenseUnitPrice, setExpenseUnitPrice] = useState("");
   const [expenseQuantity, setExpenseQuantity] = useState("1");
-  const [expenseCategory, setExpenseCategory] = useState<"SUPPLIER" | "GENERAL" | "SALARY">(
-    "GENERAL"
-  );
+  const [expenseUiCategory, setExpenseUiCategory] = useState<ExpenseUiCategory>("Other");
+  const [expenseCategorySearch, setExpenseCategorySearch] = useState("");
   const [expensePartId, setExpensePartId] = useState("");
   const [expenseNote, setExpenseNote] = useState("");
   const [expenseSupplierId, setExpenseSupplierId] = useState("");
   const [expenseInvoiceId, setExpenseInvoiceId] = useState("");
   const [expenseDate, setExpenseDate] = useState("");
+
   const [loadingWalkin, setLoadingWalkin] = useState(false);
   const [loadingExpense, setLoadingExpense] = useState(false);
   const [loadingCartCheckout, setLoadingCartCheckout] = useState(false);
+
   const [saleSearch, setSaleSearch] = useState("");
   const [salePartId, setSalePartId] = useState("");
+  const [saleCustomerSearch, setSaleCustomerSearch] = useState("");
+  const [saleCustomerId, setSaleCustomerId] = useState("");
   const [saleDate, setSaleDate] = useState("");
   const [saleCart, setSaleCart] = useState<SaleCartLine[]>([]);
+
   const [modalOpen, setModalOpen] = useState(false);
   const [modalQuantity, setModalQuantity] = useState("1");
   const [modalUnitPrice, setModalUnitPrice] = useState("");
   const [modalNote, setModalNote] = useState("");
+
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
+  const expenseCategory = EXPENSE_UI_TO_API[expenseUiCategory];
   const walkinTotal = Number(walkinUnitPrice || 0) * Number(walkinQuantity || 0);
   const expenseTotal = Number(expenseUnitPrice || 0) * Number(expenseQuantity || 0);
   const selectedPart = parts.find((part) => part.id === expensePartId) ?? null;
   const selectedSalePart = parts.find((part) => part.id === salePartId) ?? null;
+
   const filteredSaleParts = useMemo(() => {
     const q = saleSearch.trim().toLowerCase();
-    if (!q) return parts;
-    return parts.filter((part) => {
-      return (
-        part.name.toLowerCase().includes(q) ||
-        (part.sku ?? "").toLowerCase().includes(q) ||
-        (part.vehicleModel ?? "").toLowerCase().includes(q) ||
-        (part.vehicleType ?? "").toLowerCase().includes(q)
-      );
-    });
+    if (!q) return parts.slice(0, 30);
+
+    return parts
+      .filter((part) => {
+        return (
+          part.name.toLowerCase().includes(q) ||
+          (part.sku ?? "").toLowerCase().includes(q) ||
+          (part.vehicleModel ?? "").toLowerCase().includes(q) ||
+          (part.vehicleType ?? "").toLowerCase().includes(q)
+        );
+      })
+      .slice(0, 30);
   }, [parts, saleSearch]);
+
+  const filteredCustomers = useMemo(() => {
+    const q = saleCustomerSearch.trim().toLowerCase();
+    if (!q) return customers.slice(0, 20);
+
+    return customers
+      .filter((customer) => {
+        return (
+          (customer.fullName ?? "").toLowerCase().includes(q) ||
+          customer.phone.toLowerCase().includes(q)
+        );
+      })
+      .slice(0, 20);
+  }, [customers, saleCustomerSearch]);
+
+  const filteredExpenseCategories = useMemo(() => {
+    const q = expenseCategorySearch.trim().toLowerCase();
+    if (!q) return EXPENSE_UI_CATEGORIES;
+    return EXPENSE_UI_CATEGORIES.filter((item) => item.toLowerCase().includes(q));
+  }, [expenseCategorySearch]);
+
   const modalTotal = Number(modalQuantity || 0) * Number(modalUnitPrice || 0);
-  const cartTotal = saleCart.reduce((sum, line) => sum + line.quantity * line.unitPrice, 0);
+  const cartTotal = useMemo(
+    () => saleCart.reduce((sum, line) => sum + line.quantity * line.unitPrice, 0),
+    [saleCart]
+  );
 
   function openAddToCartModal(): void {
     if (!selectedSalePart) {
@@ -126,6 +211,7 @@ export function AccountingEntryForms({
       setError("Selected inventory item not found.");
       return;
     }
+
     const qty = Number(modalQuantity);
     const unitPrice = Number(modalUnitPrice);
     if (!Number.isFinite(qty) || qty < 1) {
@@ -140,6 +226,7 @@ export function AccountingEntryForms({
     setSaleCart((prev) => [
       ...prev,
       {
+        id: globalThis.crypto.randomUUID(),
         partId: selectedSalePart.id,
         partName: selectedSalePart.name,
         vehicleCategory: selectedSalePart.vehicleType ?? "-",
@@ -153,8 +240,13 @@ export function AccountingEntryForms({
     setSuccess("Item added to cart.");
   }
 
-  function removeCartLine(index: number): void {
-    setSaleCart((prev) => prev.filter((_, idx) => idx !== index));
+  function removeCartLine(lineId: string): void {
+    setSaleCart((prev) => prev.filter((line) => line.id !== lineId));
+  }
+
+  function clearCart(): void {
+    setSaleCart([]);
+    setSuccess("Cart cleared.");
   }
 
   async function checkoutCart(): Promise<void> {
@@ -162,6 +254,7 @@ export function AccountingEntryForms({
       setError("Cart is empty.");
       return;
     }
+
     setLoadingCartCheckout(true);
     setError(null);
     setSuccess(null);
@@ -178,8 +271,12 @@ export function AccountingEntryForms({
         unitAmount: line.unitPrice
       }))
     };
+
     if (saleDate) {
       payload.issueDate = new Date(saleDate).toISOString();
+    }
+    if (saleCustomerId) {
+      payload.customerId = saleCustomerId;
     }
 
     const response = await fetch("/api/accounting/sale-invoices", {
@@ -199,6 +296,8 @@ export function AccountingEntryForms({
     setSaleDate("");
     setSalePartId("");
     setSaleSearch("");
+    setSaleCustomerId("");
+    setSaleCustomerSearch("");
     setSuccess("Cart sale confirmed and inventory updated.");
     router.refresh();
   }
@@ -254,6 +353,7 @@ export function AccountingEntryForms({
       occurredAt: new Date(expenseDate).toISOString(),
       expenseCategory
     };
+
     if (expenseNote.trim()) payload.note = expenseNote.trim();
     if (expenseSupplierId) payload.supplierId = expenseSupplierId;
     if (expenseInvoiceId) payload.invoiceId = expenseInvoiceId;
@@ -275,7 +375,8 @@ export function AccountingEntryForms({
     setExpenseItemName("");
     setExpenseUnitPrice("");
     setExpenseQuantity("1");
-    setExpenseCategory("GENERAL");
+    setExpenseUiCategory("Other");
+    setExpenseCategorySearch("");
     setExpensePartId("");
     setExpenseNote("");
     setExpenseSupplierId("");
@@ -292,26 +393,72 @@ export function AccountingEntryForms({
         <p className="mt-1 text-xs text-slate-500">Recorded by: {recordedByName}</p>
 
         <div className="mt-3 grid gap-3 md:grid-cols-2">
-          <input
-            value={saleSearch}
-            onChange={(event) => setSaleSearch(event.target.value)}
-            className="min-w-0 rounded-xl border border-slate-300 px-3 py-3 md:col-span-2"
-            placeholder="Search item by name/SKU/model/category"
-          />
-          <select
-            value={salePartId}
-            onChange={(event) => setSalePartId(event.target.value)}
-            className="min-w-0 rounded-xl border border-slate-300 px-3 py-3 md:col-span-2"
-          >
-            <option value="">Select inventory item</option>
-            {filteredSaleParts.map((part) => (
-              <option key={part.id} value={part.id}>
-                {part.name}
-                {part.vehicleModel ? ` - ${part.vehicleModel}` : ""}
-                {part.vehicleType ? ` (${part.vehicleType})` : ""}
-              </option>
-            ))}
-          </select>
+          <div className="md:col-span-2">
+            <input
+              value={saleCustomerSearch}
+              onChange={(event) => {
+                setSaleCustomerSearch(event.target.value);
+                setSaleCustomerId("");
+              }}
+              className="min-w-0 w-full rounded-xl border border-slate-300 px-3 py-3"
+              placeholder="Search customer name or phone..."
+            />
+            {!!saleCustomerSearch.trim() && (
+              <div className="mt-2 max-h-44 overflow-auto rounded-xl border border-slate-200 bg-white p-1">
+                {filteredCustomers.length ? (
+                  filteredCustomers.map((customer) => (
+                    <button
+                      key={customer.id}
+                      type="button"
+                      onClick={() => {
+                        setSaleCustomerId(customer.id);
+                        setSaleCustomerSearch(toCustomerLabel(customer));
+                      }}
+                      className="w-full rounded-lg px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"
+                    >
+                      {toCustomerLabel(customer)}
+                    </button>
+                  ))
+                ) : (
+                  <p className="px-3 py-2 text-sm text-slate-500">No customer matches your search.</p>
+                )}
+              </div>
+            )}
+          </div>
+
+          <div className="md:col-span-2">
+            <input
+              value={saleSearch}
+              onChange={(event) => {
+                setSaleSearch(event.target.value);
+                setSalePartId("");
+              }}
+              className="min-w-0 w-full rounded-xl border border-slate-300 px-3 py-3"
+              placeholder="Search inventory item..."
+            />
+            {!!saleSearch.trim() && (
+              <div className="mt-2 max-h-52 overflow-auto rounded-xl border border-slate-200 bg-white p-1">
+                {filteredSaleParts.length ? (
+                  filteredSaleParts.map((part) => (
+                    <button
+                      key={part.id}
+                      type="button"
+                      onClick={() => {
+                        setSalePartId(part.id);
+                        setSaleSearch(toPartLabel(part));
+                      }}
+                      className="w-full rounded-lg px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"
+                    >
+                      {toPartLabel(part)}
+                    </button>
+                  ))
+                ) : (
+                  <p className="px-3 py-2 text-sm text-slate-500">No inventory items match your search.</p>
+                )}
+              </div>
+            )}
+          </div>
+
           <button
             type="button"
             onClick={openAddToCartModal}
@@ -331,7 +478,7 @@ export function AccountingEntryForms({
         <div className="mt-4">
           <ResponsiveDataTable
             items={saleCart}
-            getKey={(line) => `${line.partId}-${line.quantity}-${line.unitPrice}-${line.note}`}
+            getKey={(line) => line.id}
             emptyState="Cart is empty."
             tableClassName="border border-slate-200 bg-white"
             columns={[
@@ -351,7 +498,7 @@ export function AccountingEntryForms({
                 cell: (line) => (
                   <button
                     type="button"
-                    onClick={() => removeCartLine(saleCart.indexOf(line))}
+                    onClick={() => removeCartLine(line.id)}
                     className="rounded-xl border border-red-200 px-3 py-2 text-sm font-semibold text-red-700"
                   >
                     Remove
@@ -365,7 +512,7 @@ export function AccountingEntryForms({
                 {(line.quantity * line.unitPrice).toFixed(2)}
               </span>
             )}
-            cardSubtitle={(line) => `${line.vehicleCategory} • ${line.carModel}`}
+            cardSubtitle={(line) => `${line.vehicleCategory} - ${line.carModel}`}
             cardFields={[
               { key: "qty", label: "Qty", value: (line) => line.quantity },
               { key: "unit", label: "Unit Price", value: (line) => line.unitPrice.toFixed(2) },
@@ -374,7 +521,7 @@ export function AccountingEntryForms({
             cardActions={(line) => (
               <button
                 type="button"
-                onClick={() => removeCartLine(saleCart.indexOf(line))}
+                onClick={() => removeCartLine(line.id)}
                 className="w-full rounded-xl border border-red-200 px-4 py-3 text-sm font-semibold text-red-700"
               >
                 Remove
@@ -385,16 +532,26 @@ export function AccountingEntryForms({
 
         <div className="sticky bottom-0 mt-4 flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white/95 p-3 backdrop-blur sm:flex-row sm:items-center sm:justify-between">
           <p className="text-sm font-semibold text-slate-800">Cart Total: {cartTotal.toFixed(2)}</p>
-          <button
-            type="button"
-            disabled={loadingCartCheckout || saleCart.length === 0}
-            onClick={() => {
-              void checkoutCart();
-            }}
-            className="w-full rounded-xl bg-emerald-700 px-4 py-3 text-sm font-semibold text-white hover:bg-emerald-800 disabled:opacity-70 sm:w-auto"
-          >
-            {loadingCartCheckout ? "Processing..." : "Confirm Cart Sale"}
-          </button>
+          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+            <button
+              type="button"
+              disabled={!saleCart.length}
+              onClick={clearCart}
+              className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60 sm:w-auto"
+            >
+              Clear Cart
+            </button>
+            <button
+              type="button"
+              disabled={loadingCartCheckout || saleCart.length === 0}
+              onClick={() => {
+                void checkoutCart();
+              }}
+              className="w-full rounded-xl bg-emerald-700 px-4 py-3 text-sm font-semibold text-white hover:bg-emerald-800 disabled:opacity-70 sm:w-auto"
+            >
+              {loadingCartCheckout ? "Processing..." : "Confirm Cart Sale"}
+            </button>
+          </div>
         </div>
       </section>
 
@@ -418,40 +575,40 @@ export function AccountingEntryForms({
             </div>
             <div className="overflow-y-auto px-4 py-4">
               <div className="grid gap-3 md:grid-cols-2">
-              <input value={selectedSalePart.name} className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2" readOnly />
-              <input value={selectedSalePart.vehicleType ?? ""} className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2" readOnly />
-              <input value={selectedSalePart.vehicleModel ?? ""} className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2" readOnly />
-              <input value={String(selectedSalePart.stockQty)} className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2" readOnly />
-              <input
-                value={modalQuantity}
-                onChange={(event) => setModalQuantity(event.target.value)}
-                className="rounded-md border border-slate-300 px-3 py-2"
-                type="number"
-                min="1"
-                step="1"
-                placeholder="Quantity"
-              />
-              <input
-                value={modalUnitPrice}
-                onChange={(event) => setModalUnitPrice(event.target.value)}
-                className="rounded-md border border-slate-300 px-3 py-2"
-                type="number"
-                min="0"
-                step="0.01"
-                placeholder="Unit Price"
-              />
-              <input
-                value={modalTotal ? modalTotal.toFixed(2) : "0.00"}
-                className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 md:col-span-2"
-                readOnly
-              />
-              <textarea
-                value={modalNote}
-                onChange={(event) => setModalNote(event.target.value)}
-                className="rounded-md border border-slate-300 px-3 py-2 md:col-span-2"
-                placeholder="Note (optional)"
-              />
-            </div>
+                <input value={selectedSalePart.name} className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2" readOnly />
+                <input value={selectedSalePart.vehicleType ?? ""} className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2" readOnly />
+                <input value={selectedSalePart.vehicleModel ?? ""} className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2" readOnly />
+                <input value={String(selectedSalePart.stockQty)} className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2" readOnly />
+                <input
+                  value={modalQuantity}
+                  onChange={(event) => setModalQuantity(event.target.value)}
+                  className="rounded-md border border-slate-300 px-3 py-2"
+                  type="number"
+                  min="1"
+                  step="1"
+                  placeholder="Quantity"
+                />
+                <input
+                  value={modalUnitPrice}
+                  onChange={(event) => setModalUnitPrice(event.target.value)}
+                  className="rounded-md border border-slate-300 px-3 py-2"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  placeholder="Unit Price"
+                />
+                <input
+                  value={modalTotal ? modalTotal.toFixed(2) : "0.00"}
+                  className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 md:col-span-2"
+                  readOnly
+                />
+                <textarea
+                  value={modalNote}
+                  onChange={(event) => setModalNote(event.target.value)}
+                  className="rounded-md border border-slate-300 px-3 py-2 md:col-span-2"
+                  placeholder="Note (optional)"
+                />
+              </div>
             </div>
             <div className="sticky bottom-0 flex justify-end gap-2 border-t border-slate-200 bg-white px-4 py-4">
               <button
@@ -545,21 +702,35 @@ export function AccountingEntryForms({
             disabled={Boolean(selectedPart)}
             required
           />
-          <select
-            value={expenseCategory}
-            onChange={(event) => {
-              const next = event.target.value as "SUPPLIER" | "GENERAL" | "SALARY";
-              setExpenseCategory(next);
-              if (next !== "SUPPLIER") {
-                setExpensePartId("");
-              }
-            }}
-            className="rounded-md border border-slate-300 px-3 py-2"
-          >
-            <option value="GENERAL">GENERAL</option>
-            <option value="SUPPLIER">SUPPLIER</option>
-            <option value="SALARY">SALARY</option>
-          </select>
+
+          <div>
+            <input
+              value={expenseCategorySearch}
+              onChange={(event) => setExpenseCategorySearch(event.target.value)}
+              className="w-full rounded-md border border-slate-300 px-3 py-2"
+              placeholder="Search expense category..."
+            />
+            <div className="mt-2 max-h-40 overflow-auto rounded-md border border-slate-200 bg-white p-1">
+              {filteredExpenseCategories.map((category) => (
+                <button
+                  key={category}
+                  type="button"
+                  onClick={() => {
+                    setExpenseUiCategory(category);
+                    setExpenseCategorySearch(category);
+                    if (EXPENSE_UI_TO_API[category] !== "SUPPLIER") {
+                      setExpensePartId("");
+                    }
+                  }}
+                  className={`w-full rounded-md px-3 py-2 text-left text-sm ${expenseUiCategory === category ? "bg-slate-100 text-slate-900" : "text-slate-700 hover:bg-slate-50"}`}
+                >
+                  {category}
+                </button>
+              ))}
+            </div>
+            <p className="mt-1 text-xs text-slate-500">Mapped backend category: {expenseCategory}</p>
+          </div>
+
           {expenseCategory === "SUPPLIER" ? (
             <select
               value={expensePartId}
@@ -582,6 +753,7 @@ export function AccountingEntryForms({
               ))}
             </select>
           ) : null}
+
           <input
             value={expenseUnitPrice}
             onChange={(event) => setExpenseUnitPrice(event.target.value)}
@@ -660,3 +832,4 @@ export function AccountingEntryForms({
     </div>
   );
 }
+

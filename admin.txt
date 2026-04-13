@@ -2,13 +2,16 @@ admin:
 0780000000
 ChangeMe123!
 
+
 admin:
 0799900090
 Admin123!
 
+
 Customer:
-0798800001
+0798800002
 Customer123!
+
 
 Employee:
 0781000102 
@@ -23,10 +26,12 @@ to run the app:
 to stop the app:
 1. press ctrl+c
 
+
 to upload the app to the internet:
 1. npm run build
 2. npm run start
 3. go to http://localhost:3000
+
 
 to save the files to github:
 1. git add .

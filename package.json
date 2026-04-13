@@ -19,6 +19,9 @@
     "db:import-mock": "tsx scripts/import-mock-data.ts",
     "chat:dedupe": "tsx scripts/dedupe-chat-threads.ts",
     "test:inventory": "tsx --test tests/inventory-stock.test.ts",
+    "test:accounting": "tsx --test tests/accounting-filters.test.ts tests/invoice-integration.test.ts",
+    "test:accounting:ui": "node tmp/playwright-accounting-filters-pass.mjs",
+    "test:chat": "tsx --test tests/chat-admin-all-users.test.ts",
     "backup:run": "tsx scripts/run-backup.ts",
     "backup:daily": "tsx scripts/daily-backup.ts"
   },

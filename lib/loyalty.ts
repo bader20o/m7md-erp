@@ -197,6 +197,7 @@ async function syncCustomerProgressForRule(customerId: string, rule: ActiveRule)
         rewardType: rule.rewardType,
         rewardServiceId: rule.rewardServiceId,
         rewardLabel: rule.rewardLabel,
+        rewardIconUrl: rule.rewardIconUrl,
         discountPercentage: rule.discountPercentage,
         fixedAmount: rule.fixedAmount,
         customGiftText: rule.customGiftText,
@@ -320,6 +321,7 @@ async function applySourceToRules(input: {
             rewardType: rule.rewardType,
             rewardServiceId: rule.rewardServiceId,
             rewardLabel: rule.rewardLabel,
+            rewardIconUrl: rule.rewardIconUrl,
             discountPercentage: rule.discountPercentage,
             fixedAmount: rule.fixedAmount,
             customGiftText: rule.customGiftText,
@@ -488,6 +490,7 @@ export async function getCustomerRewardsPayload(customerId: string): Promise<{
     triggerValue: number;
     rewardType: RewardType;
     rewardLabel: string | null;
+    rewardIconUrl: string | null;
     rewardServiceName: string | null;
     discountPercentage: number | null;
     fixedAmount: number | null;
@@ -537,7 +540,7 @@ export async function getCustomerRewardsPayload(customerId: string): Promise<{
       },
       include: {
         rewardRule: {
-          select: { id: true, title: true, triggerType: true, triggerValue: true }
+          select: { id: true, title: true, rewardIconUrl: true, triggerType: true, triggerValue: true }
         },
         rewardService: {
           select: { id: true, nameEn: true, nameAr: true }
@@ -552,7 +555,7 @@ export async function getCustomerRewardsPayload(customerId: string): Promise<{
       },
       include: {
         rewardRule: {
-          select: { id: true, title: true, triggerType: true, triggerValue: true }
+          select: { id: true, title: true, rewardIconUrl: true, triggerType: true, triggerValue: true }
         },
         rewardService: {
           select: { id: true, nameEn: true, nameAr: true }
@@ -591,6 +594,7 @@ export async function getCustomerRewardsPayload(customerId: string): Promise<{
         triggerValue: rule.triggerValue,
         rewardType: rule.rewardType,
         rewardLabel: rule.rewardLabel,
+        rewardIconUrl: rule.rewardIconUrl,
         rewardServiceName: rule.rewardService ? rule.rewardService.nameEn : null,
         discountPercentage: rule.discountPercentage == null ? null : toNumber(rule.discountPercentage),
         fixedAmount: rule.fixedAmount == null ? null : toNumber(rule.fixedAmount),
@@ -609,6 +613,7 @@ export async function getCustomerRewardsPayload(customerId: string): Promise<{
       issuedAt: item.issuedAt,
       rewardType: item.rewardType,
       rewardLabel: item.rewardLabel,
+      rewardIconUrl: item.rewardIconUrl,
       discountPercentage: item.discountPercentage == null ? null : toNumber(item.discountPercentage),
       fixedAmount: item.fixedAmount == null ? null : toNumber(item.fixedAmount),
       customGiftText: item.customGiftText,
@@ -622,6 +627,7 @@ export async function getCustomerRewardsPayload(customerId: string): Promise<{
       redeemedAt: item.redeemedAt,
       rewardType: item.rewardType,
       rewardLabel: item.rewardLabel,
+      rewardIconUrl: item.rewardIconUrl,
       discountPercentage: item.discountPercentage == null ? null : toNumber(item.discountPercentage),
       fixedAmount: item.fixedAmount == null ? null : toNumber(item.fixedAmount),
       customGiftText: item.customGiftText,

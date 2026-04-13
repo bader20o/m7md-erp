@@ -27,6 +27,7 @@ export async function PATCH(request: Request, context: Params): Promise<Response
     const nextRewardType = body.rewardType ?? existing.rewardType;
     const nextRewardServiceId = body.rewardServiceId === undefined ? existing.rewardServiceId : body.rewardServiceId;
     const nextRewardLabel = body.rewardLabel === undefined ? existing.rewardLabel : normalizeOptionalText(body.rewardLabel);
+    const nextRewardIconUrl = body.rewardIconUrl === undefined ? existing.rewardIconUrl : normalizeOptionalText(body.rewardIconUrl);
     const nextDiscountPercentage =
       body.discountPercentage === undefined
         ? existing.discountPercentage == null
@@ -49,6 +50,7 @@ export async function PATCH(request: Request, context: Params): Promise<Response
       rewardType: nextRewardType,
       rewardServiceId: nextRewardServiceId,
       rewardLabel: nextRewardLabel,
+      rewardIconUrl: nextRewardIconUrl,
       discountPercentage: nextDiscountPercentage,
       fixedAmount: nextFixedAmount,
       customGiftText: nextCustomGiftText,
@@ -75,6 +77,7 @@ export async function PATCH(request: Request, context: Params): Promise<Response
         rewardType: nextRewardType,
         rewardServiceId: nextRewardServiceId,
         rewardLabel: nextRewardLabel,
+        rewardIconUrl: nextRewardIconUrl,
         discountPercentage: nextDiscountPercentage,
         fixedAmount: nextFixedAmount,
         customGiftText: nextCustomGiftText,

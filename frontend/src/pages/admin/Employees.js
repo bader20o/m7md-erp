@@ -21,6 +21,8 @@ const isZeroLike = (value) => ["0", "0.0", "0.00", "0 min", "0.0 min", "0.00 min
 const formatIpAddress = (value) => (value && value !== "::1" ? value : "Not available");
 const formatDeviceBrowser = (security) => (security?.device && security?.browser ? `${security.device} / ${security.browser}` : "Not available");
 const formatSuspendedUntil = (value) => (value ? `Suspended until ${new Date(value).toLocaleDateString()}` : "Suspended");
+const formatDepartmentLabel = (value) => String(value || "").replaceAll("_", " ") || "Not assigned";
+const formatEmploymentType = (value) => String(value || "").replaceAll("_", " ") || "Not specified";
 const disableClass = "disabled:cursor-not-allowed disabled:opacity-50";
 
 function getStatusMeta(item) {
@@ -41,7 +43,7 @@ function normalizeKpiCards(performance) {
   const hasRows = Boolean(performance?.rows?.length);
   return cards.map((card) => ({
     ...card,
-    value: !hasRows && isZeroLike(card.value) ? "No data yet" : card.value
+    value: !hasRows && isZeroLike(card.value) ? "Awaiting tracked work data" : card.value
   }));
 }
 
@@ -93,6 +95,7 @@ export function AdminEmployees() {
   window.onMount = () => {
     const tbody = document.getElementById("employees-tbody");
     const pagination = document.getElementById("employees-pagination");
+    const summaryChips = document.getElementById("employees-summary-chips");
     const createForm = document.getElementById("employee-create-form");
     const createContainer = document.getElementById("employee-create-container");
     const warning = document.getElementById("employee-duplicate-warning");
@@ -103,6 +106,43 @@ export function AdminEmployees() {
       const node = document.getElementById(id);
       node.innerHTML = url ? `<img src="${url}" alt="${label}" class="h-full w-full object-cover">` : `<div class="flex h-full w-full items-center justify-center text-[10px] text-muted">No image</div>`;
     };
+    const normalizeStatus = (value) => String(value || "").toUpperCase();
+    const normalizeRole = (value) => String(value || "").toUpperCase();
+
+    function renderSummaryChips(items = [], summary = {}) {
+      const active = Number(summary.active ?? items.filter((i) => normalizeStatus(i.status) === "ACTIVE").length);
+      const suspended = Number(summary.suspended ?? items.filter((i) => normalizeStatus(i.status) === "SUSPENDED").length);
+      const managerCount = Number(summary.managers ?? summary.manager ?? items.filter((i) => normalizeRole(i.roleProfile).includes("MANAGER")).length);
+      const technicianCount = Number(summary.technicians ?? summary.technician ?? items.filter((i) => normalizeRole(i.roleProfile).includes("TECHNICIAN")).length);
+      const receptionCount = Number(summary.reception ?? items.filter((i) => normalizeRole(i.roleProfile).includes("RECEPTION")).length);
+
+      summaryChips.innerHTML = `
+        <div class="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-bg/30 px-3 py-2 text-xs">
+          <span class="text-muted uppercase tracking-wider">Total employees</span>
+          <span class="font-semibold text-text tabular-nums">${state.total}</span>
+        </div>
+        <div class="inline-flex items-center gap-2 rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-500">
+          <span class="uppercase tracking-wider">Active</span>
+          <span class="font-semibold tabular-nums">${active}</span>
+        </div>
+        <div class="inline-flex items-center gap-2 rounded-xl border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-xs text-amber-500">
+          <span class="uppercase tracking-wider">Suspended</span>
+          <span class="font-semibold tabular-nums">${suspended}</span>
+        </div>
+        <div class="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-bg/30 px-3 py-2 text-xs">
+          <span class="text-muted uppercase tracking-wider">Managers</span>
+          <span class="font-semibold text-text tabular-nums">${managerCount}</span>
+        </div>
+        <div class="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-bg/30 px-3 py-2 text-xs">
+          <span class="text-muted uppercase tracking-wider">Technicians</span>
+          <span class="font-semibold text-text tabular-nums">${technicianCount}</span>
+        </div>
+        <div class="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-bg/30 px-3 py-2 text-xs">
+          <span class="text-muted uppercase tracking-wider">Reception</span>
+          <span class="font-semibold text-text tabular-nums">${receptionCount}</span>
+        </div>
+      `;
+    }
 
     async function loadEmployees() {
       if (state.loading) return;
@@ -112,31 +152,33 @@ export function AdminEmployees() {
         const res = await apiFetch(`/admin/employees${buildQuery({ q: state.q, status: state.status, joinFrom: state.joinFrom, joinTo: state.joinTo, page: state.page, limit: state.limit })}`);
         state.total = res.total || 0;
         const items = res.items || [];
+        renderSummaryChips(items, res.summary || res.stats || {});
         tbody.innerHTML = items.length
           ? items
               .map(
                 (item) => `
-                  <tr class="border-b border-border text-center hover:bg-bg">
-                    <td class="px-4 py-3 text-left">
-                      <button type="button" data-open="${item.id}" class="flex w-full items-center gap-3 text-left">
+                  <tr class="border-b border-white/10 text-left transition-colors hover:bg-slate-800/45">
+                    <td class="px-4 py-3.5">
+                      <button type="button" data-open="${item.id}" class="flex w-full items-center gap-3.5 text-left">
                         ${avatarMarkup(item.fullName, item.avatar, true)}
                         <div>
-                          <div class="text-sm font-semibold text-text">${esc(item.fullName || "Unnamed Employee")}</div>
-                          <div class="text-xs text-muted">${esc(item.phone)}</div>
+                          <div class="text-sm font-semibold text-text leading-tight">${esc(item.fullName || "Unnamed Employee")}</div>
+                          <div class="text-xs text-muted mt-1">${esc(item.phone)}</div>
                         </div>
                       </button>
                     </td>
-                    <td class="px-4 py-3 text-sm">${esc(item.phone)}</td>
-                    <td class="px-4 py-3 text-sm">${roleBadge(item.roleProfile)}</td>
-                    <td class="px-4 py-3 text-sm">${statusBadge(item.status)}</td>
-                    <td class="px-4 py-3 text-sm">${d(item.joinedAt)}</td>
-                    <td class="px-4 py-3 text-sm"><button type="button" data-open="${item.id}" class="font-semibold text-primary">View</button></td>
+                    <td class="px-4 py-3.5 text-sm text-muted">${esc(item.phone)}</td>
+                    <td class="px-4 py-3.5 text-sm">${roleBadge(item.roleProfile)}</td>
+                    <td class="px-4 py-3.5 text-sm">${statusBadge(item.status)}</td>
+                    <td class="px-4 py-3.5 text-sm whitespace-nowrap text-muted">${d(item.joinedAt)}</td>
+                    <td class="px-4 py-3.5 text-sm text-right"><button type="button" data-open="${item.id}" class="inline-flex rounded-lg border border-primary/30 bg-primary/10 px-2.5 py-1 font-semibold text-primary">View</button></td>
                   </tr>
                 `
               )
               .join("")
           : `<tr><td colspan="6" class="py-12 text-center text-sm text-muted">No employees found.</td></tr>`;
       } catch (error) {
+        summaryChips.innerHTML = "";
         tbody.innerHTML = `<tr><td colspan="6" class="py-12 text-center text-sm text-danger">${esc(error.message)}</td></tr>`;
       } finally {
         state.loading = false;
@@ -171,58 +213,109 @@ export function AdminEmployees() {
       const editingDisabled = item.status === "BANNED";
       const kpis = normalizeKpiCards(item.performance);
       const attendanceSnapshot = item.attendance?.snapshot || {};
+      const department = item.profile?.department || item.department || "Not assigned";
+      const employmentType = item.profile?.employmentType || item.employmentType || "Not specified";
+      const employeeCode = item.employeeCode || item.employeeId || item.id;
+      const taskList = item.tasks || item.assignedTasks || [];
+      const lastTaskLabel = item.currentTask?.title || item.lastTask?.title || taskList?.[0]?.title || "No assigned tasks";
+      const workloadOpen = item.workload?.openTasks ?? item.taskStats?.pending ?? item.openTasks ?? null;
+      const payrollStatus = item.hr?.lastPayrollStatus || item.payroll?.status || item.lastPayrollStatus || "Not available";
+      const payrollUpdatedAt = item.hr?.lastPayrollUpdatedAt || item.payroll?.updatedAt || null;
+      const alerts = [
+        item.status === "SUSPENDED" ? formatSuspendedUntil(item.suspendedUntil) : "",
+        item.status === "BANNED" ? "Account is banned and restricted from operational access." : "",
+        security?.lastLoginAt ? "" : "No login recorded yet.",
+        attendanceSnapshot.lastCheckInAt ? "" : "No recent attendance check-in found."
+      ].filter(Boolean);
       content.innerHTML = `
-        <div class="space-y-6">
-          <div class="flex flex-col gap-4 rounded-[24px] border border-border px-6 py-6 lg:flex-row lg:items-center lg:justify-between">
-            <div class="flex items-start gap-4">
-              ${avatarMarkup(item.fullName, item.avatar)}
-              <div class="space-y-2">
-                <div class="text-2xl font-semibold text-text">${esc(item.fullName || "Employee")}</div>
-                <div class="text-sm text-muted">${esc(item.phone || "-")}</div>
-                <div class="flex flex-wrap gap-2">${roleBadge(item.roleProfile)} ${statusMeta.badge}</div>
-                ${statusMeta.detail ? `<div class="text-sm font-medium ${statusMeta.tone}">${esc(statusMeta.detail)}</div>` : ""}
+        <div class="space-y-4">
+          <div class="rounded-2xl border border-white/10 px-4 py-4">
+            <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+              <div class="flex items-start gap-3">
+                ${avatarMarkup(item.fullName, item.avatar)}
+                <div class="space-y-1.5">
+                  <div class="text-xl font-semibold text-text">${esc(item.fullName || "Employee")}</div>
+                  <div class="text-sm text-muted">${esc(item.phone || "-")}</div>
+                  <div class="flex flex-wrap gap-2">${roleBadge(item.roleProfile)} ${statusMeta.badge}</div>
+                  <div class="grid grid-cols-1 gap-1 text-xs text-muted sm:grid-cols-2">
+                    <div>Employee ID: <span class="text-text font-mono">${esc(employeeCode)}</span></div>
+                    <div>Department: <span class="text-text">${esc(formatDepartmentLabel(department))}</span></div>
+                    <div>Employment: <span class="text-text">${esc(formatEmploymentType(employmentType))}</span></div>
+                    <div>Last task: <span class="text-text">${esc(lastTaskLabel)}</span></div>
+                  </div>
+                  ${workloadOpen != null ? `<div class="text-xs text-muted">Current workload: <span class="text-text font-semibold">${esc(String(workloadOpen))} open task(s)</span></div>` : ""}
+                  <div class="text-xs text-muted">Last payroll status: <span class="text-text">${esc(payrollStatus)}</span>${payrollUpdatedAt ? ` <span class="text-muted">(${esc(d(payrollUpdatedAt))})</span>` : ""}</div>
+                </div>
+              </div>
+              <div class="grid grid-cols-2 gap-2 lg:w-[19rem]">
+                ${item.status === "ACTIVE" ? actionButton("Suspend 1 day", `data-action="suspend" data-days="1" ${editingDisabled ? "disabled" : ""}`) : ""}
+                ${item.status === "ACTIVE" ? actionButton("Suspend 7 days", `data-action="suspend" data-days="7" ${editingDisabled ? "disabled" : ""}`) : ""}
+                ${item.status === "ACTIVE" ? actionButton("Suspend 30 days", `data-action="suspend" data-days="30" ${editingDisabled ? "disabled" : ""}`) : ""}
+                ${item.status !== "ACTIVE" ? actionButton("Activate", `data-action="activate"`) : ""}
+                ${actionButton("Ban", `data-action="ban" ${editingDisabled ? "disabled" : ""}`, "border-danger/30 text-danger hover:border-danger col-span-2")}
               </div>
             </div>
-            <div class="flex flex-wrap gap-3">
-              ${item.status === "ACTIVE" ? actionButton("Suspend 1 day", `data-action="suspend" data-days="1" ${editingDisabled ? "disabled" : ""}`) : ""}
-              ${item.status === "ACTIVE" ? actionButton("Suspend 7 days", `data-action="suspend" data-days="7" ${editingDisabled ? "disabled" : ""}`) : ""}
-              ${item.status === "ACTIVE" ? actionButton("Suspend 30 days", `data-action="suspend" data-days="30" ${editingDisabled ? "disabled" : ""}`) : ""}
-              ${item.status !== "ACTIVE" ? actionButton("Activate", `data-action="activate"`) : ""}
-              ${actionButton("Ban", `data-action="ban" ${editingDisabled ? "disabled" : ""}`, "border-danger/30 text-danger hover:border-danger")}
-            </div>
+            ${statusMeta.detail ? `<div class="mt-3 text-sm font-medium ${statusMeta.tone}">${esc(statusMeta.detail)}</div>` : ""}
           </div>
-          <div class="grid grid-cols-1 gap-4 md:grid-cols-3">${kpis.map(kpiCard).join("") || `<div class="rounded-2xl border border-border px-4 py-10 text-center text-sm text-muted md:col-span-3">No performance data available.</div>`}</div>
-          <div class="rounded-[24px] border border-border px-6 py-6">
-            <div class="mb-4 text-sm font-semibold text-text">Attendance Snapshot</div>
+
+          <div class="grid grid-cols-2 gap-3 md:grid-cols-4">
             ${
-              attendanceSnapshot.lastCheckInAt || attendanceSnapshot.lastCheckOutAt
-                ? `${infoRow("Last Check-in", dt(attendanceSnapshot.lastCheckInAt))}${infoRow("Last Check-out", dt(attendanceSnapshot.lastCheckOutAt))}`
-                : `<div class="text-sm text-muted">No attendance records yet.</div>`
+              kpis.length
+                ? kpis
+                    .map((card) => `<div class="rounded-xl border border-white/10 bg-bg/30 px-3 py-3"><div class="text-[10px] uppercase tracking-wide text-muted">${esc(card.label)}</div><div class="mt-1 text-lg font-semibold text-text tabular-nums">${esc(card.value)}</div></div>`)
+                    .join("")
+                : `<div class="rounded-xl border border-white/10 px-4 py-8 text-center text-sm text-muted md:col-span-4">Performance KPIs will appear here once this employee starts receiving tracked assignments.</div>`
             }
           </div>
-          <div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
-            <div class="rounded-[24px] border border-border px-6 py-6">
-              <div class="mb-4 text-sm font-semibold text-text">Security Snapshot</div>
+
+          ${
+            alerts.length
+              ? `<div class="rounded-2xl border border-amber-500/20 bg-amber-500/10 px-4 py-3"><div class="mb-2 text-xs uppercase tracking-wide text-amber-500">Operational Alerts</div>${alerts.map((a) => `<div class="text-sm text-amber-500 py-1">${esc(a)}</div>`).join("")}</div>`
+              : `<div class="rounded-2xl border border-white/10 bg-bg/30 px-4 py-3 text-sm text-muted">No account risks are currently flagged for this employee.</div>`
+          }
+
+          <div class="grid grid-cols-1 gap-3 lg:grid-cols-2">
+            <div class="rounded-2xl border border-white/10 px-4 py-4">
+              <div class="mb-3 text-sm font-semibold text-text">Attendance Snapshot</div>
+              ${
+                attendanceSnapshot.lastCheckInAt || attendanceSnapshot.lastCheckOutAt
+                  ? `${infoRow("Last Check-in", dt(attendanceSnapshot.lastCheckInAt))}${infoRow("Last Check-out", dt(attendanceSnapshot.lastCheckOutAt))}`
+                  : `<div class="text-sm text-muted">Attendance check-ins and check-outs will appear here once this employee starts scanning attendance.</div>`
+              }
+            </div>
+            <div class="rounded-2xl border border-white/10 px-4 py-4">
+              <div class="mb-3 text-sm font-semibold text-text">Security Snapshot</div>
               ${infoRow("Last login", dt(security.lastLoginAt))}
               ${infoRow("Last active", dt(security.lastActiveAt))}
               ${infoRow("Device / Browser", formatDeviceBrowser(security))}
               ${infoRow("IP address", formatIpAddress(security.ipAddress))}
             </div>
-            <div class="rounded-[24px] border border-border px-6 py-6">
-              <div class="mb-4 text-sm font-semibold text-text">Recent Activity</div>
-              <div class="space-y-3">${(item.recentActivity || []).length ? item.recentActivity.map((entry) => `<div class="rounded-2xl border border-border px-4 py-3"><div class="text-sm font-medium text-text">${esc(entry.action)}</div><div class="text-xs text-muted">${dt(entry.createdAt)}</div></div>`).join("") : `<div class="text-sm text-muted">No recent activity.</div>`}</div>
-            </div>
           </div>
-          <div class="rounded-[24px] border border-border px-6 py-6">
-            <div class="mb-4 text-sm font-semibold text-text">Actions</div>
-            <div class="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+
+          <div class="rounded-2xl border border-white/10 px-4 py-4">
+            <div class="mb-3 text-sm font-semibold text-text">Recent Activity</div>
+            <div class="space-y-2">${
+              (item.recentActivity || []).length
+                ? item.recentActivity
+                    .slice(0, 5)
+                    .map(
+                      (entry) => `<div class="rounded-xl border border-white/10 px-3 py-2"><div class="text-sm font-medium text-text">${esc(entry.action)}</div><div class="text-xs text-muted">${dt(entry.createdAt)}</div></div>`
+                    )
+                    .join("")
+                : `<div class="text-sm text-muted">Recent account and admin events will appear here as operational activity is recorded.</div>`
+            }</div>
+          </div>
+
+          <div class="rounded-2xl border border-white/10 px-4 py-4">
+            <div class="mb-3 text-sm font-semibold text-text">Actions</div>
+            <div class="grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-3">
               ${actionButton("Reset password", `data-action="reset_password" ${editingDisabled ? "disabled" : ""}`)}
               ${actionButton("Resend credentials", `data-action="resend_credentials" ${editingDisabled ? "disabled" : ""}`)}
               ${actionButton("Edit permissions", `data-open-tab="permissions" ${editingDisabled ? "disabled" : ""}`)}
               ${actionButton("Edit HR", `data-open-tab="hr" ${editingDisabled ? "disabled" : ""}`)}
               ${actionButton("Open Full Profile", `data-open-tab="profile"`)}
             </div>
-            <div class="mt-4 text-xs text-muted">Suspend = temporary restriction. Ban = permanent disable until manually reactivated.</div>
+            <div class="mt-3 text-xs text-muted">Suspend is temporary access restriction. Ban disables the account until manual reactivation.</div>
           </div>
         </div>
       `;
@@ -390,29 +483,31 @@ export function AdminEmployees() {
       </div>
 
       <div class="grid grid-cols-1 gap-3 md:grid-cols-5">
-        <input id="employees-search" placeholder="Search by name or phone" class="md:col-span-2 rounded-xl border border-border bg-surface px-4 py-3">
-        <select id="employees-status" class="rounded-xl border border-border bg-surface px-4 py-3">
+        <input id="employees-search" placeholder="Search by name or phone" class="md:col-span-2 h-11 rounded-xl border border-white/10 bg-surface px-4 text-sm">
+        <select id="employees-status" class="h-11 rounded-xl border border-white/10 bg-surface px-4 text-sm">
           <option value="">All status</option>
           <option value="active">Active</option>
           <option value="suspended">Suspended</option>
           <option value="banned">Banned</option>
           <option value="on_leave">On leave</option>
         </select>
-        <div>${DateInput({ id: "employees-join-from", className: "employee-date-input w-full rounded-xl border border-border bg-surface px-4 py-3" })}</div>
-        <div>${DateInput({ id: "employees-join-to", className: "employee-date-input w-full rounded-xl border border-border bg-surface px-4 py-3" })}</div>
+        <div>${DateInput({ id: "employees-join-from", className: "employee-date-input h-11 w-full rounded-xl border border-white/10 bg-surface px-4 text-sm" })}</div>
+        <div>${DateInput({ id: "employees-join-to", className: "employee-date-input h-11 w-full rounded-xl border border-white/10 bg-surface px-4 text-sm" })}</div>
       </div>
+
+      <div id="employees-summary-chips" class="flex flex-wrap gap-2"></div>
 
       <div class="overflow-hidden rounded-[24px] border border-border bg-surface">
         <div class="overflow-auto">
           <table class="min-w-[960px] w-full text-left">
-            <thead class="bg-bg">
+            <thead class="bg-bg border-b border-white/10">
               <tr>
-                <th class="px-4 py-3 text-xs uppercase tracking-wide text-muted">Employee</th>
-                <th class="px-4 py-3 text-xs uppercase tracking-wide text-muted">Phone</th>
-                <th class="px-4 py-3 text-xs uppercase tracking-wide text-muted">Role</th>
-                <th class="px-4 py-3 text-xs uppercase tracking-wide text-muted">Status</th>
-                <th class="px-4 py-3 text-xs uppercase tracking-wide text-muted">Joined</th>
-                <th class="px-4 py-3 text-xs uppercase tracking-wide text-muted">Action</th>
+                <th class="px-4 py-3 text-xs uppercase tracking-wide text-muted w-[34%]">Employee</th>
+                <th class="px-4 py-3 text-xs uppercase tracking-wide text-muted w-[18%]">Phone</th>
+                <th class="px-4 py-3 text-xs uppercase tracking-wide text-muted w-[16%]">Role</th>
+                <th class="px-4 py-3 text-xs uppercase tracking-wide text-muted w-[16%]">Status</th>
+                <th class="px-4 py-3 text-xs uppercase tracking-wide text-muted w-[10%]">Joined</th>
+                <th class="px-4 py-3 text-xs uppercase tracking-wide text-muted text-right w-[6%]">Action</th>
               </tr>
             </thead>
             <tbody id="employees-tbody"></tbody>
@@ -464,13 +559,13 @@ export function AdminEmployees() {
       </div>
 
       <div id="employee-quick-modal" class="fixed inset-0 z-[90] hidden items-center justify-center bg-black/50 px-4 py-10">
-        <div class="max-h-[90vh] w-full max-w-5xl overflow-auto rounded-[28px] border border-border bg-surface px-6 py-6">
-          <div class="mb-4 flex items-center justify-between">
+        <div class="max-h-[90vh] w-full max-w-5xl overflow-auto rounded-[28px] border border-white/10 bg-surface px-5 py-5">
+          <div class="mb-3 flex items-center justify-between">
             <div>
               <h3 class="text-xl font-semibold text-text">Quick Employee Control Panel</h3>
-              <p class="mt-1 text-sm text-muted">Security, performance, and account actions in one place.</p>
+              <p class="mt-1 text-xs text-muted">Operations snapshot, risks, and account controls.</p>
             </div>
-            <button id="close-employee-quick" type="button" class="rounded-xl border border-border px-3 py-2 text-sm text-text">Close</button>
+            <button id="close-employee-quick" type="button" class="rounded-xl border border-white/10 px-3 py-2 text-sm text-text">Close</button>
           </div>
           <div id="employee-quick-content"></div>
         </div>

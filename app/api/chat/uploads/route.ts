@@ -22,7 +22,11 @@ const mimeMap: Record<string, { extension: string; maxBytes: number }> = {
   "audio/wav": { extension: "wav", maxBytes: maxAudioSizeBytes },
   "audio/mpeg": { extension: "mp3", maxBytes: maxAudioSizeBytes },
   "audio/mp4": { extension: "m4a", maxBytes: maxAudioSizeBytes },
-  "audio/ogg": { extension: "ogg", maxBytes: maxAudioSizeBytes }
+  "audio/ogg": { extension: "ogg", maxBytes: maxAudioSizeBytes },
+  // Browser/recorder aliases
+  "audio/wave": { extension: "wav", maxBytes: maxAudioSizeBytes },
+  "audio/x-wav": { extension: "wav", maxBytes: maxAudioSizeBytes },
+  "audio/x-m4a": { extension: "m4a", maxBytes: maxAudioSizeBytes }
 };
 
 export async function POST(request: Request): Promise<Response> {
@@ -36,7 +40,11 @@ export async function POST(request: Request): Promise<Response> {
       throw new ApiError(400, "MISSING_FILE", "File is required.");
     }
 
-    const config = mimeMap[file.type];
+    const normalizedType = String(file.type || "")
+      .toLowerCase()
+      .split(";")[0]
+      .trim();
+    const config = mimeMap[normalizedType];
     if (!config) {
       throw new ApiError(
         400,
@@ -61,7 +69,7 @@ export async function POST(request: Request): Promise<Response> {
 
     return ok({
       fileUrl: `/${relativeDir.replace(/\\/g, "/")}/${safeName}`,
-      mimeType: file.type,
+      mimeType: normalizedType || file.type,
       size: file.size
     });
   } catch (error) {

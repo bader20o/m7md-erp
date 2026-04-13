@@ -20,13 +20,13 @@ async function buildItemsForActor(actor: { sub: string; role: Role }): Promise<u
         where: { id: conversation.id },
         include: {
           participants: {
-            include: { user: { select: { id: true, fullName: true, phone: true, role: true, avatarUrl: true } } }
+            include: { user: { select: { id: true, fullName: true, phone: true, role: true } } }
           },
           messages: {
             where: { deletedAt: null },
             orderBy: [{ createdAt: "desc" }, { id: "desc" }],
             take: 1,
-            include: { sender: { select: { id: true, fullName: true, phone: true, role: true, avatarUrl: true } } }
+            include: { sender: { select: { id: true, fullName: true, phone: true, role: true } } }
           }
         }
       });
@@ -68,10 +68,23 @@ async function buildItemsForActor(actor: { sub: string; role: Role }): Promise<u
     });
 
     if (supportRows.length) {
-      await prisma.conversationParticipant.createMany({
-        data: supportRows.map((row) => ({ conversationId: row.id, userId: actor.sub })),
-        skipDuplicates: true
-      });
+      await prisma.$transaction(
+        supportRows.map((row) =>
+          prisma.conversationParticipant.upsert({
+            where: {
+              conversationId_userId: {
+                conversationId: row.id,
+                userId: actor.sub
+              }
+            },
+            update: {},
+            create: {
+              conversationId: row.id,
+              userId: actor.sub
+            }
+          })
+        )
+      );
     }
 
     const items = await prisma.conversation.findMany({
@@ -82,13 +95,13 @@ async function buildItemsForActor(actor: { sub: string; role: Role }): Promise<u
       },
       include: {
         participants: {
-          include: { user: { select: { id: true, fullName: true, phone: true, role: true, avatarUrl: true } } }
+          include: { user: { select: { id: true, fullName: true, phone: true, role: true } } }
         },
         messages: {
           where: { deletedAt: null },
           orderBy: [{ createdAt: "desc" }, { id: "desc" }],
           take: 1,
-          include: { sender: { select: { id: true, fullName: true, phone: true, role: true, avatarUrl: true } } }
+          include: { sender: { select: { id: true, fullName: true, phone: true, role: true } } }
         }
       },
       orderBy: [{ type: "asc" }, { updatedAt: "desc" }]
@@ -126,13 +139,13 @@ async function buildItemsForActor(actor: { sub: string; role: Role }): Promise<u
     },
     include: {
       participants: {
-        include: { user: { select: { id: true, fullName: true, phone: true, role: true, avatarUrl: true } } }
+        include: { user: { select: { id: true, fullName: true, phone: true, role: true } } }
       },
       messages: {
         where: { deletedAt: null },
         orderBy: [{ createdAt: "desc" }, { id: "desc" }],
         take: 1,
-        include: { sender: { select: { id: true, fullName: true, phone: true, role: true, avatarUrl: true } } }
+        include: { sender: { select: { id: true, fullName: true, phone: true, role: true } } }
       }
     },
     orderBy: { updatedAt: "desc" }
@@ -192,7 +205,7 @@ export async function POST(request: Request): Promise<Response> {
           where: { id: conversation.id },
           include: {
             participants: {
-              include: { user: { select: { id: true, fullName: true, phone: true, role: true, avatarUrl: true } } }
+              include: { user: { select: { id: true, fullName: true, phone: true, role: true } } }
             }
           }
         });
@@ -229,7 +242,7 @@ export async function POST(request: Request): Promise<Response> {
         where: { id: conversation.id },
         include: {
           participants: {
-            include: { user: { select: { id: true, fullName: true, phone: true, role: true, avatarUrl: true } } }
+            include: { user: { select: { id: true, fullName: true, phone: true, role: true } } }
           }
         }
       });

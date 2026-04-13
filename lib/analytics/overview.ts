@@ -95,6 +95,12 @@ export type AnalyticsOverviewPayload = {
       employeeId: string;
       name: string;
     }>;
+    expiringMemberships: Array<{
+      memberId: string;
+      name: string;
+      car: string;
+      expiresAt: string;
+    }>;
   };
   kpis: {
     totalIncome: number;
@@ -165,6 +171,26 @@ export type AnalyticsOverviewPayload = {
       finalPrice: number;
     }>;
   };
+  todayData: {
+    hourlyRevenue: Array<{ hour: string; revenue: number }>;
+    topEmployees: Array<{ name: string; jobsCompleted: number; revenue: number }>;
+    statusDistribution: Array<{ status: BookingStatus; count: number }>;
+    services: Array<{
+      id: string;
+      carName: string;
+      serviceName: string;
+      status: BookingStatus;
+      employeeName: string | null;
+      appointmentAt: string;
+    }>;
+    waitingCars: Array<{
+      id: string;
+      carName: string;
+      serviceName: string;
+      waitingSince: string;
+    }>;
+  };
+  profitTrend: Array<{ date: string; profit: number }>;
 };
 
 export type OverviewInput = {
@@ -337,7 +363,10 @@ export async function getAnalyticsOverview(input: OverviewInput): Promise<Analyt
     newCustomersInRangeCount,
     bookingCustomersInRangeRows,
     bookingCustomersBeforeRangeRows,
-    customerLedgerRows
+    customerLedgerRows,
+    todayBookingsRaw,
+    expiringMembershipsRaw,
+    last7DaysTransactionsRaw
   ] = await Promise.all([
     prisma.transaction.findMany({
       where: {
@@ -542,7 +571,8 @@ export async function getAnalyticsOverview(input: OverviewInput): Promise<Analyt
       },
       select: {
         type: true,
-        amount: true
+        amount: true,
+        occurredAt: true
       }
     }),
     prisma.booking.count({
@@ -678,6 +708,31 @@ export async function getAnalyticsOverview(input: OverviewInput): Promise<Analyt
         amount: true,
         occurredAt: true
       }
+    }),
+    prisma.booking.findMany({
+      where: { appointmentAt: { gte: todayStart, lte: todayEnd } },
+      include: {
+        customer: { select: { fullName: true, phone: true, carCompany: true, carModel: true } },
+        performedByEmployee: { include: { user: { select: { fullName: true, phone: true } } } }
+      },
+      orderBy: { appointmentAt: "asc" }
+    }),
+    prisma.membershipOrder.findMany({
+      where: {
+        status: MembershipOrderStatus.ACTIVE,
+        endDate: { gte: todayStart, lte: new Date(todayStart.getTime() + 7 * DAY_MS) }
+      },
+      include: {
+        customer: { select: { fullName: true, phone: true, carCompany: true, carModel: true } }
+      },
+      orderBy: { endDate: "asc" }
+    }),
+    prisma.transaction.findMany({
+      where: {
+        deletedAt: null,
+        occurredAt: { gte: new Date(todayStart.getTime() - 6 * DAY_MS), lte: todayEnd }
+      },
+      select: { type: true, amount: true, occurredAt: true }
     })
   ]);
 
@@ -843,15 +898,98 @@ export async function getAnalyticsOverview(input: OverviewInput): Promise<Analyt
 
   let todayIncome = 0;
   let todayExpenses = 0;
+  const hourlyRevenueMap = new Map<string, number>();
   for (const row of todayTransactionRows) {
     const amount =
       row.type === TransactionType.EXPENSE ? Math.abs(toNumber(row.amount)) : toNumber(row.amount);
     if (row.type === TransactionType.INCOME) {
       todayIncome += amount;
+      const startOfHour = new Date(row.occurredAt);
+      startOfHour.setUTCMinutes(0, 0, 0);
+      const key = startOfHour.toISOString();
+      hourlyRevenueMap.set(key, (hourlyRevenueMap.get(key) ?? 0) + amount);
     } else if (row.type === TransactionType.EXPENSE) {
       todayExpenses += amount;
     }
   }
+
+  const hourlyRevenue = Array.from(hourlyRevenueMap.entries())
+    .map(([hour, revenue]) => ({ hour, revenue: round2(revenue) }))
+    .sort((a, b) => a.hour.localeCompare(b.hour));
+
+  const todayStatusDistributionMap = new Map<BookingStatus, number>();
+  const todayServicesRows: AnalyticsOverviewPayload["todayData"]["services"] = [];
+  const todayWaitingCars: AnalyticsOverviewPayload["todayData"]["waitingCars"] = [];
+  const todayEmployeeStats = new Map<string, { jobsCompleted: number; revenue: number; name: string }>();
+
+  for (const booking of todayBookingsRaw) {
+    todayStatusDistributionMap.set(booking.status, (todayStatusDistributionMap.get(booking.status) ?? 0) + 1);
+
+    const carName = [booking.customer.carCompany, booking.customer.carModel].filter(Boolean).join(" ") || "Unknown Car";
+    const employeeName = booking.performedByEmployee?.user.fullName ?? booking.performedByEmployee?.user.phone ?? null;
+
+    todayServicesRows.push({
+      id: booking.id,
+      carName,
+      serviceName: booking.serviceNameSnapshotEn,
+      status: booking.status,
+      employeeName,
+      appointmentAt: booking.appointmentAt.toISOString()
+    });
+
+    if (booking.status === BookingStatus.PENDING || booking.status === BookingStatus.PRICE_SET || booking.status === BookingStatus.APPROVED) {
+      todayWaitingCars.push({
+        id: booking.id,
+        carName,
+        serviceName: booking.serviceNameSnapshotEn,
+        waitingSince: booking.appointmentAt.toISOString()
+      });
+    }
+
+    if (booking.status === BookingStatus.COMPLETED && booking.performedByEmployeeId) {
+      const stats = todayEmployeeStats.get(booking.performedByEmployeeId) ?? { jobsCompleted: 0, revenue: 0, name: employeeName ?? "Unknown" };
+      stats.jobsCompleted += 1;
+      stats.revenue += toNumber(booking.finalPrice);
+      todayEmployeeStats.set(booking.performedByEmployeeId, stats);
+    }
+  }
+
+  const todayTopEmployees = Array.from(todayEmployeeStats.values())
+    .map(stats => ({ ...stats, revenue: round2(stats.revenue) }))
+    .sort((a, b) => b.revenue - a.revenue)
+    .slice(0, 5);
+
+  const todayStatusDistribution = Array.from(todayStatusDistributionMap.entries()).map(([status, count]) => ({ status, count }));
+
+  const last7DaysMap = new Map<string, { income: number; expenses: number }>();
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(todayStart.getTime() - i * DAY_MS);
+    last7DaysMap.set(formatDateOnly(d), { income: 0, expenses: 0 });
+  }
+
+  for (const row of last7DaysTransactionsRaw) {
+    const day = formatDateOnly(toDayStartUtc(row.occurredAt));
+    const entry = last7DaysMap.get(day);
+    if (!entry) continue;
+    const amount = toNumber(row.amount);
+    if (row.type === TransactionType.INCOME) {
+      entry.income += amount;
+    } else if (row.type === TransactionType.EXPENSE) {
+      entry.expenses += Math.abs(amount);
+    }
+  }
+
+  const profitTrend = Array.from(last7DaysMap.entries()).map(([date, stats]) => ({
+    date,
+    profit: round2(stats.income - stats.expenses)
+  }));
+
+  const expiringMemberships = expiringMembershipsRaw.map(m => ({
+    memberId: m.id,
+    name: m.customer.fullName ?? m.customer.phone,
+    car: [m.customer.carCompany, m.customer.carModel].filter(Boolean).join(" ") || "Unknown Car",
+    expiresAt: m.endDate!.toISOString()
+  }));
 
   const lowStockItems = activeParts
     .filter((part) => isLowStock(part.stockQty, part.lowStockThreshold))
@@ -984,9 +1122,17 @@ export async function getAnalyticsOverview(input: OverviewInput): Promise<Analyt
       returningCustomers,
       customersWithDebt: debtRows.length
     },
+    todayData: {
+      hourlyRevenue,
+      topEmployees: todayTopEmployees,
+      statusDistribution: todayStatusDistribution,
+      services: todayServicesRows,
+      waitingCars: todayWaitingCars
+    },
+    profitTrend,
     employeePerformance,
     alerts: {
-      lowInventory: lowStockItems.slice(0, 3).map((part) => ({
+      lowInventory: lowStockItems.map((part) => ({
         partId: part.id,
         name: part.name,
         stockQty: part.stockQty,
@@ -1002,7 +1148,8 @@ export async function getAnalyticsOverview(input: OverviewInput): Promise<Analyt
           lastActivityAt: customerLastActivity.get(customerId)?.toISOString() ?? null
         };
       }),
-      absentEmployeesToday
+      absentEmployeesToday,
+      expiringMemberships
     },
     kpis: {
       totalIncome: round2(totalIncome),

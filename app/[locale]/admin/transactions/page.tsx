@@ -1,11 +1,12 @@
 import { AccountingEntryForms } from "@/components/admin/accounting-entry-forms";
-import { ResponsiveDataTable } from "@/components/ui/responsive-data-table";
+import { AccountingLedgerView, type LedgerTransaction } from "@/components/admin/accounting-ledger-view";
+import { Role } from "@prisma/client";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
 export default async function AdminTransactionsPage(): Promise<React.ReactElement> {
   const session = await getSession();
-  const [transactions, suppliers, invoices, parts, currentUser] = await Promise.all([
+  const [transactions, suppliers, invoices, parts, customers, currentUser] = await Promise.all([
     prisma.transaction.findMany({
       include: {
         createdBy: { select: { fullName: true, phone: true } },
@@ -53,6 +54,12 @@ export default async function AdminTransactionsPage(): Promise<React.ReactElemen
       },
       orderBy: { name: "asc" }
     }),
+    prisma.user.findMany({
+      where: { role: Role.CUSTOMER, isActive: true },
+      select: { id: true, fullName: true, phone: true },
+      orderBy: { fullName: "asc" },
+      take: 500
+    }),
     session
       ? prisma.user.findUnique({
           where: { id: session.sub },
@@ -61,6 +68,25 @@ export default async function AdminTransactionsPage(): Promise<React.ReactElemen
       : Promise.resolve(null)
   ]);
   const recordedByName = currentUser?.fullName || currentUser?.phone || session?.phone || "Current User";
+  const ledgerItems: LedgerTransaction[] = transactions.map((item) => ({
+    id: item.id,
+    recordedAt: item.recordedAt.toISOString(),
+    type: item.type,
+    incomeSource: item.incomeSource,
+    expenseCategory: item.expenseCategory,
+    itemName: item.itemName,
+    note: item.note,
+    quantity: item.quantity,
+    unitPrice: item.unitPrice,
+    amount: Number(item.amount),
+    createdBy: item.createdBy?.fullName || item.createdBy?.phone || null,
+    customerName:
+      item.booking?.customer?.fullName ||
+      item.booking?.customer?.phone ||
+      item.membershipOrder?.customer?.fullName ||
+      item.membershipOrder?.customer?.phone ||
+      null
+  }));
 
   return (
     <section className="space-y-4">
@@ -77,80 +103,14 @@ export default async function AdminTransactionsPage(): Promise<React.ReactElemen
         suppliers={suppliers}
         invoices={invoices}
         parts={parts}
+        customers={customers.map((customer) => ({
+          id: customer.id,
+          fullName: customer.fullName,
+          phone: customer.phone
+        }))}
         recordedByName={recordedByName}
       />
-      <ResponsiveDataTable
-        items={transactions}
-        getKey={(item) => item.id}
-        emptyState="No transactions found."
-        tableClassName="border border-slate-200 bg-white"
-        columns={[
-          {
-            key: "item",
-            header: "Item",
-            cell: (item) => item.itemName
-          },
-          {
-            key: "unit-price",
-            header: "Unit Price",
-            cell: (item) => `$${item.unitPrice.toFixed(2)}`
-          },
-          {
-            key: "qty",
-            header: "Qty",
-            cell: (item) => item.quantity
-          },
-          {
-            key: "total",
-            header: "Total",
-            cell: (item) => <span className="font-medium">{`$${item.amount.toString()}`}</span>
-          },
-          {
-            key: "date",
-            header: "Date",
-            cell: (item) => item.recordedAt.toLocaleString()
-          },
-          {
-            key: "by",
-            header: "By",
-            cell: (item) => item.createdBy?.fullName || item.createdBy?.phone || "-"
-          },
-          {
-            key: "note",
-            header: "Note",
-            cell: (item) => <span className="text-xs text-slate-600">{item.note || "-"}</span>
-          }
-        ]}
-        cardTitle={(item) => item.itemName}
-        cardBadge={(item) => (
-          <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
-            {`$${item.amount.toString()}`}
-          </span>
-        )}
-        cardSubtitle={(item) => item.recordedAt.toLocaleString()}
-        cardFields={[
-          {
-            key: "unit-price",
-            label: "Unit Price",
-            value: (item) => `$${item.unitPrice.toFixed(2)}`
-          },
-          {
-            key: "qty",
-            label: "Qty",
-            value: (item) => item.quantity
-          },
-          {
-            key: "by",
-            label: "By",
-            value: (item) => item.createdBy?.fullName || item.createdBy?.phone || "-"
-          },
-          {
-            key: "note",
-            label: "Note",
-            value: (item) => item.note || "-"
-          }
-        ]}
-      />
+      <AccountingLedgerView transactions={ledgerItems} />
     </section>
   );
 }

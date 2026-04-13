@@ -69,6 +69,10 @@ function computeInvoiceTotal(
 }
 
 function isPostgres(): boolean {
+    const sqliteUrl = process.env.DATABASE_URL_SQLITE ?? "";
+    if (sqliteUrl.startsWith("file:")) {
+        return false;
+    }
     const url = process.env.DATABASE_URL ?? "";
     return url.startsWith("postgres://") || url.startsWith("postgresql://");
 }
@@ -78,7 +82,17 @@ async function lockPartsForUpdate(
     partIds: string[]
 ): Promise<void> {
     if (!partIds.length || !isPostgres()) return;
-    await tx.$queryRaw`SELECT id FROM "Part" WHERE id IN (${Prisma.join(partIds)}) FOR UPDATE`;
+    try {
+        await tx.$queryRaw`SELECT id FROM "Part" WHERE id IN (${Prisma.join(partIds)}) FOR UPDATE`;
+    } catch (error) {
+        // SQLite and some providers do not support FOR UPDATE. We still remain safe
+        // because stock writes use updateMany + gte guards for concurrency checks.
+        const message = error instanceof Error ? error.message.toLowerCase() : "";
+        if (message.includes("near \"for\"") || message.includes("syntax error")) {
+            return;
+        }
+        throw error;
+    }
 }
 
 function computeInventoryCostTotals(

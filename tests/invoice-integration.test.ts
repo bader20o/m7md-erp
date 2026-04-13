@@ -59,14 +59,25 @@ async function createTestPart(
 
 // Clean up test data after each test
 afterEach(async () => {
-    // Order matters due to foreign keys
-    await prisma.customerAccountEntry.deleteMany({});
-    await prisma.stockMovement.deleteMany({});
-    await prisma.transaction.deleteMany({});
-    await prisma.invoiceLine.deleteMany({});
-    await prisma.invoice.deleteMany({});
-    await prisma.part.deleteMany({});
-    await prisma.user.deleteMany({});
+    // Delete only test-scoped fixtures to avoid touching unrelated records.
+    const testInvoices = await prisma.invoice.findMany({
+        where: { number: { startsWith: "INV-test-" } },
+        select: { id: true },
+    });
+    const invoiceIds = testInvoices.map((item) => item.id);
+
+    if (invoiceIds.length) {
+        await prisma.customerAccountEntry.deleteMany({
+            where: { referenceType: "SALE_INVOICE", referenceId: { in: invoiceIds } },
+        });
+        await prisma.stockMovement.deleteMany({ where: { invoiceId: { in: invoiceIds } } });
+        await prisma.transaction.deleteMany({ where: { invoiceId: { in: invoiceIds } } });
+        await prisma.invoiceLine.deleteMany({ where: { invoiceId: { in: invoiceIds } } });
+        await prisma.invoice.deleteMany({ where: { id: { in: invoiceIds } } });
+    }
+
+    // Keep parts/users cleanup out of teardown because these entities can be referenced
+    // by unrelated records in shared dev databases. IDs are unique per test run.
 });
 
 // ── Tests ──────────────────────────────────────────────────────────────
